@@ -2,7 +2,7 @@
 
 **Banco:** MariaDB 11.4 LTS (desde o DB-03; antes, MySQL), schema `rotaperfumes` (padrão do `Makefile`: `DB_NAME?=rotaperfumes`), charset `utf8mb4`, collation `utf8mb4_unicode_ci` (definidos no `make db-create`).
 **Requisitos:** cliente `mariadb` (MariaDB ≥ 11.4) no `PATH` para todos os alvos `make db-*`, inclusive o `make db-seed` (o `seedusers` em Go chama o binário `mariadb`, sem fallback para `mysql`). A API e os importadores usam o driver Go `go-sql-driver/mysql`, compatível com o MariaDB; por isso os pacotes de adapter continuam com o sufixo `mysql` (`<contexto>mysql`).
-**Servidor (Lote 30, DOC-08, 2026-11-02):** somente MariaDB. Em produção, o container `rotaperfumes-mariadb` (imagem `mariadb:11.4` fixada por digest) criado pelo `deploy/mariadb-docker.sh`, na rede Docker `rotaperfumes-db`, com TLS obrigatório e contas `ed25519` + `REQUIRE SSL` (`rotaperfumes_app`, só DML, para a API; `rotaperfumes_admin` para import e migrações; `casaos`, só com `--dev-ip`, para a máquina do admin, pelo `.env.producao`). O `sql_mode` do servidor é `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION` (DB-07, Lote 36: `ONLY_FULL_GROUP_BY` ligado; antes desligado, DB-04/DB-06; vale numa instalação existente depois do `--recriar`). **DEPLOY-07 (Lote 33, 2026-11-04):** a produção nasce vazia, sem migração de dados: o `deploy/seed-producao.sh` aplica a DDL de `sql/ordem-ddl.txt`, os seeds 02 e 03 (os 42 vendedores **inativos**) e cria o admin com troca obrigatória. O banco de **dev** é o MariaDB 11.8 do CasaOS (porta 3307, CA `deploy/ca-cert.pem`). Detalhes: `docs/deploy-servidor.md` (seções 3 e 11) e `docs/Instal_SSL.md`. **Integração e recriação de banco (`INTEGRATION=1`, `make db-down`/`db-reset`/`db-rebuild`/`db-seed`) só em banco de dev ou descartável**, nunca contra a produção (a guarda `db-guard-producao` do `Makefile` recusa).
+**Servidor (Lote 30, DOC-08, 2026-11-02):** somente MariaDB. Em produção, o container `rotaperfumes-mariadb` (imagem `mariadb:11.4` fixada por digest) criado pelo `deploy/mariadb-docker.sh`, na rede Docker `rotaperfumes-db`, com TLS obrigatório e contas `ed25519` + `REQUIRE SSL` (`rotaperfumes_app`, só DML, para a API; `rotaperfumes_admin` para import e migrações; `rotaperfumes_backup`, só `SELECT`, para o dump, seção 24; `casaos`, só com `--dev-ip`, para a máquina do admin, pelo `.env.producao`). O `sql_mode` do servidor é `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION` (DB-07, Lote 36: `ONLY_FULL_GROUP_BY` ligado; antes desligado, DB-04/DB-06; vale numa instalação existente depois do `--recriar`). **DEPLOY-07 (Lote 33, 2026-11-04):** a produção nasce vazia, sem migração de dados: o `deploy/seed-producao.sh` aplica a DDL de `sql/ordem-ddl.txt`, os seeds 02 e 03 (os 42 vendedores **inativos**) e cria o admin com troca obrigatória. O banco de **dev** é o MariaDB 11.8 do CasaOS (porta 3307, CA `deploy/ca-cert.pem`). Detalhes: `docs/deploy-servidor.md` (seções 3 e 11) e `docs/Instal_SSL.md`. **Integração e recriação de banco (`INTEGRATION=1`, `make db-down`/`db-reset`/`db-rebuild`/`db-seed`) só em banco de dev ou descartável**, nunca contra a produção (a guarda `db-guard-producao` do `Makefile` recusa).
 **Fonte da verdade:** os scripts em `sql/` (DDLs mais as migrações de alteração, em ordem numérica). Em caso de divergência entre este manual e um script, vale o script.
 **Autor:** SubBrain (2026-09-25, card DOC-02; atualizado no Lote 5 com o NEG-02, CNPJ alfanumérico, no Lote 6 com a migração 21 e `refresh_tokens.revoked_reason`, no Lote 8 com a migração 22 e `usuarios.tokens_validos_desde` e, no Lote 11, 2026-09-26, card DOC-04, com o detalhamento de todas as tabelas; no Lote 12, 2026-09-27, com DB-01 (`estoque` no `db-up`), SEC-11 (credenciais do banco), SEC-12 (migração 23, `refresh_tokens.reuso_detectado_em`) e CHORE-02 (limpeza de `refresh_tokens`); no Lote 26, 2026-10-31, com o IMG-01 (migração 26, `produtos.imagem`, seção 13.1)).
 
@@ -22,6 +22,7 @@
 8. Migração 19 e backups: [migração 19](#18-migração-19-unificação-dos-cnpjs-duplicados), [tabelas de backup](#19-tabelas-de-backup-da-migração-19), [reversão](#20-reversão-make-db-revert-cnpj-unique), [consultas](#21-consultas-de-verificação-da-migração-19)
 9. [Pontos a confirmar](#22-pontos-a-confirmar)
 10. [Credenciais do banco e uso do cliente `mariadb` (SEC-11; DB-03)](#23-credenciais-do-banco-e-uso-do-cliente-mariadb-sec-11-lote-12-2026-09-27-db-03)
+11. [Backup e restauração do banco e das imagens (BACKUP-01)](#24-backup-e-restauração-do-banco-e-das-imagens-backup-01-lote-42-2026-11-06)
 
 ---
 
@@ -1019,3 +1020,186 @@ Registradas para lotes futuros (não corrigidas no SEC-11):
 | 4 | `MYSQL_PWD` é considerado obsoleto (inseguro) pelo cliente MySQL e pode sair em versões futuras. Com o MariaDB (DB-03), o cliente `mariadb` continua lendo `MYSQL_PWD`; a alternativa futura é um arquivo de opções (`--defaults-extra-file`), já descartado na seção 23.2 pelo risco de senha em disco. | `Makefile` |
 | 5 | Opcional: `cmd/cleanuprefresh` em Go para rodar a limpeza de `refresh_tokens` sob demanda (hoje só a API faz, seção 7.2). | `backend/shared/cmd` |
 | 6 | ~~A receita do `db-check-env` era `@test -n "$(DB_USUARIO)" -a -n "$(DB_SENHA)"`: o `make` expandia a senha no argv do `test` e no `make -n`.~~ **Resolvido no Lote 12 (commit `069d708`, conferido em 2026-10-07):** a receita testa as variáveis de ambiente já exportadas (`@test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD"`, `Makefile` linha 48), então a senha não aparece no argv nem no eco do `make -n`. | `Makefile`, alvo `db-check-env` |
+
+---
+
+## 24. Backup e restauração do banco e das imagens (BACKUP-01, Lote 42, 2026-11-06)
+
+A rotina de backup (`deploy/backup-banco.sh`, instalada em `/usr/local/sbin/rotaperfumes-backup-banco`, com o timer `rotaperfumes-backup-banco.timer`) está em `docs/deploy-servidor.md`. Esta seção cobre a conta, o conteúdo do dump, a verificação e a restauração. Nenhum script ou alvo do `Makefile` grava o backup em produção: a restauração real é só este runbook, executado por você no servidor.
+
+### 24.1 Conta `rotaperfumes_backup`
+
+- **Conta:** `rotaperfumes_backup@172.30.42.21`, criada e convergida pelo `deploy/mariadb-docker.sh`, com `ed25519`, `REQUIRE SSL` e somente `GRANT SELECT ON rotaperfumes.*`.
+- **Senha:** `/root/rotaperfumes-mariadb/rotaperfumes_backup.senha` (600). Reexecutar o script não a troca.
+- **Option file:** `/root/rotaperfumes-mariadb/backup-cliente/rotaperfumes_backup.cnf` (400, root; diretório 700, root). Nunca em `container/`, que é montado no container do banco. O dono precisa ser root: o cliente roda como root com `--cap-drop ALL`, sem `CAP_DAC_OVERRIDE`, e não lê um arquivo 400 de outro dono.
+- **Sem `TRIGGER` nem `EVENT`:** esses privilégios permitem criar objetos. Por isso o dump usa `--skip-triggers`. Hoje o `sql/` não tem trigger, view, rotina nem evento; se algum surgir, o `GRANT` e as flags precisam de revisão.
+
+### 24.2 O que o dump leva e o que não leva
+
+**Comando do cliente** (validado no Lote 42, na imagem fixada 11.4.13):
+
+```bash
+docker run --rm -i --network rotaperfumes-db --ip 172.30.42.21 \
+  --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  --mount type=bind,source=/etc/mysql/ssl/ca.pem,target=/run/backup/ca.pem,readonly \
+  --mount type=bind,source=/root/rotaperfumes-mariadb/backup-cliente/rotaperfumes_backup.cnf,target=/run/backup/cliente.cnf,readonly \
+  --entrypoint mariadb-dump "$IMG" --defaults-extra-file=/run/backup/cliente.cnf \
+  -h rotaperfumes-mariadb -P 3306 --ssl-ca=/run/backup/ca.pem --ssl-verify-server-cert \
+  --single-transaction --skip-lock-tables --no-tablespaces --skip-add-drop-table --skip-triggers \
+  --hex-blob --default-character-set=utf8mb4 rotaperfumes
+```
+
+- `--defaults-extra-file` precisa ser o primeiro argumento do `mariadb-dump`.
+- O dump não seleciona banco (sem `USE`) e não apaga tabela (sem `DROP TABLE`). Restaurar sobre uma tabela existente falha com o erro 1050, sem alterar os dados.
+- Os `TIMESTAMP` saem em UTC (`SET TIME_ZONE='+00:00'` no próprio dump) e voltam ao mesmo instante, em qualquer fuso de servidor. `DATETIME` e `DATE` não são convertidos (seção 1.1).
+- **Formato na 11.4.13:** a primeira linha é `/*M!999999\- enable the sandbox mode */`. Cada lote de dados começa com a linha ``INSERT INTO `tabela` VALUES``, e cada registro fica em uma linha que começa com `(`. As quebras de linha dos dados saem escapadas, então um dado de cliente nunca começa linha.
+
+**Fora do dump (guarde separado):**
+
+| Item | Onde fica | Sem ele |
+| --- | --- | --- |
+| `PASSWORD_PEPPER` | cofre e Secret file `rotaperfumes-api-env` | **nenhum login funciona** (seção 24.4) |
+| `JWT_SECRET` | Secret file `rotaperfumes-api-env` | gere outro; só as sessões em aberto caem |
+| Secret do Turnstile e senha do SMTP | Secret file; o original fica nos painéis da Cloudflare e do provedor de e-mail | obtenha de novo nos painéis; sem eles a API não sobe ou o e-mail não sai |
+| Contas e senhas do banco | `mysql.*` e `/root/rotaperfumes-mariadb` | o `mariadb-docker.sh` recria, com senhas novas |
+| CA e certificados | `/etc/mysql/ssl`; chave da CA em mídia offline | gere outra CA (`--nova-ca`) e troque o fingerprint |
+| Certificado e CA interna do Caddy | volumes `caddy_data` e `caddy_config` | o Caddy gera outros; a raiz nova precisa ser instalada de novo nos clientes |
+| Configuração do Jenkins | servidor (job, parâmetros, credenciais `rotaperfumes-api-env` e `rotaperfumes-db-admin`) | refaça pelas seções 5 e 6 de `docs/deploy-servidor.md` |
+
+**As imagens de produto (IMG-01) têm arquivo próprio:** cada backup bom é o par dump + `rotaperfumes-imagens-*.tar.gz`, do volume `rotaperfumes_produto_imagens`. Só os dois restauram o site. A rotina está em `docs/deploy-servidor.md`, seção 9.
+
+### 24.3 Verificar um backup sem tocar na produção
+
+```bash
+sudo bash deploy/verificar-backup.sh /var/backups/rotaperfumes/ARQUIVO.sql.gz
+```
+
+O script sobe um container descartável com `--network none`, sem volume e sem credencial; os dados ficam em tmpfs e somem com ele. Ele não tem opção de host, porta, usuário, senha, rede ou container, e a saída traz só contagens.
+
+- **Recusa antes de subir o container:** arquivo que não seja regular, gzip inválido, última linha sem `-- Dump completed`, `USE` ou `CREATE`/`DROP DATABASE` no início de linha.
+- **Aprova com:** importação com código 0, nenhum banco além do temporário, pelo menos 13 tabelas, `usuarios`, `vendedores` e `clientes` presentes, um admin e linhas em `vendedores`.
+- **Clientes vazia gera só `AVISO`:** a produção nasce sem clientes (seed do DEPLOY-07). Quando a produção já tiver clientes, trate esse aviso como reprovação.
+- **Códigos de saída:** 0 aprovado, 1 reprovado ou falha, 2 uso incorreto.
+- **Memória:** os dados ocupam memória até o limite do tmpfs (`--tmpfs-mb`, padrão 2048). Se ele encher, a importação falha com o erro 1114; repita com um valor maior, se o servidor tiver memória livre.
+- **Registro:** ao aprovar, grava `.ultima-verificacao` ao lado do arquivo (modo 600; data, nome e sha256).
+- **Quando rodar:** depois do `--instalar`, uma vez por mês e antes de trocar o digest da imagem.
+
+Aprovado significa que o arquivo restaura e tem o mínimo esperado. Só as contagens, comparadas por você com o que espera, indicam se o conteúdo é o certo.
+
+### 24.4 Pré-requisito: o mesmo `PASSWORD_PEPPER`
+
+Os hashes de `usuarios.password_hash` dependem do `PASSWORD_PEPPER` da API (`deploy/api.env.example`), que não está no banco. Antes de apagar qualquer coisa, confirme que o valor do cofre é o mesmo da API, sem imprimi-lo. Guarde o pepper longe dos backups: junto do dump, ele perde a função.
+
+Com outro pepper, os dados voltam, mas nenhum login funciona e todas as senhas precisam ser redefinidas (`backend/shared/tools/resetpassword`). Não troque o pepper para "resolver" um login.
+
+### 24.5 Restaurar no servidor em uso
+
+> **Risco:** os passos 4 e 5 apagam e regravam o banco de produção, e os dados gravados depois do backup se perdem. Leia até o fim antes de começar. Se quiser só recuperar um registro, não use este runbook: restaure numa cópia descartável e copie o dado à mão.
+
+Faça tudo como root no servidor, sem push na `main` durante o processo, pois um push dispara o deploy. Defina antes o `admin_sql` de `docs/deploy-servidor.md`, seção 11, passo 7, que já traz o `IMG` da imagem fixada.
+
+**1. Pare a API e o timer do backup.** Sem isso, um dump agendado disputaria o IP `.21` e pegaria o banco pela metade.
+
+```bash
+sudo -i
+umask 077
+set -o pipefail
+systemctl stop rotaperfumes-backup-banco.timer
+cd /root/rotaperfumes/deploy && API_ENV_FILE=/dev/null docker compose -p rotaperfumes stop api
+```
+
+**2. Guarde o estado atual, mesmo danificado.** Use o comando direto: o `rotaperfumes-backup-banco --agora` recusa um banco que não passe nos critérios de conteúdo. O nome `pre-restauracao-*` fica fora da retenção automática.
+
+```bash
+PRE="/var/backups/rotaperfumes/pre-restauracao-$(date -u +%Y%m%d-%H%M%SZ).sql.gz"
+docker run --rm -i --network rotaperfumes-db --ip 172.30.42.21 \
+  --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  --mount type=bind,source=/etc/mysql/ssl/ca.pem,target=/run/backup/ca.pem,readonly \
+  --mount type=bind,source=/root/rotaperfumes-mariadb/backup-cliente/rotaperfumes_backup.cnf,target=/run/backup/cliente.cnf,readonly \
+  --entrypoint mariadb-dump "$IMG" --defaults-extra-file=/run/backup/cliente.cnf \
+  -h rotaperfumes-mariadb -P 3306 --ssl-ca=/run/backup/ca.pem --ssl-verify-server-cert \
+  --single-transaction --skip-lock-tables --no-tablespaces --skip-add-drop-table --skip-triggers \
+  --hex-blob --default-character-set=utf8mb4 rotaperfumes | gzip > "$PRE"
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+zcat "$PRE" | tail -n 1              # esperado: -- Dump completed ...
+```
+
+Se o banco estiver danificado a ponto de o dump falhar, pare e avalie: copie o datadir (`/var/lib/rotaperfumes/mariadb`) com o container parado antes de prosseguir.
+
+**3. Verifique o arquivo que será restaurado.** Só siga com `APROVADO`.
+
+```bash
+ARQ=/var/backups/rotaperfumes/ARQUIVO.sql.gz
+bash /root/rotaperfumes/deploy/verificar-backup.sh "$ARQ"
+```
+
+**4. Esvazie o banco, conscientemente.** O dump não apaga tabelas, então restaurar sobre elas falha com o erro 1050. Os `GRANT` ficam em `mysql.*` e continuam valendo depois do `DROP DATABASE`.
+
+```bash
+admin_sql -e "DROP DATABASE rotaperfumes; CREATE DATABASE rotaperfumes CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+```
+
+**5. Importe.** O cliente para no primeiro erro. Se falhar, repita os passos 4 e 5 depois de entender a causa; se o arquivo for o problema, use outro backup.
+
+```bash
+gzip -dc "$ARQ" | admin_sql rotaperfumes
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+```
+
+**6. Derrube as sessões antigas.**
+
+```bash
+admin_sql rotaperfumes -e 'TRUNCATE TABLE refresh_tokens'
+```
+
+**6a. Devolva as imagens ao volume, com a API ainda parada.** Use o `rotaperfumes-imagens-*` com o mesmo carimbo do dump. A conferência recusa gzip inválido, entrada com caminho absoluto ou `..`, link e dispositivo, e imprime só contagens: só siga com `APROVADO`. O primeiro `docker run` guarda as imagens atuais, porque o segundo apaga o conteúdo do volume antes de extrair.
+
+```bash
+IMAGENS=/var/backups/rotaperfumes/rotaperfumes-imagens-CARIMBO.tar.gz
+bash /root/rotaperfumes/deploy/backup-banco.sh --conferir-imagens "$IMAGENS"
+PRE_IMG="/var/backups/rotaperfumes/pre-restauracao-imagens-$(date -u +%Y%m%d-%H%M%SZ).tar.gz"
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --user 65532:65532 \
+  --mount type=volume,source=rotaperfumes_produto_imagens,target=/imagens,readonly \
+  --entrypoint tar "$IMG" -C /imagens --numeric-owner -cf - . | gzip > "$PRE_IMG"
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+gzip -dc "$IMAGENS" | docker run --rm -i --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --user 65532:65532 \
+  --mount type=volume,source=rotaperfumes_produto_imagens,target=/imagens \
+  --entrypoint bash "$IMG" -c 'find /imagens -mindepth 1 -delete && tar -xf - -C /imagens --no-same-owner --no-overwrite-dir'
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+```
+
+Os dois dados precisam combinar: dump de uma data e imagens de outra deixam `produtos.imagem` apontando para arquivos que não existem. Se quiser restaurar só o banco, porque o volume está íntegro, pule este passo.
+
+**7. Aplique as migrações mais novas que o dump.** Compare a data do backup com as migrações de `sql/` (seção 4), sempre as `*_alter_*`, nunca as `*_revert_*`. Se a produção já tinha a migração quando o dump foi gerado, não há nada a fazer.
+
+**8. Confira e volte ao ar.** Rode as consultas do passo 7 da seção 11 de `docs/deploy-servidor.md`. Lá, os valores de vendedores ativos e de `deve_trocar_senha` são os do seed: vale o que o backup continha. Depois:
+
+```bash
+cd /root/rotaperfumes/deploy && API_ENV_FILE=/dev/null docker compose -p rotaperfumes start api
+systemctl start rotaperfumes-backup-banco.timer
+rotaperfumes-backup-banco --agora
+```
+
+Teste um login no site e abra um produto com imagem. Quando estiver tudo certo, apague os `pre-restauracao-*`: o do dump tem hashes de senha, e a retenção não os remove. Um dump restaurado bem menor que o último pode exigir `--agora --aceitar-reducao`.
+
+### 24.6 Perda do servidor
+
+As contas não estão no dump, então o banco precisa nascer antes da importação. Tenha em mãos a cópia externa do par dump + imagens (o backup local se perde com o disco), o `PASSWORD_PEPPER` do cofre e, se houver, a chave da CA em mídia offline.
+
+1. **Prepare a máquina nova:** `docs/deploy-servidor.md`, seção 11, passo 1.
+2. **Instale o banco:** `sudo bash deploy/mariadb-docker.sh` com `--nova-ca` (ou `--ca-key`, com o `ca.pem` original copiado para `/etc/mysql/ssl`), mais `--ip` se o IP mudou. O script cria o banco vazio e as contas, inclusive `rotaperfumes_backup`, com **senhas novas**.
+3. **Atualize o que depende disso** (seção 11, passos 3 a 5): fingerprint em `deploy/db-ca.fingerprint`, se a CA mudou, `DB_SENHA` do Secret file `rotaperfumes-api-env` e a credencial `rotaperfumes-db-admin`.
+4. **Use o mesmo `PASSWORD_PEPPER`** no Secret file (seção 24.4). **Não** gere um novo, como faz o passo 5 da seção 11 numa instalação limpa.
+5. **Não rode o `seed-producao.sh`:** ele criaria as tabelas, e a importação falharia com o erro 1050.
+6. **Restaure o banco:** rode os passos 3, 5, 6, 7 e 8 da seção 24.5, sem o `docker compose start` e os comandos do timer, que ainda não existem aqui. O banco já está vazio, então o passo 4 não se aplica.
+7. **Suba a aplicação** pelo Jenkins, com `IMPORTAR_DUMP` desmarcado (seção 11, passo 9). É esse deploy que cria o volume `rotaperfumes_produto_imagens`; não o crie à mão, porque o backup confere as labels do compose.
+8. **Devolva as imagens:** pare a API (`API_ENV_FILE=/dev/null docker compose -p rotaperfumes stop api`), rode o passo 6a da seção 24.5, sem a cópia `PRE_IMG`, pois o volume está vazio, e religue-a (`start api`).
+9. **Reinstale a rotina:** `sudo bash deploy/backup-banco.sh --instalar`. Ela recusa enquanto o volume não existir.
+
+### 24.7 O que foi testado
+
+**Testado no Lote 42**, em descartável local (rede própria sem porta publicada, conta criada pelo SQL real do script, schema real, dados sintéticos): dump com a conta só `SELECT`, negações, TLS, ida e volta, `verificar-backup.sh` e os passos 2, 4, 5, 6 e 8 (só a conferência) do runbook, pelo mesmo comando do `admin_sql`. Também o `deploy/backup-banco.sh --agora` real, com volume sintético (dono 65532, modos 750/640): par com o mesmo carimbo, `--conferir-imagens`, `--status`, volume vazio, volume ausente, SIGTERM durante o tar, retenção por par e os dois comandos do passo 6a, com a devolução sobre um volume com lixo (nomes, dono, modos e sha256 idênticos).
+
+**Não testado:** a execução em produção; o `docker compose stop`/`start` da API; o timer e o sandbox da unit (só a sintaxe, com `systemd-analyze verify`); o `--exigir-montagem` num disco real (ensaio com tmpfs); o passo 7, que depende das migrações do momento; a seção 24.6 de ponta a ponta. Antes de confiar neste runbook num incidente, faça um ensaio completo numa máquina que não seja a de produção.

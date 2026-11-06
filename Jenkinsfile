@@ -58,8 +58,11 @@ pipeline {
         //   (node: idem com node:22.23-alpine; versao do Node = frontend/.nvmrc,
         //   a mesma linha 22 do NODE_VERSION do frontend/Dockerfile)
         //   -> trocar "<tag com patch>@sha256:<digest>" aqui; o do mariadb TAMBEM
-        //   no IMAGEM_BASE do deploy/mariadb-docker.sh (mesma string) -> make test
-        //   -> backup do banco -> sudo bash deploy/mariadb-docker.sh --recriar.
+        //   no IMAGEM_BASE dos deploy/mariadb-docker.sh, deploy/backup-banco.sh e
+        //   deploy/verificar-backup.sh e no DB_CLIENT_IMAGE do deploy/seed-producao.sh
+        //   (mesma string) -> make test -> no servidor: sudo bash deploy/backup-banco.sh
+        //   --instalar -> sudo rotaperfumes-backup-banco --agora
+        //   -> sudo bash deploy/mariadb-docker.sh --recriar.
         // "make deps-audit-imagens" mostra se ha digest novo (so informa).
         // O GO_IMAGE nao e usado por nenhum estagio: e a referencia do GO_IMAGE
         // do deploy/seed-producao.sh (mesma string, alpine; um teste confere).

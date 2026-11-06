@@ -269,7 +269,8 @@ func TestTST21_SeedProducao_TerminalReal_Forcar(t *testing.T) {
 		t.Run(c.nome, func(t *testing.T) {
 			e := novoEnsaioTTY(t)
 			e.state("linhas", "5\n")
-			s := e.rodarComTerminal("--pepper-file", "/root/pepper.txt", "--forcar")
+			// BACKUP-01: a guarda do dump tem teste próprio; aqui, só a confirmação.
+			s := e.rodarComTerminal("--pepper-file", "/root/pepper.txt", "--forcar", "--sem-backup-motivo", "ensaio da confirmacao digitada")
 			s.digitar(promptNomeDoBanco, c.resposta)
 			out, err := s.terminar()
 			assert.Contains(t, out, "--forcar: usuarios tem 5 linha(s)")

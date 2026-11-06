@@ -169,7 +169,7 @@ No fim, imprime o fingerprint da CA (formato do `deploy/db-ca.fingerprint`), ond
 
 **Diretórios (TST-16, Lote 36):** `--segredos-dir DIR` e `--ca-dir DIR` trocam os padrões `/root/rotaperfumes-mariadb` e `/root/rotaperfumes-ca` (no servidor, use os padrões: o `deploy/seed-producao.sh` só lê `/root/rotaperfumes-mariadb`; as opções são para o teste real). Na etapa 1, antes de qualquer efeito, os quatro diretórios (`--ssl-dir`, `--dados`, `--segredos-dir`, `--ca-dir`) precisam ser absolutos, sem `..`, espaços ou vírgulas, e disjuntos (nenhum igual ou dentro de outro: a chave da CA e as senhas nunca dentro do `--ssl-dir`, que é 755 e montado no container); segredos e CA que já existem precisam ser diretório real (não symlink), do root e com modo `700`; o script não corrige o modo, falha. **Lote 36 (SecBrain, TOCTOU):** a disjunção compara os caminhos reais (`realpath -m`), não o texto; em `--segredos-dir`/`--ca-dir` nenhum componente pode ser symlink (o `realpath -m` precisa ser igual ao informado; `//` e `/./` também são recusados) e cada ancestral existente, até `/`, precisa ser do root e sem escrita para grupo e outros (o `/tmp` 1777 é recusado: o sticky não basta). A checagem (com `-L` e dono/modo `0 700`) roda de novo logo depois do `install -d`, antes de gravar a chave da CA e as senhas. Os padrões em `/root/...` passam (`/root` 700 e `/` 755, do root).
 
-**`ONLY_FULL_GROUP_BY` ligado (DB-07, Lote 36, 2026-11-05).** O `sql_mode` do `zz-rotaperfumes.cnf` é `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION`: um `GROUP BY` incompleto dá erro 1055 (`ER_WRONG_FIELD_WITH_GROUP`) em vez de valores arbitrários. Antes (DB-04/DB-06) o modo ficava desligado; ele foi ligado depois de a série de vendas agrupar pelo alias (`GROUP BY data`) e de a suíte de integração passar num MariaDB 11.4 descartável com o modo ligado no global. O `TestIntegracaoDB07_GroupByComOnlyFullGroupBy` (`backend/shared/tests/analytics`) liga o modo na **sessão** e cobre os `GROUP BY` do `analyticsmysql` (funil, clientes por segmento/UF, série, metas/vendas do mês e ranking), em qualquer banco de teste. **Instalação existente:** o modo novo só vale depois de regravar a imagem e recriar o container (backup antes; `sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ...]`); sem isso o script só avisa que o container usa outra imagem. O MariaDB de dev do CasaOS (3307) não é configurado por este script: para alinhar, `SET GLOBAL sql_mode` com o mesmo valor (e no cnf dele, para sobreviver ao restart).
+**`ONLY_FULL_GROUP_BY` ligado (DB-07, Lote 36, 2026-11-05).** O `sql_mode` do `zz-rotaperfumes.cnf` é `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION`: um `GROUP BY` incompleto dá erro 1055 (`ER_WRONG_FIELD_WITH_GROUP`) em vez de valores arbitrários. Antes (DB-04/DB-06) o modo ficava desligado; ele foi ligado depois de a série de vendas agrupar pelo alias (`GROUP BY data`) e de a suíte de integração passar num MariaDB 11.4 descartável com o modo ligado no global. O `TestIntegracaoDB07_GroupByComOnlyFullGroupBy` (`backend/shared/tests/analytics`) liga o modo na **sessão** e cobre os `GROUP BY` do `analyticsmysql` (funil, clientes por segmento/UF, série, metas/vendas do mês e ranking), em qualquer banco de teste. **Instalação existente:** o modo novo só vale depois de regravar a imagem e recriar o container (`sudo rotaperfumes-backup-banco --agora` e `sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ...]`); sem isso o script só avisa que o container usa outra imagem. O MariaDB de dev do CasaOS (3307) não é configurado por este script: para alinhar, `SET GLOBAL sql_mode` com o mesmo valor (e no cnf dele, para sobreviver ao restart).
 
 ### 3.2 Rede `rotaperfumes-db`
 
@@ -195,6 +195,7 @@ Todas `IDENTIFIED VIA ed25519` + `REQUIRE SSL` (SEC-30/SEC-39), criadas e altera
 |---|---|---|---|---|
 | `rotaperfumes_app` | `172.30.42.10` | `SELECT, INSERT, UPDATE, DELETE ON rotaperfumes.*` | `rotaperfumes_app.senha` | `DB_SENHA` do Secret file `rotaperfumes-api-env` |
 | `rotaperfumes_admin` | `172.30.42.20` | `ALL ON rotaperfumes.*` | `rotaperfumes_admin.senha` | credencial `rotaperfumes-db-admin` |
+| `rotaperfumes_backup` | `172.30.42.21` | `SELECT ON rotaperfumes.*` (BACKUP-01) | `rotaperfumes_backup.senha` | option file `backup-cliente/rotaperfumes_backup.cnf` (400, root; `docs/manual-base-de-dados.md`, seção 24) |
 | `casaos` | cada `--dev-ip` | `ALL ON rotaperfumes.*` (só esse banco, DEPLOY-07) | `casaos.senha` | `.env.producao` da máquina do admin (seção 11, passo 11); **não se aplica hoje** (produção só local, sem `--dev-ip`; conferência pelo passo 7) |
 | `root` | `localhost` | (todos) | `root.senha` | só `docker exec` (socket) |
 
@@ -231,10 +232,11 @@ As imagens base são fixadas pelo digest do **índice multi-arch** (a tag sozinh
    docker buildx imagetools inspect mariadb:11.4 --format '{{.Manifest.Digest}}'
    ```
    e anote a tag do patch (ex.: `11.4.13`).
-2. Troque `mariadb:<patch>@sha256:<digest>` no `IMAGEM_BASE` do script **e** no `DB_CLIENT_IMAGE` do `Jenkinsfile`.
-3. `make test` (os testes de `tests/deploy` conferem o formato e a igualdade das duas strings).
-4. Backup do banco (seção 9, "Backup do banco").
-5. Depois do merge, no servidor: `sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ... (a mesma lista)]`. O banco fica fora do ar alguns segundos; os dados ficam no datadir. Sem `--recriar`, o script só avisa que o container usa uma imagem diferente.
+2. Troque `mariadb:<patch>@sha256:<digest>` no `IMAGEM_BASE` de `deploy/mariadb-docker.sh`, `deploy/backup-banco.sh` e `deploy/verificar-backup.sh` **e** no `DB_CLIENT_IMAGE` do `Jenkinsfile` e de `deploy/seed-producao.sh`.
+3. `make test` (os testes de `tests/deploy` conferem o formato e a igualdade das strings).
+4. Depois do merge, no servidor, atualize a cópia instalada, que usa a imagem antiga até isso: `sudo bash deploy/backup-banco.sh --instalar`.
+5. Gere o backup que a guarda do `--recriar` exige (até 60 minutos) e confira-o: `sudo rotaperfumes-backup-banco --agora` e `sudo bash deploy/verificar-backup.sh <dump>`.
+6. `sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ... (a mesma lista)]`. O banco fica fora do ar alguns segundos; os dados ficam no datadir. Sem `--recriar`, o script só avisa que o container usa uma imagem diferente.
 
 Só suba **patch** do 11.4 assim. Mudança de versão menor/maior é card próprio (backup, teste em banco descartável).
 
@@ -250,7 +252,7 @@ Só suba **patch** do 11.4 assim. Mudança de versão menor/maior é card própr
 - `INTEGRATION=1`, `make db-down`, `make db-reset`, `make db-rebuild`, `make db-seed` e `make db-import-*` **apagam ou sobrescrevem dados**. Só rode contra um banco **descartável**: um MariaDB 11.4 local em container (`DB_HOST=127.0.0.1`, `.env` separado) ou o container temporário do `TestTST15_MariadbDocker_Real`.
 - **Nunca** contra o banco de produção (conta `casaos` do `.env.producao`, que tem `ALL` em `rotaperfumes.*`, com dados reais).
 - **Guarda `db-guard-producao` (DEPLOY-07):** todo alvo do `Makefile` que escreve no banco (`db-create`, `db-up`, `db-seed`, `db-down`, `db-reset`, `db-rebuild`, `db-fix-*`, `db-revert-*`, `db-import-*`, `db-seed-mes-atual`, `db-gerar-imagens-produtos`, `gen-hash`, `fix-hash`, `fix-admin`, `reset-senhas-ativos`, `test-integration`) depende dela. A guarda olha **host e porta**: é produção `DB_HOST` = `192.168.168.106` ou `ivo-inspiron-15-3530` (`PRODUCAO_HOSTS_LAN`) com `DB_PORT` vazio ou `3306` (a porta publicada com `--dev-ip`), ou `DB_HOST` = `rotaperfumes-mariadb` ou `172.30.42.2` (`PRODUCAO_HOSTS_REDE`, rede Docker) em qualquer porta. O MariaDB de dev do CasaOS, no mesmo host, porta `3307` (`192.168.168.106:3307`), **passa**. **SEC-54:** antes de comparar, o `DB_HOST` é normalizado sem DNS (espaços, minúsculas, `[ ]` das pontas, todos os `.` finais, um sufixo `.local` e IPv4 mapeado em IPv6, `::ffff:a.b.c.d` → `a.b.c.d`); qualquer outro literal IPv6 que não seja `::1` e porta não numérica contam como produção. Assim `ivo-inspiron-15-3530.local.` e `[::ffff:192.168.168.106]` são recusados. **SEC-56 (Lote 37):** IPv4 em forma numérica não canônica (decimal `3232278634`, hex `0xc0a8a86a`, octal `0300.0250.0250.0152`, curta `192.168.43114`/`127.1`, octeto com zero à esquerda `127.000.000.001`) é recusado **sem válvula** (nem com `CONFIRMO_PRODUCAO`), com a mensagem `SEC-56: DB_HOST=... e IPv4 em forma numerica nao canonica`; use `a.b.c.d`. O loopback `127.x.x.x` só conta com octetos canônicos. **SEC-57 (Lote 37):** `DB_PORT` fora de `+` opcional e dígitos (inclusive espaço no fim, `DB_PORT="3307 "` na linha de comando) é recusado sem válvula (`SEC-57: DB_PORT='...' invalida`). O `DB_PORT` do `.env` tem os espaços das pontas tirados; o da linha de comando só perde os do início (o próprio make tira). Outro IP da mesma máquina continua fora da lista (risco residual aceito: o destrutivo fora do loopback já exige `CONFIRMAR`). Em produção o alvo é recusado, salvo `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>` **na linha de comando** (no `.env` ou no ambiente não vale). O seed de produção é o `deploy/seed-producao.sh`, nunca `make db-seed`.
-- **SEC-46:** `db-down`, `db-reset`, `db-rebuild` e `db-seed` também dependem de `db-guard-sem-producao`, que os recusa na produção **mesmo com** `CONFIRMO_PRODUCAO` (sem válvula; recriar a produção é backup + `mariadb-docker.sh --recriar` + `seed-producao.sh` no servidor). E `db-down`/`db-reset`/`db-rebuild` dependem de `db-guard-drop`: com `DB_NAME=rotaperfumes` (sem diferenciar maiúsculas) e `DB_HOST` fora do loopback (ex.: o dev do CasaOS, `192.168.168.106:3307`), o `DROP DATABASE` exige `CONFIRMAR=<DB_NAME>` **na linha de comando** (ex.: `make db-reset CONFIRMAR=rotaperfumes`; no `.env` ou no ambiente não vale). Loopback (`localhost`, `127.x.x.x`, `::1`, depois da normalização do SEC-54; nome `.local` nunca conta como loopback) ou outro nome de banco (ex.: `rotaperfumes_teste`) seguem sem pergunta. **BUG-27:** `db-reset` e `db-rebuild` têm só as três guardas como pré-requisitos e rodam as etapas em cadeia (`$(MAKE) db-down && $(MAKE) db-seed && $(MAKE) db-import-...`): com `make -k` ou `-j`, um DROP recusado ou com erro para tudo (nenhum `CREATE DATABASE`/seed/import) e cada etapa só começa depois da anterior. As guardas rodam de novo em cada etapa (o AVISO pode aparecer mais de uma vez). `CONFIRMAR`/`CONFIRMO_PRODUCAO` da linha de comando chegam às etapas; no `.env` ou no ambiente continuam sem valer. **BUG-28 (Lote 37):** o `db-seed` depende só das guardas e do `db-check-env` e roda o `db-up` (CREATE + DDL) na receita, por sub-make: com `make -k`/`-j` o schema não é criado junto de uma guarda que falhou. **BUG-29 (Lote 37):** `ENV_ARQUIVO`, `CONFIRMAR` e `CONFIRMO_PRODUCAO` chegam às etapas pelo `MAKEFLAGS`; por isso o `make` recusa no parse (antes de qualquer guarda ou cliente): `MAKEFLAGS=`, `MAKEOVERRIDES=` ou `GNUMAKEFLAGS=` **na linha de comando** (use `make -k ...` ou `MAKEFLAGS=-k make ...` no ambiente), `ENV_ARQUIVO` vindo do ambiente (`export ENV_ARQUIVO=...`), `ENV_ARQUIVO` fora de `[A-Za-z0-9._/-]` e `.env`/`ENV_ARQUIVO` que declare `MAKEFLAGS`, `MAKEOVERRIDES`, `GNUMAKEFLAGS`, `MAKEFILES`, `MAKELEVEL`, `MAKE`, `RP_ENV_PAI` ou `ENV_ARQUIVO_LIDO`. Cada sub-make recebe a sentinela `RP_ENV_PAI=<arquivo lido pelo pai>` e aborta se fosse ler outro arquivo.
+- **SEC-46:** `db-down`, `db-reset`, `db-rebuild` e `db-seed` também dependem de `db-guard-sem-producao`, que os recusa na produção **mesmo com** `CONFIRMO_PRODUCAO` (sem válvula; recriar a produção é `rotaperfumes-backup-banco --agora` + `mariadb-docker.sh --recriar` + `seed-producao.sh` no servidor). E `db-down`/`db-reset`/`db-rebuild` dependem de `db-guard-drop`: com `DB_NAME=rotaperfumes` (sem diferenciar maiúsculas) e `DB_HOST` fora do loopback (ex.: o dev do CasaOS, `192.168.168.106:3307`), o `DROP DATABASE` exige `CONFIRMAR=<DB_NAME>` **na linha de comando** (ex.: `make db-reset CONFIRMAR=rotaperfumes`; no `.env` ou no ambiente não vale). Loopback (`localhost`, `127.x.x.x`, `::1`, depois da normalização do SEC-54; nome `.local` nunca conta como loopback) ou outro nome de banco (ex.: `rotaperfumes_teste`) seguem sem pergunta. **BUG-27:** `db-reset` e `db-rebuild` têm só as três guardas como pré-requisitos e rodam as etapas em cadeia (`$(MAKE) db-down && $(MAKE) db-seed && $(MAKE) db-import-...`): com `make -k` ou `-j`, um DROP recusado ou com erro para tudo (nenhum `CREATE DATABASE`/seed/import) e cada etapa só começa depois da anterior. As guardas rodam de novo em cada etapa (o AVISO pode aparecer mais de uma vez). `CONFIRMAR`/`CONFIRMO_PRODUCAO` da linha de comando chegam às etapas; no `.env` ou no ambiente continuam sem valer. **BUG-28 (Lote 37):** o `db-seed` depende só das guardas e do `db-check-env` e roda o `db-up` (CREATE + DDL) na receita, por sub-make: com `make -k`/`-j` o schema não é criado junto de uma guarda que falhou. **BUG-29 (Lote 37):** `ENV_ARQUIVO`, `CONFIRMAR` e `CONFIRMO_PRODUCAO` chegam às etapas pelo `MAKEFLAGS`; por isso o `make` recusa no parse (antes de qualquer guarda ou cliente): `MAKEFLAGS=`, `MAKEOVERRIDES=` ou `GNUMAKEFLAGS=` **na linha de comando** (use `make -k ...` ou `MAKEFLAGS=-k make ...` no ambiente), `ENV_ARQUIVO` vindo do ambiente (`export ENV_ARQUIVO=...`), `ENV_ARQUIVO` fora de `[A-Za-z0-9._/-]` e `.env`/`ENV_ARQUIVO` que declare `MAKEFLAGS`, `MAKEOVERRIDES`, `GNUMAKEFLAGS`, `MAKEFILES`, `MAKELEVEL`, `MAKE`, `RP_ENV_PAI` ou `ENV_ARQUIVO_LIDO`. Cada sub-make recebe a sentinela `RP_ENV_PAI=<arquivo lido pelo pai>` e aborta se fosse ler outro arquivo.
 - **SEC-59 (Lote 39):** o `.env` (ou o `ENV_ARQUIVO`) só aceita linhas vazias, comentários e `[export ]NOME [:?+]=valor` literal, conferidos antes do `include`. O `make` recusa no parse qualquer outra linha (`override`, `define`, `include`, `!=`, regras), linha terminada em `\` e `$` fora de comentário, inclusive num `#` depois do valor. A mensagem traz só os números das linhas, nunca o conteúdo. Efeitos colaterais: valor com `$` e `.env` com BOM UTF-8 são recusados. Também são proibidas `SHELL`, `MAKESHELL`, `MAKECMDGOALS`, `CURDIR`, `VPATH`, `PATH` e `VARS_DO_ENV`, além das do BUG-29. `ENV_ARQUIVO` com `-` inicial é recusado (use `./-foo`).
 - **SEC-50:** os testes Go de integração (helper `backend/shared/testkit/integracao`) recusam a produção **antes de conectar**, com a mesma regra de host e porta, também quando o `go test` com `INTEGRATION=1` é chamado direto. **SEC-54:** a integração tem ainda uma allowlist (`INTEGRACAO_PERMITIDOS` no `Makefile`, guarda `db-guard-integracao`; `integracao.Permitidos` no Go): só loopback (`localhost`, `127.0.0.0/8`, `::1`, qualquer porta) e o CasaOS de dev `192.168.168.106:3307`; qualquer outro destino falha (`t.Fatal`). **SEC-53:** `make test`/`lint`/`build` e os alvos `npm` não recebem mais as variáveis do `.env` (só `make test-integration` passa as `DB_*` ao `go test`). **SEC-55:** só as linhas `go test` (`$(SEM_SEGREDOS_TESTE)`) recebem as `DB_*` no modo integração; `go build`, `go tool cover`, `go vet`, `arch-check` e `npm` usam o `$(SEM_SEGREDOS)` estrito, nem com `INTEGRATION=1`.
 - Os agentes da equipe também seguem a regra: nenhum `make db-*` nem `INTEGRATION=1` com o `.env` atual.
@@ -415,29 +417,69 @@ cd /var/lib/jenkins/workspace/rotaperfumes-deploy/deploy
 | Remover (mantém o volume da CA) | `API_ENV_FILE=/dev/null docker compose -p rotaperfumes down` |
 
 - **Nunca** rode `up` manualmente com `API_ENV_FILE=/dev/null`, porque a API seria recriada sem as variáveis. Para subir ou recriar, **rode o job**.
-- O banco **não** faz parte do compose: `down` não o afeta. Para recriá-lo, use `sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ...]`.
+- O banco **não** faz parte do compose: `down` não o afeta. Para recriá-lo, use `sudo rotaperfumes-backup-banco --agora` e `sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ...]`.
 - Os containers têm `restart: unless-stopped` e voltam sozinhos após um reboot do servidor. A exceção é se tiverem sido parados com `stop`. A unit `rotaperfumes-db-firewall` reaplica a regra do banco depois do Docker.
 - Os logs rodam em `json-file` com até 5 × 10 MB por serviço.
 
-### Backup do banco
+### Backup do banco e das imagens de produto
 
-No servidor, pela rede interna, com o cliente da imagem fixada (a mesma string de `IMAGEM_BASE`/`DB_CLIENT_IMAGE`) e a conta admin:
+O backup é automático (BACKUP-01): um timer systemd roda às 03:30 (com até 15 min de atraso aleatório) e, se o servidor estava desligado, roda ao ligar. Cada backup bom é um **par** com o mesmo carimbo UTC, em `/var/backups/rotaperfumes` (root, 700):
+
+- `rotaperfumes-AAAAMMDD-HHMMSSZ.sql.gz`: dump, com a conta só `SELECT` `rotaperfumes_backup@172.30.42.21`.
+- `rotaperfumes-imagens-AAAAMMDD-HHMMSSZ.tar.gz`: volume `rotaperfumes_produto_imagens`, lido sem rede e somente leitura.
+
+O `--agora` usa a série `-manual` nos dois nomes. **Isso não recupera o site sozinho:** veja o que fica fora em `docs/manual-base-de-dados.md`, seção 24.2. A restauração está nas seções 24.5 e 24.6 do mesmo manual.
+
+**Instalação numa produção já ativa, nesta ordem e em horário calmo:**
+
+1. Atualize o checkout do servidor (`/root/rotaperfumes` ainda não é checkout git: card DEPLOY-08, item 6 da limpeza).
+2. Crie a conta de backup, **sem `--recriar`** e com o mesmo `--dev-ip` em uso, se a porta ainda estiver publicada. O container não reinicia, mas há um `REVOKE` + `GRANT` rápido nas contas e o firewall é recarregado:
+   ```bash
+   sudo bash deploy/mariadb-docker.sh [--dev-ip ... (a mesma lista)]
+   ```
+3. Instale a rotina. O volume de imagens precisa existir (ele nasce no 1º deploy). O 1º backup roda pela unit, e o comando falha se ele falhar:
+   ```bash
+   sudo bash deploy/backup-banco.sh --instalar
+   ```
+4. Confira:
+   ```bash
+   sudo rotaperfumes-backup-banco --status
+   sudo bash deploy/verificar-backup.sh /var/backups/rotaperfumes/rotaperfumes-AAAAMMDD-HHMMSSZ.sql.gz
+   ```
+5. Só depois rode o `--recriar` do item 7 da limpeza, com um `sudo rotaperfumes-backup-banco --agora` logo antes. Nesta ordem, a guarda abaixo não trava a própria instalação.
+
+**Comandos:**
+
+| Comando | Efeito |
+| --- | --- |
+| `sudo rotaperfumes-backup-banco --agora` | backup na série `-manual`, com retenção própria |
+| `sudo rotaperfumes-backup-banco --agora --aceitar-reducao` | aceita **uma vez** um dump com menos de 50% do anterior; fica em `.registro-reducao` |
+| `sudo rotaperfumes-backup-banco --status` | sai com erro se o último par tiver mais de 26 h, se o timer estiver inativo, se a última execução falhou ou se o tar de imagens for reprovado; avisa se a última verificação tiver mais de 35 dias |
+| `sudo bash deploy/backup-banco.sh --conferir-imagens ARQ` | confere um tar de imagens e imprime só contagens; não usa rede, credencial nem Docker |
+| `sudo bash deploy/backup-banco.sh --instalar` | instala ou atualiza a cópia, as units e o conf |
+
+O root executa só a cópia `/usr/local/sbin/rotaperfumes-backup-banco` (700, root), nunca o checkout: um push na `main` não vira código rodando como root. Por isso, depois de atualizar o script ou o digest, rode `--instalar` de novo. A exceção é `--conferir-imagens`, que só lê o arquivo.
+
+**Retenção:** 14 pares diários e 3 manuais, por contagem de pares bons e por série, nunca por data. Para mudar, use `--instalar --retencao-diarios N --retencao-manuais N` (mínimo 2); o valor fica em `/etc/rotaperfumes/backup-banco.conf`. A retenção só roda depois de um par novo publicado, então disco cheio nunca apaga backup. Ela não toca em nomes parecidos, symlinks, subdiretórios, `pre-restauracao-*` nem `parcial-*`.
+
+**Espaço:** antes de começar, exige livre ≥ 2× o dump anterior + o maior entre 2× as imagens anteriores e o tamanho atual do volume + 1 GiB. O backup divide o disco com o banco: encher o disco derruba o banco.
+
+**Quando as imagens falham:** o dump já validado é guardado como `parcial-rotaperfumes-*.sql.gz`, e a execução termina com erro. Esse arquivo **não conta como backup bom**: não dispara a retenção, não satisfaz o `--status` nem a guarda do `--recriar`. Ele fica para uso manual, e só os 3 mais novos são mantidos. Volume ausente é falha. Volume vazio é aceito com `AVISO`. A regra dos 50% vale só para o dump, porque remover produto é legítimo; tamanho e contagem de arquivos ficam no log (`journalctl -u rotaperfumes-backup-banco.service`), que nunca traz linhas do dump nem nomes do tar.
+
+**Guarda do `--recriar` e do `seed-producao.sh --forcar`:** com dados existentes, exigem um dump de até 60 minutos (`--backup-janela-min N` muda a janela), regular, root, 600, sem data futura, com `gzip -t` e marcador na última linha. Nome `pre-restauracao-*` ou `parcial-*` não vale. Exigem só o dump porque não tocam no volume de imagens. Para dispensar (ex.: container parado, que não gera dump novo), use `--sem-backup-motivo TEXTO`, com 10 a 300 caracteres, gravado em `/root/rotaperfumes-mariadb/recriar.registro` ou `seed-forcar.registro` (600). Com outro destino, passe também `--backup-dir DIR`.
+
+**Destino em outro disco (ex.: SSD):**
 
 ```bash
-sudo -i
-umask 077
-IMG='mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620'
-MYSQL_PWD=$(cat /root/rotaperfumes-mariadb/rotaperfumes_admin.senha) \
-docker run --rm -i -e MYSQL_PWD --network rotaperfumes-db --ip 172.30.42.20 \
-  --cap-drop ALL --security-opt no-new-privileges:true \
-  --mount type=bind,source=/etc/mysql/ssl/ca.pem,target=/ca.pem,readonly \
-  --entrypoint mariadb-dump "$IMG" -h rotaperfumes-mariadb -P 3306 -u rotaperfumes_admin \
-  --ssl-ca=/ca.pem --ssl-verify-server-cert --single-transaction --routines --triggers \
-  --hex-blob --default-character-set=utf8mb4 rotaperfumes \
-  | gzip > "/root/backup-rotaperfumes-$(date +%Y%m%d-%H%M%S).sql.gz"
+sudo bash deploy/backup-banco.sh --instalar --backup-dir /mnt/ssd/rotaperfumes --exigir-montagem /mnt/ssd
 ```
 
-O arquivo fica em `/root` com modo 600 (tem os hashes de senha). Copie para mídia offline e apague os antigos.
+- Com o disco desmontado, o backup **falha** em vez de gravar no disco do sistema. A unit ganha `RequiresMountsFor=`, e o script confere com `mountpoint` no início e antes de publicar. O `ReadWritePaths=` e a conferência de espaço seguem o destino.
+- `--instalar` também recusa se o disco não estiver montado, sem criar o diretório. Os ancestrais precisam ser do root, sem escrita para grupo e outros, e o destino, 700.
+- Cifrar e abrir o disco fica **fora do script**: com o disco fechado no horário do timer, a execução falha e o `--status` acusa. Para voltar ao disco do sistema: `--instalar --backup-dir /var/backups/rotaperfumes --sem-exigir-montagem`.
+- A troca de destino não move os backups antigos, e a retenção do diretório anterior deixa de rodar.
+
+**Falha invisível:** sem aviso externo (decisão D2 do BACKUP-01 em aberto), uma falha só aparece no `--status`, consultado à mão. E o backup local não protege contra perda do disco (D1 em aberto).
 
 ### Atualizar
 
@@ -482,7 +524,7 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 | `mariadb-docker.sh` avisa "contem o fingerprint da CA de DEV" | A linha de uma CA de dev (`d150ee67...`, a atual, em `deploy/ca-cert.pem`, ou `ef31b656...`, a anterior) está em `deploy/db-ca.fingerprint` | Remova essa linha e commite: CA de dev nunca vale em produção (seção 3.7) |
 | `mariadb-docker.sh` avisa "`$SSL_DIR/ca.pem e uma CA de DEV`" (por padrão, `/etc/mysql/ssl/ca.pem`) | A CA instalada no host é uma CA de dev. O script não aborta: o passo 2 do resumo manda não gravar o fingerprint, e não sai "ja contem: OK" | Não grave esse fingerprint. Confira como ela chegou ao servidor e restaure a CA de produção. Use `--nova-ca` só se a CA de produção não puder ser restaurada, porque ela troca a CA em uso; nesse caso, o fingerprint novo precisa ir para `deploy/db-ca.fingerprint` antes do deploy (seção 3.7) |
 | `make db-*`: "DEPLOY-07: DB_HOST=... DB_PORT=... e o banco de PRODUCAO: alvo recusado" | Guarda `db-guard-producao`: host do servidor com `DB_PORT` vazio/3306, ou host da rede Docker (o dev do CasaOS é a porta 3307) | Confira se era mesmo para a produção. Se sim (e o alvo não apaga dados), repita com `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>` na linha de comando (seção 3.8) |
-| `make db-down/db-reset/db-rebuild/db-seed`: "SEC-46: ... e PRODUCAO: ... sao recusados mesmo com CONFIRMO_PRODUCAO" | Guarda `db-guard-sem-producao`: esses alvos nunca rodam na produção | Na produção, use backup (seção 9), `sudo bash deploy/mariadb-docker.sh --recriar` e `sudo bash deploy/seed-producao.sh` no servidor (seção 11) |
+| `make db-down/db-reset/db-rebuild/db-seed`: "SEC-46: ... e PRODUCAO: ... sao recusados mesmo com CONFIRMO_PRODUCAO" | Guarda `db-guard-sem-producao`: esses alvos nunca rodam na produção | Na produção, use `sudo rotaperfumes-backup-banco --agora` (seção 9), `sudo bash deploy/mariadb-docker.sh --recriar` e `sudo bash deploy/seed-producao.sh` no servidor (seção 11) |
 | `make db-down/db-reset/db-rebuild`: "SEC-46: DROP DATABASE rotaperfumes em ... (fora do loopback): repita com CONFIRMAR=rotaperfumes" | Guarda `db-guard-drop`: `DROP DATABASE rotaperfumes` fora do loopback (ex.: CasaOS :3307) | Confira o `DB_HOST`/`DB_PORT`. Se for mesmo para apagar esse banco, repita com `CONFIRMAR=rotaperfumes` na linha de comando |
 | `make test-integration`: "SEC-54: DB_HOST=... DB_PORT=... fora da allowlist da integracao" (ou `go test` com `INTEGRATION=1`: `ErrHostNaoPermitido`) | Guarda `db-guard-integracao`/`integracao.Permitidos`: integração só no loopback ou no CasaOS `192.168.168.106:3307` | Use um MariaDB descartável no loopback (`DB_HOST=127.0.0.1`) ou o dev do CasaOS na porta 3307 |
 | `make ...`: `*** BUG-29: ...  Stop.` | `MAKEFLAGS`/`MAKEOVERRIDES`/`GNUMAKEFLAGS` na linha de comando, `ENV_ARQUIVO` exportado no shell, `ENV_ARQUIVO` com caractere fora de `A-Z a-z 0-9 . _ / -`, variável do make no `.env` ou `RP_ENV_PAI` passado à mão | Use `make -k ...` (ou `MAKEFLAGS=-k make ...`), `unset ENV_ARQUIVO` e passe `ENV_ARQUIVO=` na linha de comando; tire a variável do `.env` |
@@ -499,7 +541,10 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 | Import falha com `Access denied` | Credencial `rotaperfumes-db-admin` com senha diferente de `rotaperfumes_admin.senha` | Atualize a credencial (seção 5.2) |
 | `make db-* ENV_ARQUIVO=.env.producao` da máquina do admin: `Access denied for user 'casaos'@'<IP>'` ou timeout | IP da máquina fora da lista `--dev-ip` (ou mudou por DHCP) | Rode o script com o `--dev-ip` certo (e `--recriar` se a lista mudou); fixe o IP. **Hoje o timeout é o esperado:** produção só local, sem `--dev-ip` (passo 11 da seção 11 não se aplica); confira o banco pelo passo 7, no servidor, como root |
 | Cliente: `Authentication plugin 'client_ed25519' cannot be loaded` | Cliente sem ed25519 (ex.: `mysql` do Oracle, Workbench) | Use o cliente `mariadb` 11.x; em último caso, `--casaos-native-motivo` (`docs/Instal_SSL.md` passo 8) |
-| `mariadb-docker.sh`: "rode de novo com --recriar" | Container existente difere do desejado (rede, porta, `--dev-ip`, read-only, usuário) | Confira a lista `--dev-ip`; rode com `--recriar` (o banco fica fora do ar alguns segundos) |
+| `mariadb-docker.sh`: "rode de novo com --recriar" | Container existente difere do desejado (rede, porta, `--dev-ip`, read-only, usuário) | Confira a lista `--dev-ip`; rode `sudo rotaperfumes-backup-banco --agora` e depois `--recriar` (o banco fica fora do ar alguns segundos) |
+| `mariadb-docker.sh --recriar` ou `seed-producao.sh --forcar`: "nenhum backup", "tem mais de 60 min" ou outra recusa do backup mais recente | Guarda do BACKUP-01: exige dump recente, antes de qualquer mudança | `sudo rotaperfumes-backup-banco --agora`. Com o container parado, `--sem-backup-motivo TEXTO` (seção 9) |
+| `rotaperfumes-backup-banco`: "nao esta montado" | Destino com `--exigir-montagem` e o disco desmontado; nada foi gravado | Abra e monte o disco e rode `--agora` |
+| `rotaperfumes-backup-banco`: "volume rotaperfumes_produto_imagens nao existe" | O volume nasce no 1º deploy; o dump ficou como `parcial-*`, sem contar como backup bom | Rode o job do Jenkins e depois `--agora` |
 | `mariadb-docker.sh`: "o container parou" com escrita negada fora de `/var/lib/mysql` | `--read-only` incompatível com a imagem | `--recriar --sem-read-only` |
 | `permission denied ... docker.sock` no build | Usuário do Jenkins sem acesso ao socket, ou Jenkins não reiniciado | Seção 2.2 |
 | Erro de schema do compose | Compose < 2.17 | Atualize o plugin `docker-compose-plugin` |

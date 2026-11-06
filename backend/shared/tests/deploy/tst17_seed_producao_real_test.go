@@ -199,7 +199,7 @@ func TestTST17_SeedProducao_Real(t *testing.T) {
 		rootSQL("UPDATE usuarios SET ativo = 1 WHERE role <> 'admin' LIMIT 1")
 		senha3 := filepath.Join(seg, "admin-app-3.senha")
 		linha := "bash"
-		for _, a := range append(append([]string{}, base...), "--admin-senha-arquivo", senha3, "--forcar") {
+		for _, a := range append(append([]string{}, base...), "--admin-senha-arquivo", senha3, "--forcar", "--sem-backup-motivo", "teste real sem rotina de backup") {
 			linha += " '" + a + "'"
 		}
 		cmd := exec.Command("script", "-qec", linha, "/dev/null")

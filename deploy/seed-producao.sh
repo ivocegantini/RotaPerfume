@@ -14,7 +14,7 @@
 #   1. confere root, comandos, container/rede, CA, senha do rotaperfumes_admin,
 #      arquivos de sql/, pepper e o destino da senha do admin (nada muda antes)
 #   2. estado do banco: tabela usuarios com linhas = recusa (fail closed),
-#      salvo --forcar, que exige digitar o nome do banco
+#      salvo --forcar, que exige dump recente (BACKUP-01) e digitar o nome do banco
 #   3. DDL na ordem de sql/ordem-ddl.txt (a mesma do make db-up)
 #   4. sql/02_seed_admin.sql e sql/03_seed_vendedores.sql (INSERT IGNORE) e,
 #      depois, todos os usuarios nao-admin INATIVOS (os 42 vendedores sao
@@ -70,6 +70,10 @@ SSL_DIR=$SSL_DIR_PADRAO
 TRABALHO_DIR=$TRABALHO_DIR_PADRAO
 
 FORCAR=false
+BACKUP_DIR="/var/backups/rotaperfumes"
+BACKUP_JANELA_MIN=60
+SEM_BACKUP_MOTIVO=""
+BACKUP_USADO=""
 PEPPER_FILE=""
 ADMIN_PROMPT=false
 # Vazio = <segredos-dir>/admin-app.senha (resolvido depois do parse).
@@ -131,7 +135,15 @@ para uma instalacao de teste criada por ele com as mesmas opcoes):
   --forcar              aceita rodar com a tabela usuarios ja com linhas
                         (reaplica a DDL e os seeds, troca a senha do admin e
                         INATIVA todos os usuarios nao-admin). Exige digitar o
-                        nome do banco ($DB_NOME) no terminal.
+                        nome do banco ($DB_NOME) no terminal e, com a tabela
+                        preenchida, dump recente
+                        (sudo rotaperfumes-backup-banco --agora).
+  --backup-dir DIR      onde o --forcar procura o dump (padrao $BACKUP_DIR;
+                        root, modo 700)
+  --backup-janela-min N idade maxima do dump, em minutos (padrao $BACKUP_JANELA_MIN; 1 a 1440)
+  --sem-backup-motivo TEXTO
+                        so com --forcar: dispensa o dump. 10 a 300 caracteres
+                        imprimiveis, registrados em <segredos-dir>/seed-forcar.registro.
   -h, --help            esta ajuda
 
 O que o script faz (nesta ordem):
@@ -170,6 +182,9 @@ while [[ $# -gt 0 ]]; do
     --admin-senha-prompt) ADMIN_PROMPT=true; shift ;;
     --admin-senha-arquivo) exigir_valor "$@"; ADMIN_SENHA_ARQ="$2"; shift 2 ;;
     --forcar) FORCAR=true; shift ;;
+    --backup-dir) exigir_valor "$@"; BACKUP_DIR="$2"; shift 2 ;;
+    --backup-janela-min) exigir_valor "$@"; BACKUP_JANELA_MIN="$2"; shift 2 ;;
+    --sem-backup-motivo) exigir_valor "$@"; SEM_BACKUP_MOTIVO="$2"; shift 2 ;;
     --container) exigir_valor "$@"; CONTAINER="$2"; shift 2 ;;
     --rede-nome) exigir_valor "$@"; REDE_NOME="$2"; shift 2 ;;
     --ip-admin) exigir_valor "$@"; IP_ADMIN="$2"; shift 2 ;;
@@ -231,6 +246,16 @@ validar_sintaxe_opcoes() {
     [[ "$d" =~ ^/[A-Za-z0-9._/-]+$ && "$d" != / && "$d" != *..* ]] \
       || die "diretorio invalido: '$d' (caminho absoluto, sem espacos/virgulas/..)"
   done
+  # BACKUP-01: a guarda do --forcar. O diretorio so e conferido se ela disparar.
+  [[ "$BACKUP_DIR" =~ ^/[A-Za-z0-9._/-]+$ && "$BACKUP_DIR" != *..* ]] \
+    || die "--backup-dir invalido: '$BACKUP_DIR' (caminho absoluto, sem espacos/virgulas/..)"
+  # shellcheck disable=SC2015 # die deve rodar se o formato OU a faixa falhar (pretendido)
+  [[ "$BACKUP_JANELA_MIN" =~ ^[0-9]{1,4}$ ]] && (( 10#$BACKUP_JANELA_MIN >= 1 && 10#$BACKUP_JANELA_MIN <= 1440 )) \
+    || die "--backup-janela-min precisa ser um numero de 1 a 1440"
+  if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
+    $FORCAR || die "--sem-backup-motivo so com --forcar"
+    [[ "$SEM_BACKUP_MOTIVO" =~ ^[[:print:]]{10,300}$ ]] || die "--sem-backup-motivo precisa de 10 a 300 caracteres imprimiveis"
+  fi
   # Sem a barra final: a comparacao de prefixo fica exata.
   SEGREDOS_DIR=${SEGREDOS_DIR%/}; SSL_DIR=${SSL_DIR%/}; TRABALHO_DIR=${TRABALHO_DIR%/}
   ADMIN_SENHA_ARQ=${ADMIN_SENHA_ARQ:-$SEGREDOS_DIR/admin-app.senha}
@@ -294,6 +319,36 @@ conferir_dir_privado() { # opcao dir [existe]
   elif [[ "$exigir" == existe ]]; then
     die "$op $d nao existe depois do install -d"
   fi
+}
+
+# BACKUP-01: copia byte a byte da funcao do deploy/mariadb-docker.sh (um teste
+# confere). Vale o que esta la: so o dump, parcial-* e pre-restauracao-* nunca
+# valem, e a idade conta pelo carimbo e pelo mtime.
+conferir_backup_recente() { # dir janela_min -> define BACKUP_USADO
+  local dir=$1 janela=$2 LC_ALL=C arq="" f nome agora mtime carimbo dica
+  dica="gere um com: sudo rotaperfumes-backup-banco --agora (ou use --sem-backup-motivo TEXTO, que fica registrado)"
+  command -v gzip >/dev/null || die "comando 'gzip' nao encontrado"
+  [[ -d "$dir" && ! -L "$dir" ]] || die "nenhum backup: $dir nao existe. Instale com sudo bash deploy/backup-banco.sh --instalar; $dica"
+  conferir_dir_privado --backup-dir "$dir" existe
+  for f in "$dir"/rotaperfumes-*.sql.gz; do
+    [[ "${f##*/}" =~ ^rotaperfumes-[0-9]{8}-[0-9]{6}Z(-manual)?\.sql\.gz$ ]] && arq=$f
+  done
+  [[ -n "$arq" ]] || die "nenhum backup em $dir; $dica"
+  nome=${arq##*/}
+  [[ ! -L "$arq" && -f "$arq" ]] || die "o backup mais recente ($nome) nao e arquivo regular; $dica"
+  [[ "$(stat -c '%u %a' -- "$arq")" == "0 600" ]] || die "o backup mais recente ($nome) precisa ser do root com modo 600; $dica"
+  [[ "$nome" =~ ^rotaperfumes-([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})Z ]] || die "carimbo invalido em $nome"
+  carimbo=$(date -u -d "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}" +%s) \
+    || die "carimbo invalido em $nome"
+  agora=$(date +%s)
+  mtime=$(stat -c %Y -- "$arq")
+  for f in "$carimbo" "$mtime"; do
+    (( f <= agora )) || die "o backup mais recente ($nome) tem data futura; $dica"
+    (( agora - f <= janela * 60 )) || die "o backup mais recente ($nome) tem mais de $janela min; $dica"
+  done
+  gzip -t -- "$arq" 2>/dev/null || die "o backup mais recente ($nome) esta corrompido; $dica"
+  [[ "$(gzip -dc -- "$arq" | tail -n 1)" == "-- Dump completed"* ]] || die "o backup mais recente ($nome) nao tem o marcador na ultima linha; $dica"
+  BACKUP_USADO=$arq
 }
 
 # conferir_dir_root_sem_escrita: como o conferir_dir_privado, mas para o
@@ -488,10 +543,19 @@ fi
 if (( LINHAS > 0 )); then
   $FORCAR || die "a tabela usuarios ja tem $LINHAS linha(s): este banco ja foi semeado. Nada foi alterado. (--forcar reaplica e INATIVA todos os nao-admin)"
   tem_tty || die "--forcar exige um terminal para a confirmacao"
+  # BACKUP-01 (D6): a mesma exigencia do --recriar, antes de pedir a confirmacao.
+  if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
+    aviso "--sem-backup-motivo: --forcar SEM conferir backup. Motivo: $SEM_BACKUP_MOTIVO"
+  else
+    conferir_backup_recente "$BACKUP_DIR" "$((10#$BACKUP_JANELA_MIN))"
+    info "Backup recente conferido: $BACKUP_USADO."
+  fi
   aviso "--forcar: usuarios tem $LINHAS linha(s). A DDL e os seeds serao reaplicados, a senha do admin trocada e TODOS os usuarios nao-admin INATIVADOS."
   IFS= read -r -p "Digite o nome do banco ($DB_NOME) para confirmar: " RESPOSTA < /dev/tty \
     || die "--forcar: leitura da confirmacao falhou; nada foi alterado"
   [[ "$RESPOSTA" == "$DB_NOME" ]] || die "confirmacao nao confere; nada foi alterado"
+  printf '%s backup=%s motivo=%s\n' "$(date -Is)" "${BACKUP_USADO:-nenhum}" "${SEM_BACKUP_MOTIVO:-nenhum}" >>"$SEGREDOS_DIR/seed-forcar.registro"
+  chmod 600 "$SEGREDOS_DIR/seed-forcar.registro"
 else
   info "Banco sem usuarios (instalacao nova): seguindo."
 fi

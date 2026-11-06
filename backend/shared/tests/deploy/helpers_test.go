@@ -78,6 +78,19 @@ func arquivoObrigatorio(t *testing.T, partes ...string) string {
 	return string(b)
 }
 
+// lerForaDoTarDoCI lê um arquivo que o estágio "Testes Go" não copia (a lista do
+// git archive no Jenkinsfile): ausente no CI, o teste é pulado; fora dele, falha.
+func lerForaDoTarDoCI(t *testing.T, partes ...string) string {
+	t.Helper()
+	p := caminhoRaiz(t, partes...)
+	b, err := os.ReadFile(p)
+	if os.IsNotExist(err) && emCI() {
+		t.Skipf("%s não vai no tar do estágio Testes Go", filepath.Join(partes...))
+	}
+	require.NoError(t, err)
+	return string(b)
+}
+
 func precisaBash(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {

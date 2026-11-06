@@ -1142,8 +1142,12 @@ func TestTST15_MariadbDocker_Real(t *testing.T) {
 	require.NoError(t, err, out)
 	assert.Contains(t, out, "TLS com verificacao do certificado")
 	assert.Contains(t, out, "Conexao sem TLS recusada: OK.")
-	assert.Equal(t, "rotaperfumes_admin@172.30.243.20 ed25519\nrotaperfumes_app@172.30.243.10 ed25519",
+	assert.Equal(t, "rotaperfumes_admin@172.30.243.20 ed25519\nrotaperfumes_app@172.30.243.10 ed25519\nrotaperfumes_backup@172.30.243.21 ed25519",
 		rootSQL("SELECT CONCAT(User,'@',Host,' ',JSON_VALUE(Priv,'$.plugin')) FROM mysql.global_priv WHERE User LIKE 'rotaperfumes%' OR User='casaos' ORDER BY User"))
+	assert.Contains(t, rootSQL("SHOW GRANTS FOR 'rotaperfumes_backup'@'172.30.243.21'"), "GRANT SELECT ON `rotaperfumes`.* TO", "BACKUP-01: conta só com SELECT")
+	stCnf, errCnf := os.Stat(filepath.Join(segredosDir, "backup-cliente", "rotaperfumes_backup.cnf"))
+	require.NoError(t, errCnf)
+	assert.Equal(t, os.FileMode(0o400), stCnf.Mode().Perm(), "BACKUP-01: option file 400")
 	assert.Equal(t, "0", rootSQL("SELECT COUNT(*) FROM mysql.global_priv WHERE User='root' AND Host<>'localhost'"), "root sem host remoto")
 	assert.Equal(t, sqlModeDB07, rootSQL("SELECT @@GLOBAL.sql_mode"), "DB-07: sql_mode do cnf com ONLY_FULL_GROUP_BY")
 	assert.Equal(t, "0", rootSQL("SELECT COUNT(*) FROM mysql.global_priv WHERE User LIKE 'rotaperfumes%' AND JSON_VALUE(Priv,'$.ssl_type')<>'1'"))

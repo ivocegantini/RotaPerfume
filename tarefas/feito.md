@@ -2,6 +2,8 @@
 
 > Histórico de tarefas finalizadas.
 >
+> 2026-11-06 (abertura do Lote 42, 🔵 SubBrain): o **Lote 41** foi commitado em `3685901`, na `main` local, sem push. A `main` local está 2 commits à frente de `origin/main` (`87f5c64`). O `CLAUDE.md` ficou de fora do commit (edição do usuário). Onde as notas abaixo dizem que o Lote 41 não foi commitado, vale esta nota.
+>
 > 2026-11-06 (🤍 MegaBrain): os Lotes 37 a 40 foram commitados juntos na branch `lote-37-40`, a pedido do usuário, sem merge na `main` remota. A branch foi enviada ao remoto em 2026-11-06 07:57 e aponta para `b8fa988`; `origin/main` segue em `87f5c64`, e a `main` local tem o mesmo `b8fa988`, à frente de `origin/main` (conferido com `git ls-remote` e o reflog). Onde os blocos abaixo desses lotes dizem "não commitado", vale esta nota.
 >
 > Atualizado em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain): o **Lote 41** foi fechado (bloco "Lote 41 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-71** concluído. **Não commitado** (pendente do ok do usuário), sem push. Entrou 1 card BAIXA em `afazer.md` (bloco "Achados do Lote 41"): **SEC-72**. No mesmo fechamento: **DEPLOY-08** corrigido para o estado real (produção no ar; resta a limpeza pós-instalação, pendente do usuário), **BACKUP-01** subiu para ALTA e o bloco do **DB-08** ganhou uma nota de correção. O `fazendo.md` voltou a ficar sem cards.
@@ -26,7 +28,7 @@
 
 ## Lote 41 de 2026-11-06: 1 card concluído
 
-Aberto e fechado em 2026-11-06 pelo 🤍 MegaBrain, depois do erro de TLS que o usuário recebeu ao rodar a contagem da migração 27. Passos: 🤍 MegaBrain (troca local da CA) → 🟡 BackBrain (guarda) → 🤍 MegaBrain (conferência dos testes) → 🟣 SecBrain (revisão só por leitura) → 🔵 SubBrain fechando. **Não commitado** (pendente do ok do usuário), sem push. Caminhos: `SH` = `backend/shared`.
+Aberto e fechado em 2026-11-06 pelo 🤍 MegaBrain, depois do erro de TLS que o usuário recebeu ao rodar a contagem da migração 27. Passos: 🤍 MegaBrain (troca local da CA) → 🟡 BackBrain (guarda) → 🤍 MegaBrain (conferência dos testes) → 🟣 SecBrain (revisão só por leitura) → 🔵 SubBrain fechando. **Commit `3685901`, na `main` local, sem push:** a `main` local está 2 commits à frente de `origin/main`; o `CLAUDE.md` ficou de fora (edição do usuário). Caminhos: `SH` = `backend/shared`.
 
 **Testes finais (conferidos pelo 🤍 MegaBrain):**
 - `go clean -testcache && env -u INTEGRATION make -k test` rc=0, 12107 PASS, 0 FAIL, 61 SKIP.
@@ -42,7 +44,7 @@ Aberto e fechado em 2026-11-06 pelo 🤍 MegaBrain, depois do erro de TLS que o 
 
 ## SEC-71: CA de dev do CasaOS divergente do `deploy/ca-cert.pem` — 2026-11-06
 
-**Status:** ✅ concluído (Lote 41). **Não commitado** (pendente do ok do usuário), sem push.
+**Status:** ✅ concluído (Lote 41). Commit `3685901`, na `main` local, sem push.
 **Camadas:** Backend/Deploy (guarda), Testes, Documentação
 **Responsável:** 🤍 MegaBrain (troca local da CA) → 🟡 BackBrain (guarda) → 🟣 SecBrain (revisão) → 🔵 SubBrain (docs e fechamento)
 **Origem:** o usuário, ao rodar a contagem da migração 27, recebeu `TLS/SSL error: self-signed certificate in certificate chain`.

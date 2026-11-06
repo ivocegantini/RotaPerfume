@@ -40,7 +40,7 @@ sudo bash deploy/mariadb-docker.sh --help
 | `--nova-ca` | gera uma CA **nova** (primeira instalação ou troca de CA). Implica `--novo-cert`. Faz backup de `/etc/mysql/ssl` em `/etc/mysql/ssl.bak-AAAAMMDD-HHMMSS` |
 | `--novo-cert` | reemite só o certificado do servidor (mesma CA; exige a chave) |
 | `--dev-ip IP` | repetível; publica `192.168.168.106:3306` só para esses IPs (na prática, a máquina do admin) e cria `casaos@IP` |
-| `--recriar` | remove e recria o container (dados ficam em `/var/lib/rotaperfumes/mariadb`) |
+| `--recriar` | remove e recria o container (dados ficam em `/var/lib/rotaperfumes/mariadb`); com dados existentes, exige dump recente (`sudo rotaperfumes-backup-banco --agora`) ou `--sem-backup-motivo TEXTO` |
 | `--imagem-base REF` | outra imagem base, formato `mariadb:<versão>@sha256:<64 hex>` |
 | `--sem-read-only` | só se o container não subir com `--read-only` |
 | `--casaos-native-motivo TEXTO` | saída de emergência: `casaos` com `mysql_native_password` (cliente sem ed25519), motivo registrado |

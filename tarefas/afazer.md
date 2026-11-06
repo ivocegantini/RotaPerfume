@@ -1,6 +1,8 @@
 # A Fazer
 
-> Atualizado em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain). O **Lote 41** foi fechado: **SEC-71** concluído (`feito.md`, "Lote 41 de 2026-11-06: 1 card concluído"; **não commitado**, pendente do ok do usuário). Entrou o **SEC-72** (BAIXA) no bloco novo "Achados do Lote 41" (logo abaixo). **DEPLOY-08** corrigido: a produção está **no ar** e o card passou a ser a limpeza pós-instalação, pendente do usuário; **um push na `main` agora é um deploy em sistema vivo**. **BACKUP-01** subiu para ALTA (produção no ar sem rotina de backup) e é o **próximo card recomendado**.
+> Atualizado em 2026-11-06 (abertura do Lote 42, 🔵 SubBrain). A pedido do usuário ("siga para o próximo card"), o **Lote 42 de 2026-11-06** foi aberto e o **BACKUP-01** (ALTA, bloco "Achados dos Lotes 30 e 31") saiu desta lista para `fazendo.md`, com a descrição atualizada. O **DEPLOY-08** ganhou a decisão do usuário de 2026-11-06: **sem passo de descarte** de `casaos.senha` e `/root/rotaperfumes.antigo`; as senhas vão para pendrive seguro (itens 1 e 3 sem alteração, dúvidas registradas no card). O **Lote 41** foi commitado em `3685901`, na `main` local, sem push (`feito.md`). O restante do backlog não mudou.
+>
+> Antes, ainda em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain). O **Lote 41** foi fechado: **SEC-71** concluído (`feito.md`, "Lote 41 de 2026-11-06: 1 card concluído"; **não commitado**, pendente do ok do usuário). Entrou o **SEC-72** (BAIXA) no bloco novo "Achados do Lote 41" (logo abaixo). **DEPLOY-08** corrigido: a produção está **no ar** e o card passou a ser a limpeza pós-instalação, pendente do usuário; **um push na `main` agora é um deploy em sistema vivo**. **BACKUP-01** subiu para ALTA (produção no ar sem rotina de backup) e é o **próximo card recomendado**.
 >
 > Antes, ainda em 2026-11-06 (abertura do Lote 41, 🔵 SubBrain). **SEC-71** registrado direto em `fazendo.md`, em execução. Corrigidos aqui os cards **DEPLOY-08** (instalação parcial já feita no servidor, ver "Andamento 2026-11-06"; passos 2 e 4 valem para instalação do zero) e **TST-04** (`.env` aponta para o CasaOS :3307). O restante do backlog não mudou.
 >
@@ -405,7 +407,7 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 - **Admin:** o usuário fez login como admin e trocou a senha; isso explica `deve_trocar_senha=0`.
 - **Banco:** 13 tabelas, 42 vendedores inativos, admin ativo.
 - **Porta:** `192.168.168.106:3306` segue publicada, com a chain `ROTAPERFUMES-DB` liberando só `192.168.168.105`, **contra a decisão de "banco só local"**.
-- **Push:** um push na `main` agora é um **deploy em sistema vivo**, com os Lotes 37 a 41 (`main` local à frente de `origin/main`; nada enviado à `origin/main`). O Lote 41 ainda não foi commitado.
+- **Push:** um push na `main` agora é um **deploy em sistema vivo**, com os Lotes 37 a 41 (`main` local à frente de `origin/main`; nada enviado à `origin/main`). O Lote 41 foi commitado em `3685901`, na `main` local, sem push (atualizado na abertura do Lote 42).
 - **Ainda no servidor:** `/root/rotaperfumes-ca/ca-key.pem`, `/root/pepper-producao.txt` e `/root/rotaperfumes-mariadb/admin-app.senha` (sem valor desde a troca). `/root/rotaperfumes` não é checkout git.
 - **CA:** em uso `CN=RotaPerfumes_MariaDB_CA`, `F3:1E:E8:20:…:04:C2`, igual à linha útil `f31ee820…` de `deploy/db-ca.fingerprint`. **Essa linha está correta.** O desatualizado é o `deploy/ca-producao.pem` local (`F8:DB:AF:59…`, CA anterior).
 - **Migração 27:** `senha_historico.created_at` com `IS_NULLABLE=YES` e 0 linhas NULL; `sql/27_*` ainda precisa ser aplicada.
@@ -439,6 +441,14 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 **Andamento 2026-11-06 (Lote 41):** o estado registrado na abertura do lote como "instalação parcial" foi corrigido pelo usuário no mesmo dia: ver "Estado real", acima. O item (b) do andamento de 2026-11-04 fica resolvido: o `deploy/ca-producao.pem` local é que está desatualizado. O `deve_trocar_senha=0`, antes com "origem a confirmar", vem da troca de senha feita pelo usuário.
 
 **Correção na §11 (mesma data):** o `sed` + `printf` do passo 4 e o `--nova-ca` sem `--dev-ip` do passo 2 valem para **instalação do zero, com CA nova**, e esse caminho não foi testado no servidor. Não se aplicam ao estado atual.
+
+**Decisão do usuário (2026-11-06): sem passo de descarte de `casaos.senha` e `/root/rotaperfumes.antigo`.** Motivo, nas palavras do usuário: "no passo de validação será necessário colocar essas senhas em um pendrive seguro caso precise da senha". Portanto, **as senhas vão para pendrive seguro**. A decisão se refere a esses dois caminhos; os itens 1 e 3 (`shred` do `admin-app.senha` e do pepper) e o critério de aceite não foram alterados.
+
+**Dúvidas em aberto dessa decisão (para o usuário):**
+- Os itens 1 e 3 e o critério de aceite apagam `admin-app.senha` e `pepper-producao.txt`. O item 1 não prevê cópia antes do `shred`, e o item 3 guarda o pepper em "cofre", não em pendrive. Esses dois arquivos também vão para o pendrive seguro?
+- A lista acima não tem um "passo de validação" com esse nome. Em que item entra a cópia para o pendrive? Nenhum item novo foi acrescentado.
+- `/root/rotaperfumes.antigo` é o checkout antigo (item 6). A cópia para o pendrive é só das senhas que ele contiver, ou da pasta inteira?
+- `docs/deploy-servidor.md` §11, passo 2, ainda sugere descartar o `casaos.senha` com `shred -u` "se não for mais usar". O texto não foi alterado.
 
 **Critério de aceite:** `deploy/db-ca.fingerprint` commitado só com o fingerprint da CA de produção; backup copiado para fora do servidor; estágios "CA do banco", "Deploy" e "Smoke test" verdes no push dos Lotes 37 a 41; log da API com `tls=ligado (custom)` e `min=TLS1.3`; `TestTST15_MariadbDocker_Real` verde; `/root/rotaperfumes` como checkout git; porta 3306 fora do `docker ps` e site respondendo; migração 27 aplicada; `/root/rotaperfumes-ca/ca-key.pem`, `/root/pepper-producao.txt` e `/root/rotaperfumes-mariadb/admin-app.senha` apagados do servidor; `.env.producao` e `deploy/ca-producao.pem` apagados da máquina de dev. A ativação dos vendedores (item 11) não condiciona o aceite: fica a critério do usuário.
 
@@ -512,26 +522,13 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 
 ---
 
+> **2026-11-06 (Lote 42):** BACKUP-01 foi para o Lote 42 (`fazendo.md`).
+>
 > **2026-11-05 (Lote 36):** DB-07 e TST-16 foram para o Lote 36 (`fazendo.md`) e foram concluídos (`feito.md`, "Lote 36 de 2026-11-05").
 >
 > **2026-11-05 (Lote 35):** FE-18 e CHORE-16 foram para o Lote 35 (`fazendo.md`).
 >
 > **2026-11-04 (Lote 34):** SEC-46, SEC-49 e CHORE-15 foram para o **Lote 34** e estão concluídos (`feito.md`).
-
----
-
-## BACKUP-01: backup diário do MariaDB de produção — prioridade ALTA
-
-**Status:** pendente. **Próximo card recomendado.** Subiu de MÉDIA para ALTA em 2026-11-06: produção no ar sem rotina de backup.
-**Camadas:** Database, Deploy
-**Responsável:** 🌸 DataBrain (🟣 SecBrain revisa)
-**Origem:** 🟣 SecBrain, Lote 30 (2026-11-02).
-
-**Descrição:** hoje não existe backup do banco de produção. Um `--recriar` do `mariadb-docker.sh`, uma troca de digest (SEC-31) ou um erro da conta `casaos` (que tem escrita a partir da LAN) pode apagar os dados sem volta.
-
-**Ação esperada:** rotina diária de dump (arquivo com permissão `600`, retenção configurável), documentada em `docs/deploy-servidor.md`; exigir/registrar um backup antes de qualquer `--recriar` ou upgrade de digest; procedimento de restauração testado.
-
-**Critério de aceite:** backup diário gerado com `600` e retenção; restauração testada num banco descartável; docs atualizadas.
 
 ---
 
