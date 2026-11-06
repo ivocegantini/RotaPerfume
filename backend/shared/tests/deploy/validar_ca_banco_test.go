@@ -163,18 +163,26 @@ func TestSEC45_ValidarCABanco_AlvoENome(t *testing.T) {
 	})
 }
 
-// DEPLOY-07: o deploy/db-ca.fingerprint do repositório (só a CA de
-// PRODUCAO, ou vazio antes da instalação) RECUSA a CA de dev
-// (deploy/ca-cert.pem, quando existe nesta máquina) e qualquer CA fora da
-// lista, no script real.
+// DEPLOY-07 / SEC-71: o deploy/db-ca.fingerprint do repositório (só a CA de
+// PRODUCAO, ou vazio antes da instalação) RECUSA as CAs de dev e qualquer CA
+// fora da lista, no script real. Os certificados de dev não são versionados:
+// o CI cobre os dois CNs com CAs descartáveis e os fingerprints reais pela
+// lista fpsCADev; deploy/ca-cert.pem entra quando existe nesta máquina.
 func TestSEC40_ValidarCABanco_CADevRecusada(t *testing.T) {
 	precisaOpenSSL(t)
-	descartavel, _ := gerarCA(t, t.TempDir(), "RotaPerfumes_MySQL_CA")
-	cas := map[string]string{"CA descartável": descartavel}
+	descartavelAntiga, _ := gerarCA(t, t.TempDir(), "RotaPerfumes_MySQL_CA")
+	descartavelAtual, _ := gerarCA(t, t.TempDir(), "MariaDB_CA")
+	cas := map[string]string{
+		"CA descartavel CN antigo": descartavelAntiga,
+		"CA descartavel CN atual":  descartavelAtual,
+	}
 	if dev := caminhoRaiz(t, "deploy", "ca-cert.pem"); func() bool { _, err := os.Stat(dev); return err == nil }() {
 		cas["deploy/ca-cert.pem (dev)"] = dev
 	}
 	repo := lerRaiz(t, "deploy", "db-ca.fingerprint")
+	for _, fpDev := range fpsCADev {
+		require.NotContains(t, linhasUteis(repo), fpDev, "CA de dev na lista que o Jenkins aceita")
+	}
 	fpProdFalso := strings.Repeat("ab", 32)
 	alvo := []string{"DB_ALVO=rotaperfumes-mariadb", "DB_HOST_PORT=3306", "TLS_NOME=rotaperfumes-mariadb"}
 	for nome, ca := range cas {

@@ -1,6 +1,10 @@
 # A Fazer
 
-> Atualizado em 2026-11-06 (fechamento do Lote 40, 🔵 SubBrain). O **Lote 40** foi fechado: **SEC-63** concluído (`feito.md`, "Lote 40 de 2026-11-06: 1 card concluído"; **não commitado**: Lotes 37 a 40 juntos). Entraram 5 cards BAIXA no bloco novo "Achados do Lote 40" (logo abaixo): **SEC-66**, **SEC-67**, **SEC-68**, **SEC-69** e **SEC-70**. O **SEC-64** ganhou um acréscimo. **Continuam aqui:** DEPLOY-08 (ALTA, pendente do usuário; bloqueia o primeiro deploy da `main`), TST-17 (resto, pendente do usuário), ARQ-09 (adiado), CHORE-14 (só 7 dias após o deploy do SEC-33), BUG-25 (decisão), BACKUP-01, SEC-47, SEC-48, SEC-51, SEC-52, TST-04, DEP-03, SEC-64, SEC-65, CHORE-20, TST-26, CI-03, TST-27 e os 5 novos.
+> Atualizado em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain). O **Lote 41** foi fechado: **SEC-71** concluído (`feito.md`, "Lote 41 de 2026-11-06: 1 card concluído"; **não commitado**, pendente do ok do usuário). Entrou o **SEC-72** (BAIXA) no bloco novo "Achados do Lote 41" (logo abaixo). **DEPLOY-08** corrigido: a produção está **no ar** e o card passou a ser a limpeza pós-instalação, pendente do usuário; **um push na `main` agora é um deploy em sistema vivo**. **BACKUP-01** subiu para ALTA (produção no ar sem rotina de backup) e é o **próximo card recomendado**.
+>
+> Antes, ainda em 2026-11-06 (abertura do Lote 41, 🔵 SubBrain). **SEC-71** registrado direto em `fazendo.md`, em execução. Corrigidos aqui os cards **DEPLOY-08** (instalação parcial já feita no servidor, ver "Andamento 2026-11-06"; passos 2 e 4 valem para instalação do zero) e **TST-04** (`.env` aponta para o CasaOS :3307). O restante do backlog não mudou.
+>
+> Antes, em 2026-11-06 (fechamento do Lote 40, 🔵 SubBrain). O **Lote 40** foi fechado: **SEC-63** concluído (`feito.md`, "Lote 40 de 2026-11-06: 1 card concluído"; **não commitado**: Lotes 37 a 40 juntos). Entraram 5 cards BAIXA no bloco novo "Achados do Lote 40" (logo abaixo): **SEC-66**, **SEC-67**, **SEC-68**, **SEC-69** e **SEC-70**. O **SEC-64** ganhou um acréscimo. **Continuam aqui:** DEPLOY-08 (ALTA, pendente do usuário; bloqueia o primeiro deploy da `main`), TST-17 (resto, pendente do usuário), ARQ-09 (adiado), CHORE-14 (só 7 dias após o deploy do SEC-33), BUG-25 (decisão), BACKUP-01, SEC-47, SEC-48, SEC-51, SEC-52, TST-04, DEP-03, SEC-64, SEC-65, CHORE-20, TST-26, CI-03, TST-27 e os 5 novos.
 >
 > Antes, em 2026-11-05 (abertura do Lote 40, 🔵 SubBrain). A pedido do usuário ("siga para SEC-63"), o 🤍 MegaBrain abriu o **Lote 40 de 2026-11-05** e o **SEC-63** (MÉDIA, bloco "Achados do Lote 39") saiu desta lista para `fazendo.md`, com o texto completo. Testes só com cópia do `Makefile` e cliente falso, ou no descartável local (`rp-descartavel-l36`, `127.0.0.1:33306`); nada no CasaOS nem na produção. O restante do backlog não mudou.
 >
@@ -92,6 +96,31 @@
 > - **X1, contrato HTTP:** a única exceção ao "contrato HTTP inalterado" é a do ARQ-01 (métodos das 13 rotas, `/api/senha-historico/2/extra` e, pelo parse estrito de `{user_id...}` (R-f), `/api/senha-historico/0` e `/-1` passando a 400).
 >
 > Histórico anterior (2026-10-11): o 🔴 TestBrain executou `docs/roteiro-teste-manual-lote12.md` (24 aprovados, 1 falhou, 13 não verificáveis de 38; ver a seção "Execução (2026-10-07, 🔴 TestBrain)" no fim do roteiro). Daí saíram os cards BUG-13, LOG-01, DOC-05 e TST-04. BUG-13, LOG-01 e DOC-05 foram concluídos no Lote 16 (2026-10-07; ver `feito.md`). O LOG-02 (Lote 17) gerou o TST-05, e o DEP-00 (Lote 19) gerou o DEP-01 e o DEP-02. No Lote 20 (2026-10-11; ver `feito.md`) foram concluídos DEP-01, DEP-02 e TST-05; o TST-04 avançou parcialmente (só faltam 1.1, 1.2 e 1.7, que dependem do usuário rodar o `make`) e do DEP-01 saiu o card DEP-03 (BAIXA). Em 2026-10-16 o DEPLOY-01 (Lote 13) foi concluído e o MAIL-01 foi cancelado (sem servidor de e-mail; a API usa o envio Noop). Os dois estão em `feito.md`.
+
+---
+
+# Achados do Lote 41, 2026-11-06
+
+> Pendências do Lote 41 (`feito.md`, "Lote 41 de 2026-11-06: 1 card concluído"), levantadas na revisão do 🟣 SecBrain sobre o SEC-71. Nenhuma bloqueou o fechamento do lote. As linhas são as da árvore no fechamento do lote. Caminhos: `SH` = `backend/shared`.
+
+---
+
+## SEC-72: ressalvas do SEC-71 (avisos do `mariadb-docker.sh`, "Restart from Stage" e testes) — prioridade BAIXA
+
+**Status:** pendente. O **C4 depende de decisão do usuário**.
+**Camadas:** Deploy, Testes
+**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** revisão do 🟣 SecBrain no Lote 41 (aprovado com ressalvas; a C7 foi resolvida no fechamento).
+
+**Itens:**
+- **C1. `deploy/mariadb-docker.sh:961`:** com CA de dev no host, o cabeçalho chama a CA de "PRODUCAO" e mostra o fingerprint. Trocar o rótulo nesse caso, mantendo igual a saída de produção.
+- **C2. `deploy/mariadb-docker.sh:1000-1002`:** com `--dev-ip` e CA de dev, o passo 3 manda copiar para `deploy/ca-producao.pem`. Omitir nesse caso (raro; `--dev-ip` não se aplica desde 2026-11-05).
+- **C3. `deploy/mariadb-docker.sh:526` e `:949`:** só o primeiro certificado do `ca.pem` é conferido. Mitigado por `deploy/validar-ca-banco.sh:96-119`, que confere todos os blocos.
+- **C4. `Jenkinsfile:172` e `deploy/validar-ca-banco.sh:62-73`:** "Restart from Stage" em "CA do banco" pula "Testes Go"; com `d150…` commitado e CA de dev no host, a validação passa. Exige ação de admin e duas falhas juntas. **Decisão do usuário:** recusar também nesse estágio (terceira cópia da lista) ou aceitar o risco.
+- **C5. `SH/tests/deploy/mariadb_docker_test.go:321-322`:** falta conferir o aviso `contem o fingerprint da CA de DEV` nos casos "lista com essa CA" e "lista com as duas".
+- **C6. `SH/tests/deploy/deploy07_seed_producao_test.go:200`:** o `Contains` aceita o literal em qualquer lugar; conferir dentro do bloco `CA_DEV_FPS=( … )`.
+
+**Critério de aceite:** C1 e C2 corrigidos, com a saída de produção inalterada e coberta por teste; C3 corrigido ou aceito, com a decisão registrada no card; decisão do usuário sobre o C4 registrada e aplicada; C5 e C6 nos testes; suíte verde.
 
 ---
 
@@ -362,30 +391,39 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 
 # Achados do Lote 33 (DEPLOY-07), 2026-11-04
 
-> Pendências do DEPLOY-07 (`feito.md`, "Lote 33 de 2026-11-04"). O DEPLOY-08 vem primeiro: sem ele não há produção. A OPS-02 e a CHORE-18 foram concluídas em 2026-11-04 (`feito.md`, "Decisões do usuário de 2026-11-04 (após o Lote 34)").
+> Pendências do DEPLOY-07 (`feito.md`, "Lote 33 de 2026-11-04"). A produção está no ar; o DEPLOY-08 cuida da limpeza pós-instalação (correção de 2026-11-06). A OPS-02 e a CHORE-18 foram concluídas em 2026-11-04 (`feito.md`, "Decisões do usuário de 2026-11-04 (após o Lote 34)").
 
-## DEPLOY-08: executar a §11 de `docs/deploy-servidor.md` no servidor (instalação inicial da produção) — prioridade ALTA (pendente do usuário)
+## DEPLOY-08: limpeza pós-instalação da produção (`docs/deploy-servidor.md` §11 no servidor) — prioridade ALTA (pendente do usuário)
 
-**Status:** pendente **do usuário**; **bloqueia o primeiro deploy da `main`**. Código e docs prontos no DEPLOY-07 (Lote 33, `feito.md`). Substitui a parte de execução do antigo DEPLOY-05.
+**Status:** pendente **do usuário**. A produção já está **no ar**; **nenhum item da limpeza abaixo foi confirmado como feito**. Corrigido em 2026-11-06 (antes: "instalação parcial" e "bloqueia o primeiro deploy"). Código e docs prontos no DEPLOY-07 (Lote 33, `feito.md`). Substitui a parte de execução do antigo DEPLOY-05.
 **Camadas:** Deploy, Database
-**Responsável:** usuário (servidor `192.168.168.106`, Jenkins e máquina do admin) → 🔴 TestBrain (conferência dos resultados) → 🔵 SubBrain (fechamento)
+**Responsável:** usuário (servidor `192.168.168.106`, Jenkins e máquina de dev) → 🔴 TestBrain (conferência dos resultados) → 🔵 SubBrain (fechamento)
 **Origem:** fechamento do DEPLOY-07 (2026-11-04).
 
-**Por que bloqueia:** a `main` espera a rede Docker `rotaperfumes-db`, o container `rotaperfumes-mariadb`, a CA de produção em `deploy/db-ca.fingerprint` (hoje só o cabeçalho: o estágio "CA do banco" falha com `deploy/db-ca.fingerprint sem fingerprint: ...`), o banco semeado e as credenciais do Jenkins.
+**Estado real (informado pelo usuário em 2026-11-06):**
+- **Produção NO AR:** `rotaperfumes-api-1`, `rotaperfumes-frontend-1` e `rotaperfumes-caddy-1` (porta 8443) no ar; `rotaperfumes-mariadb` no ar.
+- **Admin:** o usuário fez login como admin e trocou a senha; isso explica `deve_trocar_senha=0`.
+- **Banco:** 13 tabelas, 42 vendedores inativos, admin ativo.
+- **Porta:** `192.168.168.106:3306` segue publicada, com a chain `ROTAPERFUMES-DB` liberando só `192.168.168.105`, **contra a decisão de "banco só local"**.
+- **Push:** um push na `main` agora é um **deploy em sistema vivo**, com os Lotes 37 a 41 (`main` local à frente de `origin/main`; nada enviado à `origin/main`). O Lote 41 ainda não foi commitado.
+- **Ainda no servidor:** `/root/rotaperfumes-ca/ca-key.pem`, `/root/pepper-producao.txt` e `/root/rotaperfumes-mariadb/admin-app.senha` (sem valor desde a troca). `/root/rotaperfumes` não é checkout git.
+- **CA:** em uso `CN=RotaPerfumes_MariaDB_CA`, `F3:1E:E8:20:…:04:C2`, igual à linha útil `f31ee820…` de `deploy/db-ca.fingerprint`. **Essa linha está correta.** O desatualizado é o `deploy/ca-producao.pem` local (`F8:DB:AF:59…`, CA anterior).
+- **Migração 27:** `senha_historico.created_at` com `IS_NULLABLE=YES` e 0 linhas NULL; `sql/27_*` ainda precisa ser aplicada.
 
-**Passo a passo:** `docs/deploy-servidor.md` §11 ("Instalação inicial da produção (DEPLOY-07)"), 12 passos:
-1. checkout com o DEPLOY-07 em `/root/rotaperfumes`;
-2. `sudo bash deploy/mariadb-docker.sh --nova-ca --dev-ip <IP do admin>` e anotar o `CA_FP`;
-3. chave da CA para mídia offline e `shred`;
-4. `CA_FP` como única linha útil de `deploy/db-ca.fingerprint`, `make test`, commit (sem push);
-5. `PASSWORD_PEPPER` novo, Secret file `rotaperfumes-api-env` e credencial `rotaperfumes-db-admin`;
-6. `sudo bash deploy/seed-producao.sh --pepper-file <arq>` (senha do admin em `/root/rotaperfumes-mariadb/admin-app.senha`);
-7. conferências SQL (13 tabelas, admin ativo com `deve_trocar_senha = 1` e Argon2id, 42 vendedores, 0 não-admin ativos);
-8. checklist pré-push (`IMPORTAR_DUMP` desmarcado);
-9. push na `main`;
-10. 1º login do admin com troca obrigatória e ativação dos vendedores (pré-requisito **OPS-02 atendido** em 2026-11-04: SMTP de produção configurado pelo usuário, por ora via Gmail);
-11. ~~`.env.producao` + `deploy/ca-producao.pem` na máquina do admin~~ **não aplicável** (marcado em 2026-11-05; decisão de 2026-11-04: o banco de produção só responde localmente no servidor, para o `rotaperfumes-api` e o root; sem `--dev-ip` para `192.168.168.105`; conferências pelo passo 7);
-12. `TestTST15_MariadbDocker_Real` numa máquina com Docker (ver **TST-17**).
+**Limpeza pós-instalação, nesta ordem (todos os itens pendentes do usuário):**
+1. [ ] `shred` do `/root/rotaperfumes-mariadb/admin-app.senha`.
+2. [ ] Backup do banco (`docs/deploy-servidor.md`, seção "Backup do banco"), copiado para fora do servidor.
+3. [ ] Comparar o pepper de `/root/pepper-producao.txt` com o da API, **sem imprimir**. Se iguais, guardar no cofre e dar `shred`. Se diferentes, **não apagar** e avisar.
+4. [ ] `TestTST15_MariadbDocker_Real` com `sudo`, na máquina de dev (ver **TST-17**; nunca no servidor).
+5. [ ] `make deps-audit`, depois push na `main` (`IMPORTAR_DUMP` desmarcado) e acompanhar o job. Efeitos: a API reinicia; `ultimo_login_at` gravado antes do deploy aparece 3 h mais cedo, cosmético (DB-08).
+6. [ ] Atualizar o checkout: mover `/root/rotaperfumes` para `/root/rotaperfumes.antigo` e `git clone --depth 1` (§11, passo 1).
+7. [ ] Novo backup e `deploy/mariadb-docker.sh --recriar` sem `--dev-ip`, em janela com queda rápida aceitável; conferir que a 3306 sumiu do `docker ps` e que o site responde. **Nunca `--nova-ca`.** Comportamento documentado na §11, passo 2, e no script: a chain `ROTAPERFUMES-DB` fica, só com `-j DROP`, se a unit antiga existir; a conta `casaos` é removida e um `casaos.senha` existente é mantido, com aviso.
+8. [ ] Migração 27 pelo `admin_sql` (§11, passo 7).
+9. [ ] §11, passo 3: tirar `ca-key.pem` do servidor, para pendrive cifrado.
+10. [ ] Na máquina de dev, apagar `.env.producao` e `deploy/ca-producao.pem`.
+11. [ ] Ativar vendedores pela tela Usuários, quando o usuário quiser (§11, passo 10, item 4; SMTP de produção configurado pelo usuário, por ora via Gmail, OPS-02).
+
+**Instalação do zero:** os 12 passos da §11 continuam como referência para esse caso e não devem ser repetidos neste servidor. O `--nova-ca` trocaria a CA em uso, e o passo 11 (`.env.producao`) segue **não aplicável**.
 
 **Item opcional (vindo do CHORE-18):** conferir o SAN do certificado no servidor: `openssl x509 -in /etc/mysql/ssl/server-cert.pem -noout -ext subjectAltName` (deve conter `ivo-Inspiron-15-3530` e `192.168.168.106`).
 
@@ -398,7 +436,11 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 
 **Andamento 2026-11-05:** o passo 11 foi marcado como **não aplicável** em `docs/deploy-servidor.md` (caixa de aviso; texto antigo mantido como referência, caso o `--dev-ip` seja habilitado) e em `docs/Instal_SSL.md` (§8 e §11). O **critério de aceite deixa de depender do passo 11**; as conferências da produção são feitas no servidor, como root, pelo `admin_sql` do passo 7.
 
-**Critério de aceite:** container `rotaperfumes-mariadb` 11.4 com a CA de produção; `deploy/db-ca.fingerprint` commitado só com o fingerprint dela; estágios "CA do banco", "Deploy" e "Smoke test" verdes; log da API com `tls=ligado (custom)` e `min=TLS1.3`; admin logado e com a senha trocada; `/root/rotaperfumes-ca/ca-key.pem`, `/root/pepper-producao.txt` e `/root/rotaperfumes-mariadb/admin-app.senha` apagados do servidor.
+**Andamento 2026-11-06 (Lote 41):** o estado registrado na abertura do lote como "instalação parcial" foi corrigido pelo usuário no mesmo dia: ver "Estado real", acima. O item (b) do andamento de 2026-11-04 fica resolvido: o `deploy/ca-producao.pem` local é que está desatualizado. O `deve_trocar_senha=0`, antes com "origem a confirmar", vem da troca de senha feita pelo usuário.
+
+**Correção na §11 (mesma data):** o `sed` + `printf` do passo 4 e o `--nova-ca` sem `--dev-ip` do passo 2 valem para **instalação do zero, com CA nova**, e esse caminho não foi testado no servidor. Não se aplicam ao estado atual.
+
+**Critério de aceite:** `deploy/db-ca.fingerprint` commitado só com o fingerprint da CA de produção; backup copiado para fora do servidor; estágios "CA do banco", "Deploy" e "Smoke test" verdes no push dos Lotes 37 a 41; log da API com `tls=ligado (custom)` e `min=TLS1.3`; `TestTST15_MariadbDocker_Real` verde; `/root/rotaperfumes` como checkout git; porta 3306 fora do `docker ps` e site respondendo; migração 27 aplicada; `/root/rotaperfumes-ca/ca-key.pem`, `/root/pepper-producao.txt` e `/root/rotaperfumes-mariadb/admin-app.senha` apagados do servidor; `.env.producao` e `deploy/ca-producao.pem` apagados da máquina de dev. A ativação dos vendedores (item 11) não condiciona o aceite: fica a critério do usuário.
 
 ---
 
@@ -478,9 +520,9 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 
 ---
 
-## BACKUP-01: backup diário do MariaDB de produção — prioridade MÉDIA
+## BACKUP-01: backup diário do MariaDB de produção — prioridade ALTA
 
-**Status:** pendente.
+**Status:** pendente. **Próximo card recomendado.** Subiu de MÉDIA para ALTA em 2026-11-06: produção no ar sem rotina de backup.
 **Camadas:** Database, Deploy
 **Responsável:** 🌸 DataBrain (🟣 SecBrain revisa)
 **Origem:** 🟣 SecBrain, Lote 30 (2026-11-02).
@@ -603,7 +645,7 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 
 ## TST-04: itens do roteiro do Lote 12 que testam o próprio `make` (1.1, 1.2 e 1.7) — prioridade MÉDIA
 
-**Status:** pendente, **bloqueado** (depende do usuário); avançou parcialmente no Lote 20 (2026-10-11). **Reconfirmado em 2026-11-02:** o `.env` local aponta para o banco de **produção** (`192.168.168.106:3306`), e os agentes não rodam `make db-*` nele. Continua bloqueado até o usuário rodar os itens (ou apontar o `.env` para um banco de dev/descartável).
+**Status:** pendente, **bloqueado** (depende do usuário); avançou parcialmente no Lote 20 (2026-10-11). **Corrigido em 2026-11-06:** o `.env` local aponta para o banco de **dev** do CasaOS (`192.168.168.106:3307`), não para a produção como dizia a reconfirmação de 2026-11-02. Continua bloqueado até o usuário rodar os itens ou liberar `make db-*` para o 🔴 TestBrain ("Falta", abaixo).
 **Camada:** Testes
 **Responsável:** 🔴 TestBrain com o usuário
 **Origem:** 🔴 TestBrain, roteiro manual do Lote 12 (2026-10-07).

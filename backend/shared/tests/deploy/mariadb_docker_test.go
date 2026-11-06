@@ -223,11 +223,14 @@ func TestSEC45_SanSemHostDockerInternal(t *testing.T) {
 	assert.NotRegexp(t, `(?m)^[^#]*-p "?0\.0\.0\.0`, md)
 }
 
-// fpCADev é o fingerprint SHA-256 da CA de DEV (MariaDB do CasaOS, porta
-// 3307, deploy/ca-cert.pem). DEPLOY-07: nunca pode estar no
+// fpsCADev lista os fingerprints SHA-256 das CAs de DEV (MariaDB do CasaOS,
+// porta 3307, deploy/ca-cert.pem). DEPLOY-07 / SEC-71: nenhum pode estar no
 // deploy/db-ca.fingerprint (roda também no Jenkins, onde o ca-cert.pem não
 // existe).
-const fpCADev = "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
+var fpsCADev = []string{
+	"ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b", // CN=RotaPerfumes_MySQL_CA (antiga)
+	"d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2", // CN=MariaDB_CA (em uso)
+}
 
 // DEPLOY-07 / SEC-45: deploy/db-ca.fingerprint lista só a CA de PRODUCAO.
 // Zero fingerprints é o estado pré-instalação (o Jenkins falha fechado, ver
@@ -241,14 +244,112 @@ func TestSEC45_FingerprintVersionadoConfereComCA(t *testing.T) {
 	for _, fp := range fps {
 		assert.Regexp(t, `^[0-9a-f]{64}$`, fp)
 	}
-	assert.NotContains(t, fps, fpCADev, "a CA de dev (CasaOS) não pode estar no db-ca.fingerprint")
+	for _, fpDev := range fpsCADev {
+		assert.NotContains(t, fps, fpDev, "a CA de dev (CasaOS) não pode estar no db-ca.fingerprint")
+	}
 	ca := caminhoRaiz(t, "deploy", "ca-cert.pem")
 	if _, err := os.Stat(ca); err != nil {
-		t.Log("deploy/ca-cert.pem ausente nesta máquina (Jenkins): só a constante fpCADev foi conferida")
+		t.Log("deploy/ca-cert.pem ausente nesta máquina (Jenkins): só a lista fpsCADev foi conferida")
 		return
 	}
 	precisaOpenSSL(t)
-	assert.NotContains(t, fps, fingerprint(t, ca), "deploy/ca-cert.pem é a CA de dev; não pode estar no db-ca.fingerprint")
+	fpLocal := fingerprint(t, ca)
+	assert.NotContains(t, fps, fpLocal, "deploy/ca-cert.pem é a CA de dev; não pode estar no db-ca.fingerprint")
+	assert.Contains(t, fpsCADev, fpLocal, "SEC-71: deploy/ca-cert.pem mudou; confira a origem no servidor (pode ser interceptação ou cópia errada) e, se legítimo, inclua o fingerprint novo em CA_DEV_FPS (mariadb-docker.sh) e em fpsCADev")
+}
+
+// SEC-71: a guarda do mariadb-docker.sh avisa, citando a linha a remover,
+// quando o deploy/db-ca.fingerprint do checkout traz uma CA de dev. Roda o
+// script real a partir de uma cópia, com um db-ca.fingerprint ao lado dele.
+func TestSEC71_Ensaio_GuardaCADevNoFingerprint(t *testing.T) {
+	const fpAntiga = "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
+	const fpAtual = "d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2"
+	aviso := func(fp string) string {
+		return "contem o fingerprint da CA de DEV (" + fp + "): remova essa linha (a CA de dev nunca vale em producao)."
+	}
+	fpProd := strings.Repeat("ab", 32)
+	casos := []struct {
+		nome, conteudo string
+		avisa, cala    []string
+	}{
+		{"so a CA nova", fpAtual + "\n", []string{fpAtual}, []string{fpAntiga}},
+		{"so a CA antiga", fpAntiga + "\n", []string{fpAntiga}, []string{fpAtual}},
+		{"as duas", fpAntiga + "\n" + fpAtual + "\n", []string{fpAntiga, fpAtual}, nil},
+		{"CA nova com producao e CRLF", fpProd + "\r\n" + fpAtual + "\r\n", []string{fpAtual}, []string{fpAntiga}},
+		{"so comentario e producao", "# nunca " + fpAtual + "\n# nem " + fpAntiga + "\n" + fpProd + "\n", nil, []string{fpAntiga, fpAtual}},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			e := novoEnsaio(t)
+			e.usarCheckout(lerRaiz(t, "deploy", "mariadb-docker.sh"), c.conteudo)
+			r := e.rodar("--nova-ca")
+			require.NoError(t, r.err, r.out)
+			for _, fp := range c.avisa {
+				assert.Contains(t, r.out, aviso(fp))
+			}
+			for _, fp := range c.cala {
+				assert.NotContains(t, r.out, aviso(fp))
+			}
+		})
+	}
+}
+
+// SEC-71: com uma CA de dev em $SSL_DIR/ca.pem, o script avisa e não manda
+// gravar esse fingerprint, sem abortar. A chave das CAs de dev não existe aqui:
+// a cópia do script passa a tratar uma CA descartável como CA de dev.
+func TestSEC71_Ensaio_CADevNoHost(t *testing.T) {
+	const fpAtual = "d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2"
+	fpProd := strings.Repeat("ab", 32)
+	preparar := func(t *testing.T, listarComoDev bool, lista string) (*ensaio, string, string) {
+		t.Helper()
+		e := novoEnsaio(t)
+		ca, key := gerarCA(t, filepath.Join(e.dir, "offline"), "MariaDB_CA")
+		escrever(t, filepath.Join(e.dir, "ssl", "ca.pem"), mustRead(t, ca), 0o644)
+		fp := fingerprint(t, ca)
+		script := lerRaiz(t, "deploy", "mariadb-docker.sh")
+		if listarComoDev {
+			require.Contains(t, script, `"`+fpAtual+`"`)
+			script = strings.ReplaceAll(script, `"`+fpAtual+`"`, `"`+fp+`"`)
+		}
+		e.usarCheckout(script, strings.ReplaceAll(lista, "<fp>", fp))
+		return e, key, fp
+	}
+	const avisoHost = "e uma CA de DEV ("
+	for nome, lista := range map[string]string{
+		"lista vazia":        "# so comentario\n",
+		"lista de producao":  fpProd + "\n",
+		"lista com essa CA":  "<fp>\n",
+		"lista com as duas":  fpProd + "\n<fp>\n",
+		"comentario com ela": "# <fp>\n",
+	} {
+		t.Run("CA de dev/"+nome, func(t *testing.T) {
+			e, key, fp := preparar(t, true, lista)
+			r := e.rodar("--ca-key", key)
+			require.NoError(t, r.err, "avisa, não aborta: %s", r.out)
+			assert.Contains(t, r.out, avisoHost+fp+"): NAO grave esse fingerprint")
+			assert.Contains(t, r.out, "2. NAO grave o fingerprint desta CA")
+			assert.NotContains(t, r.out, "Grave "+fp)
+			assert.NotContains(t, r.out, "grave "+fp)
+			assert.NotContains(t, r.out, "ja contem "+fp)
+			assert.NotContains(t, r.out, "NAO contem "+fp)
+		})
+	}
+	t.Run("CA de producao segue mandando gravar", func(t *testing.T) {
+		e, key, fp := preparar(t, false, "# so comentario\n")
+		r := e.rodar("--ca-key", key)
+		require.NoError(t, r.err, r.out)
+		assert.NotContains(t, r.out, avisoHost)
+		assert.NotContains(t, r.out, "2. NAO grave")
+		assert.Contains(t, r.out, "2. Grave "+fp)
+		assert.Contains(t, r.out, "ainda nao tem fingerprint: grave "+fp)
+	})
+	t.Run("CA de producao ja listada", func(t *testing.T) {
+		e, key, fp := preparar(t, false, "<fp>\n")
+		r := e.rodar("--ca-key", key)
+		require.NoError(t, r.err, r.out)
+		assert.NotContains(t, r.out, avisoHost)
+		assert.Contains(t, r.out, "ja contem "+fp+": OK.")
+	})
 }
 
 func linhasUteis(s string) []string {
@@ -320,8 +421,9 @@ func TestSEC45_MariadbDocker_OpcoesRemovidasEInvalidas(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type ensaio struct {
-	t   *testing.T
-	dir string
+	t      *testing.T
+	dir    string
+	script string // vazio: o deploy/mariadb-docker.sh do repositório
 }
 
 const (
@@ -391,6 +493,15 @@ func pacoteGreeting() []byte {
 	return append([]byte{byte(n), byte(n >> 8), byte(n >> 16), 0x00}, payload...)
 }
 
+// usarCheckout faz o ensaio rodar esta versão do script, com o
+// db-ca.fingerprint dado ao lado dela (nunca o arquivo real do repositório).
+func (e *ensaio) usarCheckout(script, fingerprints string) {
+	e.t.Helper()
+	e.script = filepath.Join(e.dir, "checkout", "mariadb-docker.sh")
+	escrever(e.t, e.script, script, 0o755)
+	escrever(e.t, filepath.Join(e.dir, "checkout", "db-ca.fingerprint"), fingerprints, 0o644)
+}
+
 func (e *ensaio) setState(nome, conteudo string) {
 	escrever(e.t, filepath.Join(e.dir, "state", nome), conteudo, 0o644)
 }
@@ -433,7 +544,11 @@ func (e *ensaio) rodar(args ...string) saidaEnsaio {
 	base := []string{"-rm", "bash", filepath.Join(e.dir, "runner.sh"),
 		"--ssl-dir", filepath.Join(e.dir, "ssl"), "--dados", filepath.Join(e.dir, "dados"), "--host-nome", hostTeste}
 	cmd := exec.Command("unshare", append(base, args...)...)
-	cmd.Env = append(ambienteLimpo(), "FAKE="+e.dir, "SCRIPT="+mariadbDocker(e.t))
+	script := e.script
+	if script == "" {
+		script = mariadbDocker(e.t)
+	}
+	cmd.Env = append(ambienteLimpo(), "FAKE="+e.dir, "SCRIPT="+script)
 	out, err := cmd.CombinedOutput()
 	return saidaEnsaio{out: string(out), err: err}
 }

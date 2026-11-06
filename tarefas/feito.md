@@ -2,9 +2,11 @@
 
 > Histórico de tarefas finalizadas.
 >
-> 2026-11-06 (🤍 MegaBrain): os Lotes 37 a 40 foram commitados juntos na branch `lote-37-40`, a pedido do usuário, sem push e sem merge na `main`. Onde os blocos abaixo desses lotes dizem "não commitado", vale esta nota.
+> 2026-11-06 (🤍 MegaBrain): os Lotes 37 a 40 foram commitados juntos na branch `lote-37-40`, a pedido do usuário, sem merge na `main` remota. A branch foi enviada ao remoto em 2026-11-06 07:57 e aponta para `b8fa988`; `origin/main` segue em `87f5c64`, e a `main` local tem o mesmo `b8fa988`, à frente de `origin/main` (conferido com `git ls-remote` e o reflog). Onde os blocos abaixo desses lotes dizem "não commitado", vale esta nota.
 >
-> Atualizado em 2026-11-06 (fechamento do Lote 40, 🔵 SubBrain): o **Lote 40** foi fechado (bloco "Lote 40 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-63** concluído. **Não commitado** (Lotes 37 a 40 juntos). Entraram 5 cards BAIXA em `afazer.md` (bloco "Achados do Lote 40"): **SEC-66**, **SEC-67**, **SEC-68**, **SEC-69** e **SEC-70**; o **SEC-64** ganhou um acréscimo. Pendência do usuário no bloco do lote: sugestão de texto para o `CLAUDE.md`. Registro do reinício da máquina de 2026-11-06 no bloco do lote. O `fazendo.md` voltou a ficar sem cards.
+> Atualizado em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain): o **Lote 41** foi fechado (bloco "Lote 41 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-71** concluído. **Não commitado** (pendente do ok do usuário), sem push. Entrou 1 card BAIXA em `afazer.md` (bloco "Achados do Lote 41"): **SEC-72**. No mesmo fechamento: **DEPLOY-08** corrigido para o estado real (produção no ar; resta a limpeza pós-instalação, pendente do usuário), **BACKUP-01** subiu para ALTA e o bloco do **DB-08** ganhou uma nota de correção. O `fazendo.md` voltou a ficar sem cards.
+>
+> Antes, ainda em 2026-11-06 (fechamento do Lote 40, 🔵 SubBrain): o **Lote 40** foi fechado (bloco "Lote 40 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-63** concluído. **Não commitado** (Lotes 37 a 40 juntos). Entraram 5 cards BAIXA em `afazer.md` (bloco "Achados do Lote 40"): **SEC-66**, **SEC-67**, **SEC-68**, **SEC-69** e **SEC-70**; o **SEC-64** ganhou um acréscimo. Pendência do usuário no bloco do lote: sugestão de texto para o `CLAUDE.md`. Registro do reinício da máquina de 2026-11-06 no bloco do lote. O `fazendo.md` voltou a ficar sem cards.
 >
 > Antes, em 2026-11-05 (fechamento do Lote 39, 🔵 SubBrain): o **Lote 39** foi fechado (bloco "Lote 39 de 2026-11-05: 12 cards fechados (11 concluídos, 1 aceito)" logo abaixo): **BUG-31**, **SEC-59**, **BUG-32**, **CHORE-19**, **SEC-60**, **SEC-61**, **CI-02**, **SEC-62**, **DB-09**, **TST-24** e **TST-25** concluídos; **BUG-33** fechado como aceito, sem correção. **Não commitado** (Lotes 37, 38 e 39 juntos). Entraram 7 cards em `afazer.md` (bloco "Achados do Lote 39"): **SEC-63** (MÉDIA) e **SEC-64**, **SEC-65**, **CHORE-20**, **TST-26**, **CI-03** e **TST-27** (BAIXA); o **SEC-47** ganhou um acréscimo. Pendências do usuário no bloco do lote: migração 27 no CasaOS, `make setup` no ambiente local e sugestões para o `CLAUDE.md`. O `fazendo.md` voltou a ficar sem cards.
 >
@@ -19,6 +21,51 @@
 > Antes, ainda em 2026-11-05 (fechamento do Lote 35, 🔵 SubBrain): o **Lote 35** (BUG-27, SEC-54, TST-19, SEC-55, TST-20, TST-21, FE-18 e CHORE-16) foi concluído (bloco "Lote 35 de 2026-11-05" logo abaixo; commitado na `main` pelo 🤍 MegaBrain, a pedido do usuário). Dele saíram 3 cards em `afazer.md` (bloco "Achados do Lote 35"): SEC-56, SEC-57 e BUG-28 (BAIXA).
 >
 > Antes, ainda em 2026-11-04 (decisões do usuário após o Lote 34, repassadas pelo 🤍 MegaBrain; 🔵 SubBrain): **OPS-02** (SMTP de produção configurado pelo usuário, por ora via Gmail) e **CHORE-18** (hostname do servidor confirmado, sem alteração de código) foram concluídos (bloco "Decisões do usuário de 2026-11-04 (após o Lote 34)" abaixo). O DOC-09 continua em `afazer.md` (o `CLAUDE.md` não foi alterado pelo agente).
+
+---
+
+## Lote 41 de 2026-11-06: 1 card concluído
+
+Aberto e fechado em 2026-11-06 pelo 🤍 MegaBrain, depois do erro de TLS que o usuário recebeu ao rodar a contagem da migração 27. Passos: 🤍 MegaBrain (troca local da CA) → 🟡 BackBrain (guarda) → 🤍 MegaBrain (conferência dos testes) → 🟣 SecBrain (revisão só por leitura) → 🔵 SubBrain fechando. **Não commitado** (pendente do ok do usuário), sem push. Caminhos: `SH` = `backend/shared`.
+
+**Testes finais (conferidos pelo 🤍 MegaBrain):**
+- `go clean -testcache && env -u INTEGRATION make -k test` rc=0, 12107 PASS, 0 FAIL, 61 SKIP.
+- `make lint` e `make shellcheck` ok.
+
+**Revisão (🟣 SecBrain): aprovado com ressalvas, sem nada a corrigir agora.** Revisão só por leitura. As ressalvas C1 a C6 viraram o **SEC-72**; a C7 foi resolvida no fechamento (`docs/deploy-servidor.md` §10).
+
+**Docs:** `docs/deploy-servidor.md` (§3.7, §10 e §11) e `docs/Instal_SSL.md`. Sem endpoint novo nem tela nova: coleção Postman e manual de telas sem mudança.
+
+**Cards criados em `afazer.md`** (bloco "Achados do Lote 41"): SEC-72 (BAIXA).
+
+---
+
+## SEC-71: CA de dev do CasaOS divergente do `deploy/ca-cert.pem` — 2026-11-06
+
+**Status:** ✅ concluído (Lote 41). **Não commitado** (pendente do ok do usuário), sem push.
+**Camadas:** Backend/Deploy (guarda), Testes, Documentação
+**Responsável:** 🤍 MegaBrain (troca local da CA) → 🟡 BackBrain (guarda) → 🟣 SecBrain (revisão) → 🔵 SubBrain (docs e fechamento)
+**Origem:** o usuário, ao rodar a contagem da migração 27, recebeu `TLS/SSL error: self-signed certificate in certificate chain`.
+
+**Diagnóstico:**
+- A porta 3307 serve `CN=MariaDB Server` (`C0:A0:40:59…`), emitido por `CN=MariaDB_CA` (`D1:50:EE:67:F2:23:36:40:6E:A5:F9:19:57:B6:93:50:09:A1:63:FC:47:27:B5:37:A0:0D:15:DA:01:FE:85:D2`).
+- O usuário conferiu no servidor, dentro do container `big-bear-linuxserver-mariadb-app-1`, que esses são os arquivos configurados em `/etc/mysql/ssl/` (no host, `/DATA/AppData/mariadb/ssl`), sem sinal de interceptação.
+- A CA antiga `EF:31:B6:56…` (`CN=RotaPerfumes_MySQL_CA`) não apareceu nas pastas verificadas do container. **A origem dela é desconhecida, e ela segue proibida.**
+- SAN do certificado: `192.168.168.106`, `127.0.0.1`, `localhost`. O handshake com a CA `D1:50` passa (código 0, TLS 1.3).
+
+**Decisão do usuário:** adotar a CA `D1:50`.
+
+**Entregas:**
+- 🤍 MegaBrain: `deploy/ca-cert.pem` local trocado depois de conferir o fingerprint; backup em `deploy/ca-cert.ef31-ate-2026-11-06.pem` (excluído só localmente, em `.git/info/exclude`); `make db-check-env` rc=0.
+- **Guarda das duas CAs de dev (`d150ee67…` e `ef31b656…`) no `deploy/db-ca.fingerprint`:** os **testes Go recusam** essas linhas (estágio "Testes Go" do Jenkins); o `deploy/mariadb-docker.sh` **só avisa, não aborta**. O `deploy/validar-ca-banco.sh` e o estágio "CA do banco" **não usam a lista de dev**: eles aceitam ou recusam só pelo `deploy/db-ca.fingerprint` (lacuna em SEC-72, C4).
+- **CA de dev instalada no host:** o `deploy/mariadb-docker.sh` diz no passo 2 para não gravar o fingerprint, emite um aviso próprio (`$SSL_DIR/ca.pem e uma CA de DEV`) e não imprime "ja contem: OK". Com CA de produção, a lógica nova fica inativa.
+- **Docs:** `docs/Instal_SSL.md` e `docs/deploy-servidor.md` citam a CA de dev `CN=MariaDB_CA` (`d150ee67…`), com a `ef31b656…` ainda proibida. No fechamento, o texto foi conferido contra o código: `docs/Instal_SSL.md:156` dizia que o estágio "CA do banco" recusa a CA de dev e foi corrigido.
+
+**Limite para outras máquinas:** o `deploy/ca-cert.pem` é local e está no git-ignore. Outra máquina de dev precisa buscar a CA `D1:50` por conta própria.
+
+**Correção de premissa (2026-11-06, 🤍 MegaBrain):** a linha `f31ee820…` de `deploy/db-ca.fingerprint` é a CA de produção em uso e está correta; o desatualizado é o `deploy/ca-producao.pem` local. O texto que chamava essa linha de antiga foi corrigido em `docs/Instal_SSL.md:156` e nos passos 1, 2 e 4 da §11 de `docs/deploy-servidor.md`. O estado da produção está no card DEPLOY-08 (`afazer.md`).
+
+**Testes:** suíte final do lote verde (bloco do lote, acima). O ensaio novo (`TestSEC71_Ensaio_CADevNoHost`, `SH/tests/deploy/mariadb_docker_test.go`) troca `d150…` por uma CA descartável só na cópia do script; os literais reais são conferidos por `TestDEPLOY07_CADevNuncaEmProducao`.
 
 ---
 
@@ -369,6 +416,8 @@ Aberto e fechado em 2026-11-05 pelo 🤍 MegaBrain, a pedido do usuário ("siga 
 **Decisão (opção (c) do 🤍 MegaBrain):** fixar o fuso da sessão no DSN. `SH/config/config.go` acrescenta `&time_zone=%27-03%3A00%27` (`tz.OffsetSQL = "-03:00"`, antes do parâmetro de TLS). Com isso, `DEFAULT`/`ON UPDATE CURRENT_TIMESTAMP` e os valores gravados pelo Go ficam coerentes, e as linhas antigas passam a aparecer certas. DDL não muda; as colunas de acesso (DATETIME naive) não são afetadas. O 🟣 SecBrain conferiu que todo caminho Go abre a conexão por `config.DSN()` (API, CLIs, `resetpassword`, importers, testkit).
 
 **Efeito colateral aceito:** `ultimo_login_at` antigo no CasaOS aparece 3 h mais cedo (só dev). Dados do CasaOS não migrados; produção ainda sem dados (DEPLOY-08 pendente).
+
+> **Correção (2026-11-06, 🔵 SubBrain):** a frase acima estava errada: o banco de produção já tinha dados. O efeito também vale em produção, e a premissa do lote estava errada. Ver o card DEPLOY-08 (`afazer.md`).
 
 **Levantamento (só no descartável):** `@@global.time_zone=SYSTEM`, `@@system_time_zone=UTC`. CasaOS e produção ficam como pendência do usuário.
 

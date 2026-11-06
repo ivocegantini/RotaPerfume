@@ -6,7 +6,7 @@
 >
 > **Primeira instalação da produção?** Siga a seção "Instalação inicial da produção (DEPLOY-07)" do [`docs/deploy-servidor.md`](deploy-servidor.md#11-instalação-inicial-da-produção-deploy-07). Ela usa os passos deste roteiro na ordem certa (CA nova com `--nova-ca`, seed, fingerprint e deploy).
 >
-> **Duas CAs, nunca misturadas (DEPLOY-07, 2026-11-04):** a CA de **produção** é gerada pelo `mariadb-docker.sh --nova-ca` (`CN=RotaPerfumes_MariaDB_CA`), fica no servidor em `/etc/mysql/ssl/ca.pem` e é a única em `deploy/db-ca.fingerprint`. A CA de **dev** é a do MariaDB 11.8 do CasaOS (porta 3307), em `deploy/ca-cert.pem` (`CN=RotaPerfumes_MySQL_CA`, fingerprint `ef31b656...`, não versionada): ela nunca vai para o `deploy/db-ca.fingerprint`, e a CA de produção nunca é copiada para `deploy/ca-cert.pem`.
+> **Duas CAs, nunca misturadas (DEPLOY-07, 2026-11-04):** a CA de **produção** é gerada pelo `mariadb-docker.sh --nova-ca` (`CN=RotaPerfumes_MariaDB_CA`), fica no servidor em `/etc/mysql/ssl/ca.pem` e é a única em `deploy/db-ca.fingerprint`. A CA de **dev** é a do MariaDB 11.8 do CasaOS (porta 3307), em `deploy/ca-cert.pem` (`CN=MariaDB_CA`, fingerprint `d150ee67...`, não versionada; SEC-71, 2026-11-06). Nem ela nem a CA de dev anterior (`CN=RotaPerfumes_MySQL_CA`, fingerprint `ef31b656...`, que continua proibida) vão para o `deploy/db-ca.fingerprint`, e a CA de produção nunca é copiada para `deploy/ca-cert.pem`.
 
 ## 0. Visão geral
 
@@ -53,7 +53,7 @@ Escolha **um** caso:
 
 | Caso | Situação | Comando |
 |---|---|---|
-| A | não há CA de produção (**primeira instalação**, decisão do DEPLOY-07) | `sudo bash deploy/mariadb-docker.sh --nova-ca --dev-ip <IP do admin>` (gera `CN=RotaPerfumes_MariaDB_CA`) |
+| A | não há CA de produção (**primeira instalação**, decisão do DEPLOY-07) | `sudo bash deploy/mariadb-docker.sh --nova-ca` (gera `CN=RotaPerfumes_MariaDB_CA`) |
 | B | a CA de produção já existe em `/etc/mysql/ssl/ca.pem` e a chave dela está na mídia offline (reexecução, renovação) | `sudo bash deploy/mariadb-docker.sh --ca-key /media/<pendrive>/ca-key.pem [--dev-ip ... (a mesma lista)]` |
 
 **Nunca** reaproveite a CA de dev (`deploy/ca-cert.pem`, CasaOS) em produção: ela não entra em `/etc/mysql/ssl/ca.pem` nem em `deploy/db-ca.fingerprint`.
@@ -153,7 +153,7 @@ Só o `ca.pem` (público) é montado na API. A `server-key.pem` continua 600.
 - **`DB_TLS_CA_HOST_PATH`** deixou de ser parâmetro do job: é constante no `environment` do `Jenkinsfile` (`/etc/mysql/ssl/ca.pem`, caminho do **host**, resolvido pelo daemon Docker; funciona com o Jenkins em container). `DB_TLS_SERVER_NAME` também saiu: o nome conferido é sempre `rotaperfumes-mariadb`.
 - **`deploy/db-ca.fingerprint`** (versionado): SHA-256 do DER de cada certificado aceito no arquivo da CA, em hex minúsculo sem `:`, um por linha (linhas vazias e `#` são ignoradas; no máximo dois, só durante uma troca de CA). O `validar-ca-banco.sh` **falha** se algum certificado do arquivo do host não estiver na lista, mesmo que o resto passe. Isso impede que alguém troque a CA no servidor sem um commit revisado.
 - Calcular o valor: `openssl x509 -in /etc/mysql/ssl/ca.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d : | tr A-F a-f` (o script imprime o mesmo valor no fim).
-- Só a CA de produção entra na lista (DEPLOY-07). O teste `TestSEC45_FingerprintVersionadoConfereComCA` confere o formato (0 a 2 fingerprints) e **proíbe** o fingerprint da CA de dev (`ef31b656...`, `deploy/ca-cert.pem`); o `TestSEC40_ValidarCABanco_CADevRecusada` confere que o estágio `CA do banco` recusa a CA de dev. Na primeira instalação o arquivo tem só o cabeçalho, e o estágio falha com `deploy/db-ca.fingerprint sem fingerprint: rode mariadb-docker.sh --nova-ca e grave o CA_FP (DEPLOY-07)` até o commit do `CA_FP` (`docs/deploy-servidor.md` §11, passo 4).
+- Só a CA de produção entra na lista (DEPLOY-07). O teste `TestSEC45_FingerprintVersionadoConfereComCA` confere o formato (0 a 2 fingerprints) e **proíbe** os fingerprints das CAs de dev (`d150ee67...`, a atual, em `deploy/ca-cert.pem`, e `ef31b656...`, a anterior; SEC-71); esse teste roda no estágio `Testes Go`, e o `mariadb-docker.sh` só avisa, sem abortar. O estágio `CA do banco` e o `deploy/validar-ca-banco.sh` não usam a lista de dev: recusam a CA de dev só por ela estar fora do `deploy/db-ca.fingerprint`, o que o `TestSEC40_ValidarCABanco_CADevRecusada` confere com o arquivo do repositório. Sem nenhuma linha útil, o estágio falha com `deploy/db-ca.fingerprint sem fingerprint: rode mariadb-docker.sh --nova-ca e grave o CA_FP (DEPLOY-07)`. Hoje a linha útil é a da CA de produção em uso (`f31ee820...`) e não deve ser apagada; numa instalação do zero, com CA nova, o `CA_FP` a **substitui** (`docs/deploy-servidor.md` §11, passo 4).
 
 **Secret file `rotaperfumes-api-env`** (modelo: `deploy/api.env.example`):
 
@@ -244,7 +244,7 @@ Se o `ca.pem` do host for trocado à mão sem atualizar o `deploy/db-ca.fingerpr
 
 ## 11. DEV (CasaOS) e acesso do admin à produção (`--dev-ip`, `casaos`, `.env.producao`)
 
-**Banco de desenvolvimento (oficial, DEPLOY-07):** o MariaDB 11.8 do CasaOS, no mesmo servidor, porta **3307**, com a CA de dev em `deploy/ca-cert.pem` (`CN=RotaPerfumes_MySQL_CA`, fingerprint `ef31b656...`; não versionada, `.gitignore`). É para ele que o `.env` padrão da raiz aponta (`DB_HOST=192.168.168.106`, `DB_PORT=3307`, `DB_TLS_CA=deploy/ca-cert.pem`, como no `.env.example`). Os dados dele são de desenvolvimento e não vão para a produção. Essa CA **não** muda quando a CA de produção é criada ou trocada.
+**Banco de desenvolvimento (oficial, DEPLOY-07):** o MariaDB 11.8 do CasaOS, no mesmo servidor, porta **3307**, com a CA de dev em `deploy/ca-cert.pem` (`CN=MariaDB_CA`, fingerprint `d150ee67...`; não versionada, `.gitignore`). A CA de dev anterior (`CN=RotaPerfumes_MySQL_CA`, `ef31b656...`) saiu de uso em 2026-11-06 (SEC-71) e continua proibida na produção. É para ele que o `.env` padrão da raiz aponta (`DB_HOST=192.168.168.106`, `DB_PORT=3307`, `DB_TLS_CA=deploy/ca-cert.pem`, como no `.env.example`). Os dados dele são de desenvolvimento e não vão para a produção. Essa CA **não** muda quando a CA de produção é criada ou trocada.
 
 > **Não aplicável hoje (2026-11-05).** Por decisão do usuário (2026-11-04), o banco de produção só responde localmente no servidor (container `rotaperfumes-api` e root), sem `--dev-ip` para a máquina do admin. Os itens 1 a 4 abaixo ficam como referência; para conferir a produção, use o passo 7 da §11 de `docs/deploy-servidor.md` (no servidor, como root). Ver também o passo 11 dessa seção.
 

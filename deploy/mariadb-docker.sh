@@ -937,9 +937,20 @@ if $PUBLICAR; then
 EOF
 fi
 
-# DEPLOY-07: fingerprint da CA de DEV (MariaDB do CasaOS, porta 3307,
-# deploy/ca-cert.pem). Nunca pode ir para o deploy/db-ca.fingerprint.
-readonly CA_DEV_FP="ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
+# DEPLOY-07 / SEC-71: fingerprints das CAs de DEV (MariaDB do CasaOS, porta
+# 3307, deploy/ca-cert.pem). Nenhuma pode ir para o deploy/db-ca.fingerprint.
+readonly -a CA_DEV_FPS=(
+  "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b" # CN=RotaPerfumes_MySQL_CA (antiga)
+  "d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2" # CN=MariaDB_CA (em uso)
+)
+# SEC-71: a CA deste servidor nao pode ser uma CA de dev (copiada para
+# $SSL_DIR/ca.pem por engano): o resumo nao manda gravar esse fingerprint.
+CA_FP_E_DEV=false
+for FP_DEV in "${CA_DEV_FPS[@]}"; do
+  if [[ "$CA_FP" == "$FP_DEV" ]]; then
+    CA_FP_E_DEV=true
+  fi
+done
 CA_SUBJECT=$(openssl x509 -in "$SSL_DIR/ca.pem" -noout -subject)
 
 cat <<EOF
@@ -966,10 +977,21 @@ Proximos passos:
   1. api.env (Secret file rotaperfumes-api-env): DB_HOST=$CONTAINER DB_PORT=3306
      DB_USUARIO=$DB_APP DB_TLS_SERVER_NAME=$CONTAINER; a API entra na rede
      $REDE_NOME com ipv4_address $IP_API (deploy/docker-compose.yml).
+EOF
+if $CA_FP_E_DEV; then
+  cat <<EOF
+  2. NAO grave o fingerprint desta CA em deploy/db-ca.fingerprint: $SSL_DIR/ca.pem
+     e uma CA de DEV (veja o AVISO no fim).
+EOF
+else
+  cat <<EOF
   2. Grave $CA_FP em deploy/db-ca.fingerprint
      como a UNICA linha util (na primeira instalacao, sem a CA de dev) e faca o
      commit ANTES do push na main (senao o estagio "CA do banco" do Jenkins
      recusa a CA).
+EOF
+fi
+cat <<EOF
   3. NAO copie esta CA para deploy/ca-cert.pem: esse arquivo e a CA do MariaDB
      de DEV (CasaOS, 3307).
 EOF
@@ -996,14 +1018,21 @@ EOF
 if $CA_MUDOU; then
   aviso "CA NOVA: troque o fingerprint em deploy/db-ca.fingerprint (rotacao de producao: a linha antiga pode ficar ate o deploy; NUNCA a CA de dev); deploy/ca-cert.pem (dev) NAO muda."
 fi
+if $CA_FP_E_DEV; then
+  aviso "$SSL_DIR/ca.pem e uma CA de DEV ($CA_FP): NAO grave esse fingerprint em deploy/db-ca.fingerprint (a CA de dev nunca vale em producao). Confira como ela chegou a este servidor e restaure a CA de producao (ou gere outra com --nova-ca)."
+fi
 # P2: confere o deploy/db-ca.fingerprint do checkout de onde o script roda.
 FP_REPO="$(dirname "$0")/db-ca.fingerprint"
 if [[ -r "$FP_REPO" ]]; then
   FPS_REPO=$(grep -Ev '^[[:space:]]*(#|$)' "$FP_REPO" | tr -d ' \t\r' || true)
-  if grep -qxF "$CA_DEV_FP" <<<"$FPS_REPO"; then
-    aviso "$FP_REPO contem o fingerprint da CA de DEV ($CA_DEV_FP): remova essa linha (a CA de dev nunca vale em producao)."
-  fi
-  if grep -qxF "$CA_FP" <<<"$FPS_REPO"; then
+  for FP_DEV in "${CA_DEV_FPS[@]}"; do
+    if grep -qxF "$FP_DEV" <<<"$FPS_REPO"; then
+      aviso "$FP_REPO contem o fingerprint da CA de DEV ($FP_DEV): remova essa linha (a CA de dev nunca vale em producao)."
+    fi
+  done
+  if $CA_FP_E_DEV; then
+    : # SEC-71: ja avisado acima; nada a gravar nem a dar como OK.
+  elif grep -qxF "$CA_FP" <<<"$FPS_REPO"; then
     info "$FP_REPO ja contem $CA_FP: OK."
   elif [[ -z "$FPS_REPO" ]]; then
     aviso "$FP_REPO ainda nao tem fingerprint: grave $CA_FP (passo 2)."
