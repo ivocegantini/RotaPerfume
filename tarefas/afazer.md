@@ -1,6 +1,10 @@
 # A Fazer
 
-> Atualizado em 2026-11-06 (abertura do Lote 42, 🔵 SubBrain). A pedido do usuário ("siga para o próximo card"), o **Lote 42 de 2026-11-06** foi aberto e o **BACKUP-01** (ALTA, bloco "Achados dos Lotes 30 e 31") saiu desta lista para `fazendo.md`, com a descrição atualizada. O **DEPLOY-08** ganhou a decisão do usuário de 2026-11-06: **sem passo de descarte** de `casaos.senha` e `/root/rotaperfumes.antigo`; as senhas vão para pendrive seguro (itens 1 e 3 sem alteração, dúvidas registradas no card). O **Lote 41** foi commitado em `3685901`, na `main` local, sem push (`feito.md`). O restante do backlog não mudou.
+> Atualizado em 2026-11-07 (fechamento do Lote 42, 🔵 SubBrain). O **Lote 42** foi fechado: **BACKUP-01**, **BACKUP-02**, **DEPLOY-10** e **DEPLOY-09** concluídos (`feito.md`, "Lote 42 de 2026-11-06/07: 4 cards concluídos"; **sem commit e pendentes de validação no servidor**). Entraram 12 cards no bloco novo "Achados do Lote 42" (logo abaixo): **SEC-73** e **TST-28** (MÉDIA) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05**, **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12**, **SEC-75** e **BACKUP-07** (BAIXA); os três últimos são os cards pedidos nas especificações do lote (`IMPORTAR_DUMP`, `-e MYSQL_PWD` e `--recriar --dados /vazio`). O **DEPLOY-08** ganhou a ordem da migração do DEPLOY-10 (entre os itens 6 e 7), o item 2 aponta para a seção "Backup do banco e das imagens de produto" e o item 7 já não remove a `casaos`. **Antes de tudo:** push (deploy) e `TestTST15_MariadbDocker_Real` como root, fora do servidor. O restante do backlog não mudou.
+>
+> Antes, ainda em 2026-11-06 (novos cards do Lote 42, 🔵 SubBrain). A pedido do usuário, **BACKUP-02** (BAIXA), **DEPLOY-09** (ALTA) e **DEPLOY-10** (MÉDIA) foram registrados direto em `fazendo.md`, no Lote 42. Nenhum card saiu desta lista e o backlog não mudou.
+>
+> Antes, ainda em 2026-11-06 (abertura do Lote 42, 🔵 SubBrain). A pedido do usuário ("siga para o próximo card"), o **Lote 42 de 2026-11-06** foi aberto e o **BACKUP-01** (ALTA, bloco "Achados dos Lotes 30 e 31") saiu desta lista para `fazendo.md`, com a descrição atualizada. O **DEPLOY-08** ganhou a decisão do usuário de 2026-11-06: **sem passo de descarte** de `casaos.senha` e `/root/rotaperfumes.antigo`; as senhas vão para pendrive seguro (itens 1 e 3 sem alteração, dúvidas registradas no card). O **Lote 41** foi commitado em `3685901`, na `main` local, sem push (`feito.md`). O restante do backlog não mudou.
 >
 > Antes, ainda em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain). O **Lote 41** foi fechado: **SEC-71** concluído (`feito.md`, "Lote 41 de 2026-11-06: 1 card concluído"; **não commitado**, pendente do ok do usuário). Entrou o **SEC-72** (BAIXA) no bloco novo "Achados do Lote 41" (logo abaixo). **DEPLOY-08** corrigido: a produção está **no ar** e o card passou a ser a limpeza pós-instalação, pendente do usuário; **um push na `main` agora é um deploy em sistema vivo**. **BACKUP-01** subiu para ALTA (produção no ar sem rotina de backup) e é o **próximo card recomendado**.
 >
@@ -98,6 +102,172 @@
 > - **X1, contrato HTTP:** a única exceção ao "contrato HTTP inalterado" é a do ARQ-01 (métodos das 13 rotas, `/api/senha-historico/2/extra` e, pelo parse estrito de `{user_id...}` (R-f), `/api/senha-historico/0` e `/-1` passando a 400).
 >
 > Histórico anterior (2026-10-11): o 🔴 TestBrain executou `docs/roteiro-teste-manual-lote12.md` (24 aprovados, 1 falhou, 13 não verificáveis de 38; ver a seção "Execução (2026-10-07, 🔴 TestBrain)" no fim do roteiro). Daí saíram os cards BUG-13, LOG-01, DOC-05 e TST-04. BUG-13, LOG-01 e DOC-05 foram concluídos no Lote 16 (2026-10-07; ver `feito.md`). O LOG-02 (Lote 17) gerou o TST-05, e o DEP-00 (Lote 19) gerou o DEP-01 e o DEP-02. No Lote 20 (2026-10-11; ver `feito.md`) foram concluídos DEP-01, DEP-02 e TST-05; o TST-04 avançou parcialmente (só faltam 1.1, 1.2 e 1.7, que dependem do usuário rodar o `make`) e do DEP-01 saiu o card DEP-03 (BAIXA). Em 2026-10-16 o DEPLOY-01 (Lote 13) foi concluído e o MAIL-01 foi cancelado (sem servidor de e-mail; a API usa o envio Noop). Os dois estão em `feito.md`.
+
+---
+
+# Achados do Lote 42, 2026-11-07
+
+> Pendências do Lote 42 (`feito.md`, "Lote 42 de 2026-11-06/07: 4 cards concluídos"), levantadas nas especificações e na revisão do 🟣 SecBrain e na rodada final de testes. Nenhuma bloqueou o fechamento do lote nem o push. Especificações: `tarefas/lote-42-backup-01-spec.md` e `tarefas/lote-42-deploy-09-10-spec.md`. Caminhos: `SH` = `backend/shared`.
+
+---
+
+## SEC-73: confirmar o fingerprint da chave apt da Cloudflare por um segundo canal — prioridade MÉDIA (pendente do usuário)
+
+**Status:** pendente **do usuário**.
+**Camadas:** Deploy, Segurança
+**Responsável:** usuário (conferência) → 🟣 SecBrain (registro) → 🔵 SubBrain
+**Origem:** DEPLOY-09 (Lote 42); fatos conferidos pelo 🤍 MegaBrain em 2026-11-06 (`tarefas/lote-42-deploy-09-10-spec.md`, seção "Cloudflare").
+
+**Descrição:** `deploy/cloudflare-apt.fingerprint` traz `CC94B39C77AE7342A68B89628A682D308D4E5E73` (`CloudFlare Software Packaging 2025`). A chave veio só pelo HTTPS da própria Cloudflare (`pkg.cloudflare.com`), e a página não publica o fingerprint. Um único canal comprometido levaria uma chave falsa ao `restaurar-maquina.sh`.
+
+**Até a conferência:** rodar o `deploy/restaurar-maquina.sh` **só com `--sem-tunel`**.
+
+**Critério de aceite:** fingerprint `CC94B39C…5E73` confirmado por um canal independente (ex.: keyserver público, outra rede ou outro meio indicado pela Cloudflare), com o canal registrado neste card; se divergir, chave e fingerprint trocados e testes do DEPLOY-09 verdes.
+
+---
+
+## TST-28: timeout do `make test` (`tests/deploy` perto dos 10 min padrão do `go test`) — prioridade MÉDIA (decisão do usuário)
+
+**Status:** pendente; **depende de decisão do usuário**.
+**Camadas:** Testes, CI
+**Responsável:** usuário (decisão) → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** rodada final do Lote 42.
+
+**Descrição:** o pacote `SH/tests/deploy` leva cerca de 580 s, perto dos 10 min padrão do `go test`, e estourou com a máquina carregada. A rodada final do lote só passou com `GO_TEST_FLAGS=-timeout=45m`. Hoje o `test-shared` (`Makefile:~620`) não fixa `-timeout`, e o `Jenkinsfile` (`:~132-133`, `go test ./...` no estágio "Testes Go") também não; o job tem `timeout(time: 60, unit: 'MINUTES')` (`:~32`).
+
+**Proposta:** `-timeout=30m` no `go test` do `test-shared`. Conferir também o `Jenkinsfile`: o mesmo `-timeout` nas duas linhas, dentro dos 60 min do job.
+
+**Critério de aceite:** decisão do usuário registrada; `-timeout` aplicado no `Makefile` e no `Jenkinsfile` (ou risco aceito); teste de paridade, se couber; `make -k test` verde sem `GO_TEST_FLAGS`.
+
+---
+
+## BACKUP-03: a mesma tolerância de relógio (300 s) nas guardas do `mariadb-docker.sh` e do seed — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, Testes
+**Responsável:** 🟡 BackBrain → 🔴 TestBrain
+**Origem:** revisão do 🟣 SecBrain, Lote 42.
+
+**Descrição:** o `deploy/backup-banco.sh` usa `TOLERANCIA_RELOGIO_S=300` ao conferir o carimbo e o mtime. As guardas do `--recriar` (`deploy/mariadb-docker.sh`) e do `--forcar` (`deploy/seed-producao.sh`) precisam da mesma folga, com a mesma regra para carimbo futuro.
+
+**Critério de aceite:** a mesma tolerância nos três scripts, com valor único conferido por teste de paridade; testes de borda (dentro e fora da folga, carimbo futuro) nas duas guardas.
+
+---
+
+## BACKUP-04: aceitar `parcial-*` na guarda do `--recriar`/seed — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, Testes
+**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** revisão do 🟣 SecBrain, Lote 42 ("parciais fora da guarda").
+
+**Descrição:** hoje a guarda do `--recriar` e do `seed-producao.sh --forcar` não aceita um par `parcial-*` como backup recente.
+
+**Critério de aceite:** `parcial-*` aceito pela guarda com as mesmas conferências do par completo (idade, carimbo, mtime, marcador, tamanho) e registro igual; testes de aceite e de recusa.
+
+---
+
+## BACKUP-05: retenção relendo todos os pares mantidos da série — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, Testes
+**Responsável:** 🟡 BackBrain → 🔴 TestBrain
+**Origem:** revisão do 🟣 SecBrain, Lote 42.
+
+**Descrição:** a retenção do `deploy/backup-banco.sh` deve reler todos os pares que mantém na série, não só o mais recente, para não guardar como "bom" um par corrompido depois de gravado.
+
+**Critério de aceite:** a retenção confere cada par mantido; par corrompido sinalizado sem apagar o último bom; testes com par corrompido no meio da série.
+
+---
+
+## BACKUP-06: `clientes` vazia só gera `AVISO` no backup — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Database, Deploy, Testes
+**Responsável:** 🟣 SecBrain → 🌸 DataBrain → 🔴 TestBrain
+**Origem:** desvio 2 do 🌸 DataBrain (`tarefas/lote-42-backup-01-spec.md`, "Desvios da especificação"): a produção nasceu sem clientes, e a reprovação estrita recusaria o backup de hoje.
+
+**Descrição:** um banco com `clientes` esvaziada ainda passa como "backup bom", só com aviso.
+
+**Critério de aceite (escolher uma):** (a) reprovar `clientes` vazia a partir do momento em que a produção tiver clientes; ou (b) comparar as contagens por tabela com o par anterior e reprovar queda brusca, com válvula registrada. Decisão registrada e testada.
+
+---
+
+## DEPLOY-11: fase 2 do `--dev-ip` (recusar e remover o código) — prioridade BAIXA
+
+**Status:** pendente; **só depois do item 7 do DEPLOY-08**.
+**Camadas:** Deploy, Testes, Documentação
+**Responsável:** 🟡 BackBrain → 🔴 TestBrain → 🔵 SubBrain
+**Origem:** DEPLOY-10, item "`--dev-ip`" (`tarefas/lote-42-deploy-09-10-spec.md`, "Itens antigos").
+
+**Descrição:** no DEPLOY-10 (fase 1), o `--dev-ip` ficou só como transição, sem conta. Depois do `--recriar` do item 7 do DEPLOY-08, ele perde o uso.
+
+**Critério de aceite:** `--dev-ip` recusado como o `--rede-lan`; código da porta publicada, da chain `ROTAPERFUMES-DB` e da unit de firewall removido (com a limpeza de uma unit antiga, se existir); testes e docs (§3.3 e §11, passo 11, de `docs/deploy-servidor.md`) atualizados.
+
+---
+
+## SEC-74: `/var/log/rotaperfumes-dba.log` num `/var/log` gravável pelo grupo `syslog` — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, Segurança
+**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** revisão do 🟣 SecBrain, Lote 42.
+
+**Descrição:** o registro de reserva do `rotaperfumes-dba` (quando o `logger` falha) grava em `/var/log/rotaperfumes-dba.log`. No Ubuntu, `/var/log` tem escrita para o grupo `syslog`, e o `O_NOFOLLOW` cobre só o último componente do caminho.
+
+**Critério de aceite:** registro de reserva num diretório próprio de root (ex.: `/var/log/rotaperfumes/`, 700) conferido antes de gravar, ou risco aceito e registrado; teste do caminho escolhido.
+
+---
+
+## DB-10: comparar o schema do dump com `sql/ordem-ddl.txt` em container sem rede — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Database, Deploy, Testes
+**Responsável:** 🟣 SecBrain → 🌸 DataBrain → 🔴 TestBrain
+**Origem:** sugestão do 🟣 SecBrain (`tarefas/lote-42-deploy-09-10-spec.md`, "Riscos que restam").
+
+**Descrição:** na etapa 6 do `restaurar-maquina.sh` (e no runbook), as migrações `sql/*_alter_*` dependem de conferência humana. Um container sem rede pode aplicar a DDL de `sql/ordem-ddl.txt` e comparar o schema com o do dump, apontando as migrações que faltam.
+
+**Critério de aceite:** comparação automatizada, sem rede e sem dados reais na saída; lista das migrações faltantes; testes com dump de schema antigo e atual.
+
+---
+
+## DEPLOY-12: `IMPORTAR_DUMP` do Jenkins sem a guarda de backup — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, CI
+**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** decisão D6 da especificação do BACKUP-01 (`tarefas/lote-42-backup-01-spec.md`): card próprio pedido e ainda não aberto (conferido no fechamento do Lote 42).
+
+**Descrição:** o estágio `IMPORTAR_DUMP` (`Jenkinsfile:~223-255`) grava em produção sem a exigência de backup recente que o `--recriar` e o `seed-producao.sh --forcar` ganharam. O Jenkins não lê o diretório 700 dos backups e pode rodar em container, então a checagem é outro desenho. Com o dump do BACKUP-01 (`--skip-add-drop-table`), a importação já falha em banco populado.
+
+**Critério de aceite:** desenho definido pelo 🟣 SecBrain (ex.: recusa com tabelas existentes, ou carimbo do último backup exposto ao Jenkins sem segredo), implementado e testado; ou risco aceito pelo usuário e registrado.
+
+---
+
+## SEC-75: senha do banco por `-e MYSQL_PWD` nos usos antigos — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, CI, Documentação
+**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** especificações do Lote 42 (`tarefas/lote-42-backup-01-spec.md`, seção 4; `tarefas/lote-42-deploy-09-10-spec.md`, "Riscos que restam"): card pedido e ainda não aberto (conferido no fechamento do Lote 42).
+
+**Descrição:** com `-e MYSQL_PWD`, o valor fica no `Config.Env` do container e aparece em `docker inspect`. O risco prático é moderado (o grupo `docker` já equivale a root), mas evita vazamento em diagnósticos. Os scripts novos do Lote 42 usam option file montado. Usos antigos: `deploy/mariadb-docker.sh` (`cliente()`, `:~1131`), `deploy/seed-producao.sh` (`:~532`), `Jenkinsfile` (`:~227-255`, estágio "Importar dump") e o `admin_sql` de `docs/deploy-servidor.md` §11, passo 7 (`:~736-737`).
+
+**Critério de aceite:** os quatro usos trocados por option file montado só para leitura (fora de `container/`), ou risco aceito e registrado por uso; teste estático de ausência de `-e MYSQL_PWD`; docs atualizadas.
+
+---
+
+## BACKUP-07: `--recriar --dados /vazio` não dispara a guarda de backup — prioridade BAIXA
+
+**Status:** pendente.
+**Camadas:** Deploy, Testes
+**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
+**Origem:** especificação e entrega do BACKUP-01 (`tarefas/lote-42-backup-01-spec.md`, seção 5 e desvio 8 do 🟡 BackBrain): card próprio pedido e ainda não aberto (conferido no fechamento do Lote 42).
+
+**Descrição:** o `mariadb-docker.sh --recriar` com `--dados` apontando para um diretório vazio não dispara a guarda e sobe um banco vazio, embora os dados antigos continuem no caminho original. O site passaria a usar o banco vazio.
+
+**Critério de aceite:** troca de `--dados` num container existente recusada ou sujeita à mesma guarda (backup recente ou motivo registrado); testes com diretório vazio e com o caminho original.
 
 ---
 
@@ -413,19 +583,25 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 - **Migração 27:** `senha_historico.created_at` com `IS_NULLABLE=YES` e 0 linhas NULL; `sql/27_*` ainda precisa ser aplicada.
 
 **Limpeza pós-instalação, nesta ordem (todos os itens pendentes do usuário):**
+
+> **Antes de tudo (atualizado em 2026-11-07, fechamento do Lote 42):** o código do Lote 42 (BACKUP-01, BACKUP-02, DEPLOY-10, DEPLOY-09) só chega ao servidor com o **push na `main`** (deploy em sistema vivo, item 5), e o `TestTST15_MariadbDocker_Real` (item 4) deve rodar **como root, fora do servidor**, antes da migração dos itens 6a a 6c. Os itens 6a a 6c entraram entre o 6 e o 7, sem renumerar, para manter as referências de `docs/deploy-servidor.md` §11, passo 11.
+
 1. [ ] `shred` do `/root/rotaperfumes-mariadb/admin-app.senha`.
-2. [ ] Backup do banco (`docs/deploy-servidor.md`, seção "Backup do banco"), copiado para fora do servidor.
+2. [ ] Backup do banco e das imagens: `docs/deploy-servidor.md`, seção "Backup do banco e das imagens de produto" (o backup manual antigo saiu). Depois do item 6c, `sudo rotaperfumes-backup-banco --agora`; copiar o par para fora do servidor (D1 em aberto).
 3. [ ] Comparar o pepper de `/root/pepper-producao.txt` com o da API, **sem imprimir**. Se iguais, guardar no cofre e dar `shred`. Se diferentes, **não apagar** e avisar.
-4. [ ] `TestTST15_MariadbDocker_Real` com `sudo`, na máquina de dev (ver **TST-17**; nunca no servidor).
+4. [ ] `TestTST15_MariadbDocker_Real` como root (`sudo`), na máquina de dev (ver **TST-17**; nunca no servidor). Agora também confere a conta e o comando do DBA (DEPLOY-10).
 5. [ ] `make deps-audit`, depois push na `main` (`IMPORTAR_DUMP` desmarcado) e acompanhar o job. Efeitos: a API reinicia; `ultimo_login_at` gravado antes do deploy aparece 3 h mais cedo, cosmético (DB-08).
 6. [ ] Atualizar o checkout: mover `/root/rotaperfumes` para `/root/rotaperfumes.antigo` e `git clone --depth 1` (§11, passo 1).
-7. [ ] Novo backup e `deploy/mariadb-docker.sh --recriar` sem `--dev-ip`, em janela com queda rápida aceitável; conferir que a 3306 sumiu do `docker ps` e que o site responde. **Nunca `--nova-ca`.** Comportamento documentado na §11, passo 2, e no script: a chain `ROTAPERFUMES-DB` fica, só com `-j DROP`, se a unit antiga existir; a conta `casaos` é removida e um `casaos.senha` existente é mantido, com aviso.
+6a. [ ] **Migração da conta (DEPLOY-10, §11, passo 11), em horário calmo, sem `--recriar`:** `sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.105`, uma vez. Cria `rotaperfumes_backup` e `rotaperfumes-admin`, remove `casaos@*` (qualquer host) e instala o `/usr/local/sbin/rotaperfumes-dba`, sem reiniciar o container.
+6b. [ ] Conferir: `echo 'SELECT CURRENT_USER()' | sudo rotaperfumes-dba` deve trazer `rotaperfumes-admin@172.30.42.22`. Saída se algo falhar: `root@localhost` (§3.4).
+6c. [ ] `sudo bash deploy/backup-banco.sh --instalar` (e `sudo rotaperfumes-backup-banco --status`).
+7. [ ] `sudo rotaperfumes-backup-banco --agora` e, até 60 minutos depois, `sudo bash deploy/mariadb-docker.sh --recriar` sem `--dev-ip`, em janela com queda rápida aceitável; conferir que a 3306 sumiu do `docker ps` e que o site responde. **Nunca `--nova-ca`.** Comportamento documentado na §11, passo 2, e no script: a chain `ROTAPERFUMES-DB` fica, só com `-j DROP`, se a unit antiga existir. **A conta `casaos` já não é removida aqui** (saiu no item 6a); um `casaos.senha` existente é mantido, com o aviso "mantido; leve ao pendrive seguro". Depois deste item, o **DEPLOY-11** (fase 2 do `--dev-ip`) fica liberado.
 8. [ ] Migração 27 pelo `admin_sql` (§11, passo 7).
 9. [ ] §11, passo 3: tirar `ca-key.pem` do servidor, para pendrive cifrado.
 10. [ ] Na máquina de dev, apagar `.env.producao` e `deploy/ca-producao.pem`.
 11. [ ] Ativar vendedores pela tela Usuários, quando o usuário quiser (§11, passo 10, item 4; SMTP de produção configurado pelo usuário, por ora via Gmail, OPS-02).
 
-**Instalação do zero:** os 12 passos da §11 continuam como referência para esse caso e não devem ser repetidos neste servidor. O `--nova-ca` trocaria a CA em uso, e o passo 11 (`.env.producao`) segue **não aplicável**.
+**Instalação do zero:** os 12 passos da §11 continuam como referência para esse caso e não devem ser repetidos neste servidor. O `--nova-ca` trocaria a CA em uso. O antigo passo 11 (`.env.producao`) segue **não aplicável**; desde o Lote 42, o passo 11 da §11 é a migração da conta `casaos` (itens 6a a 6c acima). Para máquina nova, use o `deploy/restaurar-maquina.sh` (§12, DEPLOY-09).
 
 **Item opcional (vindo do CHORE-18):** conferir o SAN do certificado no servidor: `openssl x509 -in /etc/mysql/ssl/server-cert.pem -noout -ext subjectAltName` (deve conter `ivo-Inspiron-15-3530` e `192.168.168.106`).
 
@@ -448,7 +624,8 @@ Os dois casos estão fora do modelo pela decisão registrada do 🤍 MegaBrain (
 - Os itens 1 e 3 e o critério de aceite apagam `admin-app.senha` e `pepper-producao.txt`. O item 1 não prevê cópia antes do `shred`, e o item 3 guarda o pepper em "cofre", não em pendrive. Esses dois arquivos também vão para o pendrive seguro?
 - A lista acima não tem um "passo de validação" com esse nome. Em que item entra a cópia para o pendrive? Nenhum item novo foi acrescentado.
 - `/root/rotaperfumes.antigo` é o checkout antigo (item 6). A cópia para o pendrive é só das senhas que ele contiver, ou da pasta inteira?
-- `docs/deploy-servidor.md` §11, passo 2, ainda sugere descartar o `casaos.senha` com `shred -u` "se não for mais usar". O texto não foi alterado.
+- ~~`docs/deploy-servidor.md` §11, passo 2, ainda sugere descartar o `casaos.senha` com `shred -u` "se não for mais usar". O texto não foi alterado.~~ **Resolvido no Lote 42 (DEPLOY-10, conferido no fechamento em 2026-11-07):** a §11, passo 2, e o passo 11 dizem que o `casaos.senha` é mantido, sem uso, e vai para o pendrive seguro; nenhum script o lê ou apaga.
+- **Recomendações do fechamento do Lote 42** (`feito.md`, decisões em aberto): `admin-app.senha` com `shred`, sem cópia (a senha já não vale); pepper copiado para pendrive cifrado, longe dos dumps, antes do `shred`; do `/root/rotaperfumes.antigo`, só as senhas.
 
 **Critério de aceite:** `deploy/db-ca.fingerprint` commitado só com o fingerprint da CA de produção; backup copiado para fora do servidor; estágios "CA do banco", "Deploy" e "Smoke test" verdes no push dos Lotes 37 a 41; log da API com `tls=ligado (custom)` e `min=TLS1.3`; `TestTST15_MariadbDocker_Real` verde; `/root/rotaperfumes` como checkout git; porta 3306 fora do `docker ps` e site respondendo; migração 27 aplicada; `/root/rotaperfumes-ca/ca-key.pem`, `/root/pepper-producao.txt` e `/root/rotaperfumes-mariadb/admin-app.senha` apagados do servidor; `.env.producao` e `deploy/ca-producao.pem` apagados da máquina de dev. A ativação dos vendedores (item 11) não condiciona o aceite: fica a critério do usuário.
 

@@ -543,8 +543,9 @@ Não li nenhum valor; a tabela vem de nomes em `deploy/api.env.example`, do comp
 Depois da revisão do 🟣 SecBrain e do push na `main`, que é deploy em produção:
 
 1. **Atualize o checkout:** item 6 da limpeza, seção 11, passo 1. Depois: `cd /root/rotaperfumes`
-2. **Crie a conta de backup, em horário calmo e sem `--recriar`.** Enquanto a porta estiver publicada, use o `--dev-ip` em uso; se a lista não for essa, troque-a:
+2. **Crie as contas novas, em horário calmo e sem `--recriar`** (atualizado no fechamento do Lote 42, 2026-11-07, com o DEPLOY-10; item 6a do DEPLOY-08 e `docs/deploy-servidor.md` §11, passo 11). Uma única execução, com o `--dev-ip` em uso enquanto a porta estiver publicada (só transição, sem conta): cria `rotaperfumes_backup` e `rotaperfumes-admin`, remove `casaos@*` com qualquer host e instala o `/usr/local/sbin/rotaperfumes-dba`, sem reiniciar o container:
    `sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.105`
+   Confira: `echo 'SELECT CURRENT_USER()' | sudo rotaperfumes-dba` deve trazer `rotaperfumes-admin@172.30.42.22`. Saída se algo falhar: `root@localhost`.
 3. **Instale a rotina:** `sudo bash deploy/backup-banco.sh --instalar`
    - Com SSD já cifrado e montado, acrescente `--backup-dir /mnt/ssd/rotaperfumes --exigir-montagem /mnt/ssd`.
 4. **Confira:** `sudo rotaperfumes-backup-banco --status`

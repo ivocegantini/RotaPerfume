@@ -27,7 +27,9 @@
 #      "..", so arquivos e diretorios). A queda de 50% nao vale aqui: remover
 #      produto e legitimo. Volume vazio e aceito com AVISO.
 #   6. publica o par: imagens primeiro; o nome final do dump fecha o par
-#   7. retencao, por contagem de pares bons e por serie
+#   7. retencao, por contagem de pares bons e por serie. Falha sem apagar nada,
+#      com o par novo intacto, se houver par com data futura, se ela fosse apagar o
+#      par novo ou se o novo ou um dos dois pares mais novos estiver corrompido.
 #
 # Falha nas imagens: o dump ja validado vira parcial-rotaperfumes-*.sql.gz,
 # guardado para uso manual. Nao conta como backup bom, nao dispara a retencao e
@@ -45,7 +47,8 @@
 #
 # Regras: nunca "set -x"; a senha fica so no option file montado (fora do argv,
 # do "docker inspect" e do ambiente); o log traz caminho, tamanho, contagem,
-# duracao e etapa que falhou, nunca linhas do dump nem nomes do tar.
+# duracao, etapa que falhou e o OK do marcador (texto fixo), nunca linhas do dump
+# nem nomes do tar.
 # Codigos de saida: 0 sucesso, 2 uso incorreto, 1 qualquer outra falha.
 # =============================================================================
 set -euo pipefail
@@ -100,6 +103,8 @@ readonly PISO_DUMP_BYTES=4096
 readonly TABELAS_MIN=13
 readonly IDADE_MAX_HORAS=26
 readonly VERIFICACAO_MAX_DIAS=35
+# Folga para ajuste de relogio ao julgar "data futura" nos pares ja publicados.
+readonly TOLERANCIA_RELOGIO_S=300
 readonly ESPERA_1O_BACKUP_S=$((3 * 3600))
 
 readonly CARIMBO_RE='[0-9]{8}-[0-9]{6}Z(-manual)?'
@@ -122,9 +127,11 @@ Uso:
                         digest da imagem. O volume $VOLUME_IMAGENS
                         precisa existir (rode o job do Jenkins antes).
   --agora               backup na serie -manual, com retencao propria
-  --status              ultimo par com ate $IDADE_MAX_HORAS h, timer ativo, ultima execucao
-                        sem falha e tar de imagens valido; avisa se a ultima
-                        verificacao tem mais de $VERIFICACAO_MAX_DIAS dias
+  --status              ultimo par com ate $IDADE_MAX_HORAS h pelo carimbo e pelo mtime, sem
+                        data futura, dump e tar de imagens validos, timer ativo e
+                        ultima execucao sem falha; avisa se a ultima verificacao
+                        tem mais de $VERIFICACAO_MAX_DIAS dias ou data futura. Com o marcador
+                        do dump valido, imprime uma linha fixa de OK
   --conferir-imagens A  confere um tar de imagens e imprime so contagens. Nao
                         usa rede, credencial nem Docker.
   --agendado            serie diaria (quem chama e o timer)
@@ -416,10 +423,59 @@ contar_incompletos() { # arquivos com nome de backup, mas sem o outro lado do pa
   printf '%d' "$n"
 }
 
-aplicar_retencao() { # serie manter
-  local serie=$1 manter=$2 pares=() i
+carimbo_epoch() { # nome do arquivo -> epoch do carimbo; falha se a data nao existir
+  [[ "$1" =~ ([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})Z ]] || return 1
+  date -u -d "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}" +%s 2>/dev/null
+}
+
+# A retencao ordena pelo carimbo: um par "do futuro" ficaria sempre entre os mais
+# novos e expulsaria o par recem-publicado. Vale carimbo e mtime, como na guarda.
+conferir_datas_dos_pares() {
+  local f nome carimbo agora
+  agora=$(date +%s)
+  while IFS= read -r f; do
+    nome=${f##*/}
+    carimbo=$(carimbo_epoch "$nome") || die "o par $nome tem carimbo invalido: nada foi apagado e o par novo ficou intacto. Confira esse arquivo"
+    if (( carimbo > agora + TOLERANCIA_RELOGIO_S || $(stat -c %Y -- "$f") > agora + TOLERANCIA_RELOGIO_S )); then
+      die "o par $nome tem data futura: nada foi apagado e o par novo ficou intacto. Confira o relogio e esse arquivo"
+    fi
+  done < <(listar_pares todos)
+}
+
+ERRO_DUMP=""
+conferir_dump_publicado() { # dump -> define ERRO_DUMP. tail le o stream inteiro: sem SIGPIPE.
+  local ultima
+  gzip -t -- "$1" 2>/dev/null || { ERRO_DUMP="gzip invalido ou truncado"; return 1; }
+  ultima=$(gzip -dc -- "$1" | tail -n 1) || { ERRO_DUMP="leitura falhou"; return 1; }
+  [[ "$ultima" == "-- Dump completed"* ]] || { ERRO_DUMP="ultima linha sem o marcador '-- Dump completed'"; return 1; }
+}
+
+conferir_par_publicado() { # dump -> define ERRO_DUMP
+  conferir_dump_publicado "$1" || return 1
+  gzip -t -- "$(par_imagens "$1")" 2>/dev/null || { ERRO_DUMP="imagens com gzip invalido ou truncado"; return 1; }
+}
+
+# Antes de apagar, confere o par novo e os dois mais novos do diretorio. So o novo
+# nao bastaria: ele acabou de ser validado, e um par anterior corrompido faria a
+# retencao apagar um par bom mais antigo para mante-lo. Os demais nao sao relidos.
+aplicar_retencao() { # serie manter dump-recem-publicado
+  local serie=$1 manter=$2 novo=$3 pares=() todos=() alvos=() i n alvo
+  conferir_datas_dos_pares
   mapfile -t pares < <(listar_pares "$serie")
-  for (( i = 0; i < ${#pares[@]} - manter; i++ )); do
+  n=$(( ${#pares[@]} - manter ))
+  (( n > 0 )) || return 0
+  for (( i = 0; i < n; i++ )); do
+    [[ "${pares[i]}" != "$novo" ]] || die "a retencao apagaria o par recem-publicado ${novo##*/}: nada foi apagado. Confira os pares com carimbo mais novo"
+  done
+  mapfile -t todos < <(listar_pares todos)
+  alvos=("$novo")
+  for (( i = ${#todos[@]} - 1; i >= 0 && i >= ${#todos[@]} - 2; i-- )); do
+    [[ "${todos[i]}" == "$novo" ]] || alvos+=("${todos[i]}")
+  done
+  for alvo in "${alvos[@]}"; do
+    conferir_par_publicado "$alvo" || die "o par ${alvo##*/} foi reprovado ($ERRO_DUMP): nada foi apagado e o par novo ficou intacto. Confira esse arquivo"
+  done
+  for (( i = 0; i < n; i++ )); do
     rm -f -- "$(par_imagens "${pares[i]}")" "${pares[i]}"
     log "retencao: par removido ${pares[i]##*/}"
   done
@@ -670,6 +726,7 @@ executar_backup() { # diario|manual
   gerar_dump
   ETAPA="conteudo-dump"
   conferir_dump
+  log "dump validado: marcador '-- Dump completed' na ultima linha: OK"
   ETAPA="tamanho-dump"
   conferir_queda_dump
 
@@ -702,9 +759,9 @@ executar_backup() { # diario|manual
 
   ETAPA="retencao"
   if [[ "$serie" == manual ]]; then
-    aplicar_retencao manual "$RETENCAO_MANUAIS"
+    aplicar_retencao manual "$RETENCAO_MANUAIS" "$final_dump"
   else
-    aplicar_retencao diario "$RETENCAO_DIARIOS"
+    aplicar_retencao diario "$RETENCAO_DIARIOS" "$final_dump"
   fi
 
   log "ok dump=$final_dump tamanho_dump=$tam_dump imagens=$final_imagens tamanho_imagens=$tam_imagens arquivos_imagens=$IMG_ARQUIVOS bytes_imagens=$IMG_BYTES duracao_s=$((SECONDS - inicio))"
@@ -716,7 +773,7 @@ executar_backup() { # diario|manual
 # --status
 # ---------------------------------------------------------------------------
 mostrar_status() {
-  local problemas=0 agora ultimo mtime idade resultado linha epoch="" dias incompletos
+  local problemas=0 agora ultimo nome mtime carimbo idade resultado linha epoch="" dias incompletos
 
   problema() { printf 'PROBLEMA: %s\n' "$*"; problemas=$((problemas + 1)); }
 
@@ -729,11 +786,24 @@ mostrar_status() {
   if [[ -z "$ultimo" ]]; then
     problema "nenhum backup bom (dump + imagens) em $BACKUP_DIR"
   else
+    nome=${ultimo##*/}
     mtime=$(stat -c %Y -- "$ultimo")
-    idade=$(( agora - mtime ))
-    printf 'Ultimo backup: %s (%d min atras, %s bytes)\n' "${ultimo##*/}" "$(( idade / 60 ))" "$(stat -c %s -- "$ultimo")"
-    (( idade >= 0 )) || problema "o ultimo backup tem data futura"
-    (( idade <= IDADE_MAX_HORAS * 3600 )) || problema "o ultimo backup tem mais de $IDADE_MAX_HORAS h"
+    carimbo=$(carimbo_epoch "$nome") || { problema "o ultimo backup ($nome) tem carimbo invalido"; carimbo=$mtime; }
+    if (( carimbo > agora + TOLERANCIA_RELOGIO_S || mtime > agora + TOLERANCIA_RELOGIO_S )); then
+      printf 'Ultimo backup: %s (%s bytes)\n' "$nome" "$(stat -c %s -- "$ultimo")"
+      problema "o ultimo backup ($nome) tem data futura"
+    else
+      # O mais antigo dos dois: um "touch" nao rejuvenesce o backup.
+      idade=$(( agora - (carimbo < mtime ? carimbo : mtime) ))
+      (( idade >= 0 )) || idade=0
+      printf 'Ultimo backup: %s (%d min atras, %s bytes)\n' "$nome" "$(( idade / 60 ))" "$(stat -c %s -- "$ultimo")"
+      (( idade <= IDADE_MAX_HORAS * 3600 )) || problema "o ultimo backup ($nome) tem mais de $IDADE_MAX_HORAS h"
+    fi
+    if conferir_dump_publicado "$ultimo"; then
+      printf '%s\n' "Dump validado: marcador '-- Dump completed' na ultima linha: OK"
+    else
+      problema "o dump do ultimo backup ($nome) foi reprovado: $ERRO_DUMP"
+    fi
     if conferir_tar_imagens "$(par_imagens "$ultimo")"; then
       printf 'Imagens: %s arquivo(s), %s bytes\n' "$IMG_ARQUIVOS" "$IMG_BYTES"
     else
@@ -757,7 +827,12 @@ mostrar_status() {
     aviso "nenhuma verificacao registrada: rode sudo bash deploy/verificar-backup.sh <arquivo .sql.gz>"
   else
     dias=$(( (agora - epoch) / 86400 ))
-    printf 'Ultima verificacao: ha %d dia(s)\n' "$dias"
+    if (( epoch > agora + TOLERANCIA_RELOGIO_S )); then
+      aviso "a ultima verificacao tem data futura: nao vale; rode deploy/verificar-backup.sh"
+    else
+      (( dias >= 0 )) || dias=0
+      printf 'Ultima verificacao: ha %d dia(s)\n' "$dias"
+    fi
     (( dias <= VERIFICACAO_MAX_DIAS )) || aviso "a ultima verificacao tem mais de $VERIFICACAO_MAX_DIAS dias: rode deploy/verificar-backup.sh"
   fi
 

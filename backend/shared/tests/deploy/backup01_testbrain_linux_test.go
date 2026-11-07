@@ -726,6 +726,16 @@ func TestBACKUP01_TB_RetencaoLadosDoPar(t *testing.T) {
 			escrever(e.t, filepath.Join(e.backups(), i), "x", 0o600)
 			return []string{d, i}
 		}},
+		{"nomes parecidos com os dois lados", func(e *ensaioBackup) []string {
+			var nomes []string
+			for _, c := range []string{"2019", "20190101-033000", "20190101-033000Z-manual2"} {
+				d, i := "rotaperfumes-"+c+".sql.gz", "rotaperfumes-imagens-"+c+".tar.gz"
+				escrever(e.t, filepath.Join(e.backups(), d), "x", 0o600)
+				escrever(e.t, filepath.Join(e.backups(), i), "x", 0o600)
+				nomes = append(nomes, d, i)
+			}
+			return nomes
+		}},
 		{"nomes quase validos", func(e *ensaioBackup) []string {
 			nomes := []string{"rotaperfumes-20190101-033000.sql.gz", "rotaperfumes-20190101-033000Z-manual2.sql.gz", "rotaperfumes-20190101-033000Z.sql.gz.bak",
 				"xrotaperfumes-20190101-033000Z.sql.gz", "rotaperfumes-imagens-20190101-033000Z.tar", "rotaperfumes-2019010-033000Z.sql.gz"}
@@ -1958,9 +1968,9 @@ func TestBACKUP01_ContaBackup_Real(t *testing.T) {
 	require.NotEmpty(t, fn)
 	escrever(t, filepath.Join(dir, "sql_contas.fn"), fn, 0o600)
 	roteiro := "export DB_NOME=rotaperfumes COLLATION=utf8mb4_unicode_ci REDE_NOME=" + redeReal + "\n" +
-		"DB_APP=rotaperfumes_app DB_ADMIN=rotaperfumes_admin DB_BACKUP=rotaperfumes_backup DB_MAKE=casaos\n" +
-		"IP_API=" + prefixoReal + ".10 IP_ADMIN=" + prefixoReal + ".20 IP_BACKUP=" + prefixoReal + ".21\n" +
-		"DEV_IPS=(); CASAOS_NATIVE_MOTIVO=''; SENHA_MAKE=''\n" +
+		"DB_APP=rotaperfumes_app DB_ADMIN=rotaperfumes_admin DB_BACKUP=rotaperfumes_backup DB_DBA=rotaperfumes-admin\n" +
+		"IP_API=" + prefixoReal + ".10 IP_ADMIN=" + prefixoReal + ".20 IP_BACKUP=" + prefixoReal + ".21 IP_DBA=" + prefixoReal + ".22\n" +
+		"SENHA_DBA=SenhaDbaRealAbc123456789XYZ012345\n" +
 		"SENHA_APP=SenhaAppRealAbc123456789XYZ012345 SENHA_ADMIN=SenhaAdminRealAbc123456789XYZ012 SENHA_BACKUP=" + r.senha + "\n" +
 		"source \"" + filepath.Join(dir, "sql_contas.fn") + "\"\nsql_contas\n"
 	cmd := exec.Command("bash", "-c", roteiro)

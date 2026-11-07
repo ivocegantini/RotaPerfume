@@ -361,7 +361,15 @@ func TestBACKUP01_ManualTemRunbook(t *testing.T) {
 	// Só runbook: nenhum alvo do Makefile restaura backup em produção.
 	assert.NotRegexp(t, `(?m)^[a-z-]*(restaura|restore)[a-z-]*:`, lerRaiz(t, "Makefile"))
 	_, err := os.Stat(caminhoRaiz(t, "deploy", "restaurar-banco.sh"))
-	assert.True(t, os.IsNotExist(err), "sem script de restauração em produção (D7)")
+	assert.True(t, os.IsNotExist(err), "sem script que restaure sobre o servidor em uso (D7, revista só para máquina nova: DEPLOY-09)")
+}
+
+// DEPLOY-09: o script de máquina nova existe, é só manual e não tem alvo no Makefile
+// (SEC-46). Quem recusa o servidor em uso são os testes deploy09_*.
+func TestDEPLOY09_ScriptDeMaquinaNovaSemAlvoNoMakefile(t *testing.T) {
+	assert.Contains(t, arquivoObrigatorio(t, "deploy", "restaurar-maquina.sh"), "conferir_producao_ativa")
+	assert.NotContains(t, lerRaiz(t, "Makefile"), "bash deploy/restaurar-maquina.sh")
+	assert.NotRegexp(t, `(?m)^[a-z-]*(restaura|restore)[a-z-]*:`, lerRaiz(t, "Makefile"))
 }
 
 // ---------------------------------------------------------------------------
@@ -409,9 +417,11 @@ func TestBACKUP01_Ensaio_ContaBackup(t *testing.T) {
 	assert.NotContains(t, r.out, senha)
 	assert.NotContains(t, log, senha)
 	assert.Contains(t, r.out, "backup 172.30.42.21")
-	assert.Contains(t, log, "User IN ('rotaperfumes_app', 'rotaperfumes_admin', 'rotaperfumes_backup', 'casaos') ORDER BY", "convergência")
-	assert.Contains(t, log, "User IN ('rotaperfumes_app', 'rotaperfumes_admin', 'rotaperfumes_backup', 'casaos') AND COALESCE", "conferência de REQUIRE SSL")
-	assert.Contains(t, e.state("sql_outras"), "'rotaperfumes_backup', 'casaos')", "não é conta estranha")
+	assert.Contains(t, log, "User IN ('rotaperfumes_app', 'rotaperfumes_admin', 'rotaperfumes_backup', 'rotaperfumes-admin', 'casaos') ORDER BY", "convergência")
+	assert.Contains(t, log, "User IN ('rotaperfumes_app', 'rotaperfumes_admin', 'rotaperfumes_backup', 'rotaperfumes-admin', 'casaos') AND COALESCE", "conferência de REQUIRE SSL")
+	assert.Contains(t, e.state("sql_outras"), "'rotaperfumes_backup', 'rotaperfumes-admin')", "não é conta estranha")
+	// Lote 42 (SecBrain): a casaos sai em qualquer host; uma sobra seria estranha.
+	assert.NotContains(t, e.state("sql_outras"), "'casaos'")
 
 	// Reexecução não troca a senha nem o option file.
 	cnf1 := e.arq(cnfRel)

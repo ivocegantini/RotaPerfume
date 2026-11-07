@@ -77,7 +77,7 @@ deploy/dumps/
 # gerado pelo Jenkins. A CA de produção fica só no host (/etc/mysql/ssl).
 deploy/ca-cert.pem
 deploy/db-ca.sha256
-# DEPLOY-07: CA de PRODUCAO e .env de PRODUCAO na maquina do admin (--dev-ip).
+# DEPLOY-07: CA de PRODUCAO e .env de PRODUCAO, se copiados para a maquina do admin (sem uso desde o DEPLOY-10).
 # Nunca versionar; o deploy/db-ca.fingerprint (versionado) so leva o SHA-256.
 deploy/ca-producao.pem
 .env.producao

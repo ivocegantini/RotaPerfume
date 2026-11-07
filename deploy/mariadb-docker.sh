@@ -7,8 +7,9 @@
 # Rodar como root NO SERVIDOR (192.168.168.106):
 #   sudo bash deploy/mariadb-docker.sh --ca-key /media/pendrive/ca-key.pem
 #       instala/atualiza, sem publicar porta (so a rede docker rotaperfumes-db)
-#   sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.50 --dev-ip 192.168.168.51
-#       publica SITE_IP:3306 so para essas maquinas de dev (conta casaos)
+#   sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.105
+#       DEPLOY-10, so na transicao: o container ja publica a porta e continua
+#       assim ate o --recriar (nenhuma conta para a LAN)
 #   sudo bash deploy/mariadb-docker.sh --nova-ca      # primeira instalacao (CA nova)
 #   sudo bash deploy/mariadb-docker.sh --recriar      # recria o container (dados ficam)
 #   sudo bash deploy/mariadb-docker.sh --novo-cert --ca-key ...  # reemite o certificado
@@ -23,18 +24,21 @@
 #   3. certificados: CA propria (chave FORA do servidor: --ca-key; CA nova so
 #      com --nova-ca) + certificado do servidor com SAN fixo
 #   4. senhas (root e usuarios) em SEGREDOS_DIR (so root le)
-#   5. rede docker rotaperfumes-db (172.30.42.0/24, IPs fixos) e, com
-#      --dev-ip, a chain ROTAPERFUMES-DB em DOCKER-USER + unit systemd
+#   5. rede docker rotaperfumes-db (172.30.42.0/24, IPs fixos) e, na transicao
+#      do --dev-ip, a chain ROTAPERFUMES-DB em DOCKER-USER + unit systemd
 #   6. container (so na rede rotaperfumes-db; --user mysql, --cap-drop ALL,
 #      --read-only; root so local: MARIADB_ROOT_HOST=localhost)
 #   7. banco rotaperfumes e contas (todas ed25519 + REQUIRE SSL), convergidas:
 #        rotaperfumes_app   @ 172.30.42.10 (API)            -> so DML
 #        rotaperfumes_admin @ 172.30.42.20 (import/migracao) -> ALL em rotaperfumes
 #        rotaperfumes_backup @ 172.30.42.21 (BACKUP-01)      -> so SELECT
-#        casaos             @ cada --dev-ip (make db-*)      -> ALL em rotaperfumes
-#      contas do projeto com outro host sao removidas (DROP USER)
-#   8. testa a conexao TLS verificada pela rede interna (e a recusa sem TLS);
-#      com --dev-ip, tambem o certificado servido em SITE_IP:PORTA
+#        rotaperfumes-admin @ 172.30.42.22 (DBA, DEPLOY-10)  -> ALL em rotaperfumes
+#      contas do projeto com outro host sao removidas (DROP USER); casaos@* sai
+#      sempre (DEPLOY-10). rotaperfumes-admin = DBA, .22; nao e rotaperfumes_admin
+#      = Jenkins e seed, .20
+#   8. instala /usr/local/sbin/rotaperfumes-dba e testa a conexao TLS verificada
+#      pela rede interna, com as duas contas (e a recusa sem TLS); na transicao
+#      do --dev-ip, tambem o certificado valido para SITE_IP e a resposta da porta
 #
 # Rede (SEC-45): a API entra na rede externa rotaperfumes-db com
 #   ipv4_address 172.30.42.10 e usa DB_HOST=rotaperfumes-mariadb, DB_PORT=3306,
@@ -44,20 +48,22 @@
 # Atualizar a imagem base (SEC-31):
 #   1. docker buildx imagetools inspect mariadb:11.4 --format '{{.Manifest.Digest}}'
 #      (digest do INDICE multi-arch) e a tag do patch (ex.: 11.4.13)
-#   2. trocar IMAGEM_BASE aqui e nos deploy/backup-banco.sh e
-#      deploy/verificar-backup.sh, e DB_CLIENT_IMAGE no Jenkinsfile e no
+#   2. trocar IMAGEM_BASE aqui e nos deploy/backup-banco.sh,
+#      deploy/verificar-backup.sh e deploy/restaurar-maquina.sh, e DB_CLIENT_IMAGE no Jenkinsfile e no
 #      deploy/seed-producao.sh (mesma string)
 #   3. make test
 #   4. no servidor: sudo bash deploy/backup-banco.sh --instalar (a copia
 #      instalada usa a imagem antiga ate isso)
 #   5. sudo rotaperfumes-backup-banco --agora (a guarda abaixo exige)
 #   6. sudo bash deploy/verificar-backup.sh <dump gerado no passo 5>
-#   7. sudo bash deploy/mariadb-docker.sh --recriar [--dev-ip ...]
+#   7. sudo bash deploy/mariadb-docker.sh --recriar
 #
 # Guarda do --recriar (BACKUP-01): com container e dados existentes, exige dump
 # de ate 60 min em --backup-dir, antes de qualquer mudanca. So o dump: o
 # --recriar do banco nao toca no volume de imagens. Container parado nao gera
-# dump novo: nesse caso, --sem-backup-motivo TEXTO (fica registrado).
+# dump novo: nesse caso, --sem-backup-motivo TEXTO (fica registrado). Janela
+# acima de 60 min (--backup-janela-min) tambem exige o motivo, sem dispensar o
+# dump; o registro leva janela=N.
 #
 # Re-executavel: cada etapa confere o estado antes de mudar algo; as senhas
 # ficam nos arquivos (reexecucao nao troca senha).
@@ -85,18 +91,24 @@ RECRIAR=false
 NOVO_CERT=false
 NOVA_CA=false
 READ_ONLY=true
-CASAOS_NATIVE_MOTIVO=""
 BACKUP_DIR="/var/backups/rotaperfumes"
 BACKUP_JANELA_MIN=60
+readonly BACKUP_JANELA_LIVRE_MAX=60
 SEM_BACKUP_MOTIVO=""
 BACKUP_USADO=""
 DEV_IPS=()
+PORTA_INFORMADA=false
 
 readonly CONTAINER_PADRAO="rotaperfumes-mariadb"
 readonly DB_NOME="rotaperfumes"
 readonly DB_APP="rotaperfumes_app"
 readonly DB_ADMIN="rotaperfumes_admin"
-readonly DB_MAKE="casaos"
+# DEPLOY-10: DBA de producao, so local (rede docker, sem porta publicada), pelo
+# comando pronto DBA_CMD. O nome, escolhido pelo usuario, e quase igual a DB_ADMIN:
+# o aviso DBA_AVISO_NOMES aparece no banner e no resumo. Nome sempre entre aspas.
+readonly DB_DBA="rotaperfumes-admin"
+# DEPLOY-10: conta antiga da porta publicada. So para remover, em qualquer host.
+readonly DB_LEGADO="casaos"
 # BACKUP-01: so SELECT, IP exclusivo (o .20 e disputado pelo Jenkins e pelo
 # admin_sql). Sem TRIGGER nem EVENT: esses privilegios criam objetos, e a conta
 # deixaria de ser so leitura. O sql/ nao tem trigger, view, rotina nem evento.
@@ -119,6 +131,13 @@ readonly FW_CHAIN="ROTAPERFUMES-DB"
 readonly FW_SCRIPT="/usr/local/sbin/rotaperfumes-db-firewall"
 readonly FW_UNIT="rotaperfumes-db-firewall.service"
 readonly FW_UNIT_ARQ="/etc/systemd/system/$FW_UNIT"
+# DEPLOY-10: comando pronto do DBA e nome do cliente descartavel.
+readonly DBA_CMD="/usr/local/sbin/rotaperfumes-dba"
+readonly DBA_CLIENTE="rotaperfumes-dba-cliente"
+readonly C_DBA="/run/dba"
+# Achado do SecBrain (Lote 42): registro do DBA quando o logger falha (so o
+# evento, nunca SQL). Arquivo do root, modo 600.
+readonly DBA_LOG_RESERVA="/var/log/rotaperfumes-dba.log"
 # Dentro do container
 readonly C_SSL="/etc/mysql/ssl"
 readonly C_SEGREDOS="/run/rotaperfumes"
@@ -127,10 +146,11 @@ usage() {
   cat <<EOF
 Uso: sudo bash $0 [opcoes]
 
-  --dev-ip IP         maquina de dev autorizada (repetivel): publica
-                      $SITE_IP:$PORTA, libera so esses IPs na chain $FW_CHAIN
-                      (DOCKER-USER) e cria casaos@IP. Sem --dev-ip: nenhuma
-                      porta publicada e nenhuma conta casaos.
+  --dev-ip IP         SO TRANSICAO (DEPLOY-10; repetivel): aceito apenas se o
+                      container ja publica $SITE_IP:$PORTA, para migrar as contas
+                      sem reiniciar. Mantem a chain $FW_CHAIN (DOCKER-USER), nao
+                      cria conta para a LAN nem publica porta. Recusado em
+                      instalacao nova e com --recriar, que fecha a porta.
   --ca-key ARQ        chave da CA existente (mantida FORA do servidor, ex.:
                       pendrive). Lida de la, nunca copiada. Exigida quando o
                       certificado do servidor precisa ser (re)emitido.
@@ -145,21 +165,25 @@ Uso: sudo bash $0 [opcoes]
   --backup-dir DIR    onde a guarda do --recriar procura o dump (padrao
                       $BACKUP_DIR; root, modo 700; so conferido se a guarda disparar)
   --backup-janela-min N
-                      idade maxima do dump, em minutos (padrao $BACKUP_JANELA_MIN; 1 a 1440)
+                      idade maxima do dump, em minutos (padrao $BACKUP_JANELA_MIN; 1 a 1440).
+                      Acima de $BACKUP_JANELA_MIN exige --sem-backup-motivo (justificativa);
+                      o dump continua conferido, com a janela informada.
   --sem-backup-motivo TEXTO
-                      so com --recriar: dispensa o dump (ex.: container parado).
-                      10 a 300 caracteres imprimiveis, registrados antes do docker rm.
+                      so com --recriar: dispensa o dump (ex.: container parado),
+                      ou justifica a --backup-janela-min acima de $BACKUP_JANELA_MIN.
+                      10 a 300 caracteres imprimiveis, registrados antes do docker rm,
+                      com janela=N, em $SEGREDOS_DIR/recriar.registro.
   --imagem-base REF   imagem base, mariadb:<versao>@sha256:<64 hex>
                       (padrao $IMAGEM_BASE)
-  --porta P           porta publicada no host com --dev-ip (padrao $PORTA)
+  --porta P           porta ja publicada no host, com --dev-ip (padrao $PORTA)
   --ip IP             IP do servidor: SAN, porta publicada e teste (padrao $SITE_IP)
   --host-nome N       nome DNS extra no SAN (padrao: hostname = $SITE_HOST)
   --rede-docker R     subnet /24 da rede $REDE_NOME (padrao $REDE_DOCKER;
                       .2 = MariaDB, .10 = API, .20 = admin/import,
-                      .21 = backup)
+                      .21 = backup, .22 = DBA)
   --rede-nome N       nome da rede docker (padrao $REDE_NOME; so para testes)
   --container N       nome do container e DNS no SAN (padrao $CONTAINER;
-                      outro nome nao aceita --dev-ip)
+                      outro nome nao aceita --dev-ip nem instala $DBA_CMD)
   --dados DIR         datadir no host (padrao $DADOS_DIR)
   --ssl-dir DIR       certificados no host (padrao $SSL_DIR, lido pelo Jenkins)
   --segredos-dir DIR  senhas e root.cnf (padrao $SEGREDOS_DIR; o
@@ -172,10 +196,6 @@ Uso: sudo bash $0 [opcoes]
   --ca-dir DIR        chave da CA gerada no servidor e server-ext.cnf
                       (padrao $CA_DIR; mesmas regras do --segredos-dir)
   --sem-read-only     cria o container sem --read-only (so se nao subir com ele)
-  --casaos-native-motivo TEXTO
-                      SAIDA DE EMERGENCIA (SEC-30): casaos com
-                      mysql_native_password (cliente sem ed25519). O motivo
-                      fica registrado em $SEGREDOS_DIR/casaos-native.motivo.
   -h, --help          esta ajuda
 EOF
 }
@@ -192,7 +212,7 @@ while [[ $# -gt 0 ]]; do
     --novo-cert) NOVO_CERT=true; shift ;;
     --recriar) RECRIAR=true; shift ;;
     --imagem-base) exigir_valor "$@"; IMAGEM_BASE="$2"; shift 2 ;;
-    --porta) exigir_valor "$@"; PORTA="$2"; shift 2 ;;
+    --porta) exigir_valor "$@"; PORTA="$2"; PORTA_INFORMADA=true; shift 2 ;;
     --ip) exigir_valor "$@"; SITE_IP="$2"; shift 2 ;;
     --host-nome) exigir_valor "$@"; SITE_HOST="$2"; shift 2 ;;
     --rede-docker) exigir_valor "$@"; REDE_DOCKER="$2"; shift 2 ;;
@@ -203,11 +223,11 @@ while [[ $# -gt 0 ]]; do
     --segredos-dir) exigir_valor "$@"; SEGREDOS_DIR="$2"; shift 2 ;;
     --ca-dir) exigir_valor "$@"; CA_DIR="$2"; shift 2 ;;
     --sem-read-only) READ_ONLY=false; shift ;;
-    --casaos-native-motivo) exigir_valor "$@"; CASAOS_NATIVE_MOTIVO="$2"; shift 2 ;;
+    --casaos-native-motivo) die "--casaos-native-motivo saiu (DEPLOY-10): a conta $DB_LEGADO nao existe mais e toda conta usa ed25519. DBA: sudo rotaperfumes-dba, no servidor. O arquivo casaos-native.motivo, se existir, fica como historico." ;;
     --backup-dir) exigir_valor "$@"; BACKUP_DIR="$2"; shift 2 ;;
     --backup-janela-min) exigir_valor "$@"; BACKUP_JANELA_MIN="$2"; shift 2 ;;
     --sem-backup-motivo) exigir_valor "$@"; SEM_BACKUP_MOTIVO="$2"; shift 2 ;;
-    --rede-lan) die "--rede-lan saiu (SEC-45): use --dev-ip IP, uma vez por maquina de dev" ;;
+    --rede-lan) die "--rede-lan saiu (SEC-45): o banco nao aceita conexao da LAN. DBA: sudo rotaperfumes-dba, no servidor" ;;
     --versao) die "--versao saiu (SEC-31): use --imagem-base mariadb:<versao>@sha256:<digest>" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Opcao desconhecida: $1" >&2; usage >&2; exit 2 ;;
@@ -325,7 +345,9 @@ conferir_dir_privado() { # opcao dir [existe]
 }
 conferir_dir_privado --segredos-dir "$SEGREDOS_DIR"
 conferir_dir_privado --ca-dir "$CA_DIR"
-readonly IP_DB="$REDE_PREFIXO.2" IP_API="$REDE_PREFIXO.10" IP_ADMIN="$REDE_PREFIXO.20" IP_BACKUP="$REDE_PREFIXO.21"
+readonly IP_DB="$REDE_PREFIXO.2" IP_API="$REDE_PREFIXO.10" IP_ADMIN="$REDE_PREFIXO.20" IP_BACKUP="$REDE_PREFIXO.21" IP_DBA="$REDE_PREFIXO.22"
+readonly DBA_DIR="$SEGREDOS_DIR/dba-cliente" DBA_SENHA="$SEGREDOS_DIR/dba-cliente/conta.senha" DBA_CNF="$SEGREDOS_DIR/dba-cliente/cliente.cnf"
+readonly DBA_AVISO_NOMES="$DB_DBA = DBA, .22; nao e $DB_ADMIN = Jenkins e seed, .20"
 
 # --dev-ip: IPv4 de maquina (sem faixa), sem repeticao.
 declare -A _vistos=()
@@ -338,16 +360,21 @@ for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do
   DEV_IPS_OK+=("$ip")
 done
 DEV_IPS=("${DEV_IPS_OK[@]+"${DEV_IPS_OK[@]}"}")
-PUBLICAR=false
-(( ${#DEV_IPS[@]} > 0 )) && PUBLICAR=true
-if $PUBLICAR && [[ "$CONTAINER" != "$CONTAINER_PADRAO" ]]; then
+PORTA_LEGADA=false
+(( ${#DEV_IPS[@]} > 0 )) && PORTA_LEGADA=true
+if $PORTA_LEGADA && [[ "$CONTAINER" != "$CONTAINER_PADRAO" ]]; then
   die "--dev-ip so com o container padrao ($CONTAINER_PADRAO): a chain $FW_CHAIN e a unit $FW_UNIT sao unicas no host"
+fi
+# Achado do SecBrain (Lote 42): sem --dev-ip nenhuma porta e publicada; um
+# --porta solto seria ignorado em silencio.
+if $PORTA_INFORMADA && ! $PORTA_LEGADA; then
+  die "--porta so com --dev-ip (DEPLOY-10): sem --dev-ip nenhuma porta e publicada"
+fi
+if $PORTA_LEGADA && $RECRIAR; then
+  die "--dev-ip nao combina com --recriar (DEPLOY-10): o container novo nunca publica porta. Rode --recriar sem --dev-ip."
 fi
 if [[ -n "$CA_KEY" ]]; then
   [[ -f "$CA_KEY" && -r "$CA_KEY" ]] || die "--ca-key nao encontrada/legivel: $CA_KEY"
-fi
-if [[ -n "$CASAOS_NATIVE_MOTIVO" ]]; then
-  [[ "$CASAOS_NATIVE_MOTIVO" =~ ^[[:print:]]{10,300}$ ]] || die "--casaos-native-motivo precisa de 10 a 300 caracteres imprimiveis"
 fi
 if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
   $RECRIAR || die "--sem-backup-motivo so com --recriar"
@@ -357,14 +384,12 @@ fi
 # shellcheck disable=SC2015 # die deve rodar se o formato OU a faixa falhar (pretendido)
 [[ "$BACKUP_JANELA_MIN" =~ ^[0-9]{1,4}$ ]] && (( 10#$BACKUP_JANELA_MIN >= 1 && 10#$BACKUP_JANELA_MIN <= 1440 )) \
   || die "--backup-janela-min precisa ser um numero de 1 a 1440"
-
-# Firewall (SEC-45, fail closed): com --dev-ip, sem iptables/DOCKER-USER aborta.
-if $PUBLICAR; then
-  for cmd in iptables iptables-restore systemctl; do
-    command -v "$cmd" >/dev/null || die "--dev-ip exige '$cmd' (chain $FW_CHAIN em DOCKER-USER); sem ele a porta ficaria aberta para a LAN"
-  done
-  iptables -w -S DOCKER-USER >/dev/null 2>&1 \
-    || die "chain DOCKER-USER nao encontrada (Docker com firewall nftables/sem iptables?): sem ela a porta ficaria aberta para a LAN. Rode sem --dev-ip."
+BACKUP_JANELA_MIN=$((10#$BACKUP_JANELA_MIN))
+# Achado do SecBrain (Lote 42): acima de 60 min o dump pode deixar de cobrir
+# vendas recentes. So com --sem-backup-motivo TEXTO, que justifica a janela e
+# fica registrado; o dump continua conferido, com a janela informada.
+if (( BACKUP_JANELA_MIN > BACKUP_JANELA_LIVRE_MAX )) && [[ -z "$SEM_BACKUP_MOTIVO" ]]; then
+  die "--backup-janela-min acima de $BACKUP_JANELA_LIVRE_MAX exige --sem-backup-motivo TEXTO (a justificativa fica registrada; o dump continua conferido)"
 fi
 
 IMAGEM="rotaperfumes-mariadb:${VERSAO_MM}-${DIGEST_BASE:0:12}"
@@ -374,8 +399,31 @@ if [[ -n "$CONTAINER_ID" ]] && [[ "$(docker inspect -f '{{.State.Running}}' "$CO
   CONTAINER_RODANDO=true
 fi
 
+# DEPLOY-10: sessao do DBA aberta ocupa o nome e o IP do teste da etapa 8. Recusa
+# aqui, antes de qualquer mudanca, e nunca derruba a sessao de ninguem.
+if [[ -n "$(docker ps -aq --filter "name=^${DBA_CLIENTE}\$")" ]]; then
+  die "ha uma sessao do DBA aberta (container $DBA_CLIENTE). Encerre-a; se estiver abandonada: sudo rotaperfumes-dba --encerrar-sessao. Nada foi mudado."
+fi
+
+# DEPLOY-10, fase 1: o --dev-ip so existe para migrar as contas sem reiniciar um
+# container que ja publica a porta. Nunca abre porta nem cria conta para a LAN.
+if $PORTA_LEGADA; then
+  [[ -n "$CONTAINER_ID" ]] \
+    || die "--dev-ip recusado em instalacao nova (DEPLOY-10): o banco nao publica porta; rode sem --dev-ip. DBA: sudo rotaperfumes-dba, no servidor"
+  portas_atual=$(docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER")
+  [[ "$portas_atual" != "null" && "$portas_atual" != "{}" ]] \
+    || die "--dev-ip recusado (DEPLOY-10): o container $CONTAINER nao publica porta; rode sem --dev-ip. DBA: sudo rotaperfumes-dba, no servidor"
+  aviso "--dev-ip e so transicao (DEPLOY-10): $SITE_IP:$PORTA segue publicada ate o --recriar sem --dev-ip, sem conta para a LAN. DBA: sudo rotaperfumes-dba, no servidor."
+  # Firewall (SEC-45, fail closed): sem iptables/DOCKER-USER aborta.
+  for cmd in iptables iptables-restore systemctl; do
+    command -v "$cmd" >/dev/null || die "--dev-ip exige '$cmd' (chain $FW_CHAIN em DOCKER-USER); sem ele a porta ficaria aberta para a LAN"
+  done
+  iptables -w -S DOCKER-USER >/dev/null 2>&1 \
+    || die "chain DOCKER-USER nao encontrada (Docker com firewall nftables/sem iptables?): sem ela a porta ficaria aberta para a LAN. Rode --recriar sem --dev-ip, para fechar a porta."
+fi
+
 # Portas publicadas esperadas (formato do docker inspect).
-if $PUBLICAR; then
+if $PORTA_LEGADA; then
   PORTAS_ESPERADAS="{\"3306/tcp\":[{\"HostIp\":\"$SITE_IP\",\"HostPort\":\"$PORTA\"}]}"
 else
   PORTAS_ESPERADAS="{}"
@@ -398,7 +446,7 @@ if [[ -n "$CONTAINER_ID" ]] && ! $RECRIAR; then
   if (( ${#DIVERGE[@]} > 0 )); then
     printf '  Container %s difere do desejado:\n' "$CONTAINER" >&2
     printf '    - %s\n' "${DIVERGE[@]}" >&2
-    die "rode de novo com --recriar (os dados ficam em $DADOS_DIR; o banco fica fora do ar alguns segundos; antes: sudo rotaperfumes-backup-banco --agora)"
+    die "rode de novo com --recriar, sem --dev-ip (os dados ficam em $DADOS_DIR; o banco fica fora do ar alguns segundos; antes: sudo rotaperfumes-backup-banco --agora)"
   fi
 fi
 
@@ -437,25 +485,29 @@ conferir_backup_recente() { # dir janela_min -> define BACKUP_USADO
 # Guarda do --recriar (BACKUP-01), antes de qualquer mudanca. So dispara com
 # container e dados existentes: conferir_dir_privado no --backup-dir fica aqui.
 if [[ -n "$CONTAINER_ID" ]] && $RECRIAR && [[ -d "$DADOS_DIR/mysql" ]]; then
-  if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
+  if (( BACKUP_JANELA_MIN > BACKUP_JANELA_LIVRE_MAX )); then
+    aviso "--backup-janela-min $BACKUP_JANELA_MIN (acima de $BACKUP_JANELA_LIVRE_MAX): dump de ate $BACKUP_JANELA_MIN min aceito. Motivo: $SEM_BACKUP_MOTIVO"
+    conferir_backup_recente "$BACKUP_DIR" "$BACKUP_JANELA_MIN"
+    info "Backup conferido (janela de $BACKUP_JANELA_MIN min): $BACKUP_USADO."
+  elif [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
     aviso "--sem-backup-motivo: --recriar SEM conferir backup. Motivo: $SEM_BACKUP_MOTIVO"
   else
-    conferir_backup_recente "$BACKUP_DIR" "$((10#$BACKUP_JANELA_MIN))"
+    conferir_backup_recente "$BACKUP_DIR" "$BACKUP_JANELA_MIN"
     info "Backup recente conferido: $BACKUP_USADO."
   fi
 fi
 
-# A porta (so com --dev-ip) pode estar ocupada pelo proprio container; por
-# qualquer outro, aborta.
-if $PUBLICAR && [[ -n "$(ss -Hltn "sport = :$PORTA")" ]]; then
+# A porta (so na transicao do --dev-ip) pode estar ocupada pelo proprio container;
+# por qualquer outro, aborta.
+if $PORTA_LEGADA && [[ -n "$(ss -Hltn "sport = :$PORTA")" ]]; then
   if ! $CONTAINER_RODANDO || ! docker port "$CONTAINER" 3306/tcp 2>/dev/null | grep -q ":$PORTA\$"; then
     info "Containers publicando a porta $PORTA:"
     docker ps --filter "publish=$PORTA" --format '    {{.Names}}  {{.Image}}  {{.Ports}}' >&2 || true
-    die "porta $PORTA ocupada por outro servico. Pare o banco antigo (ex.: docker stop <container_mysql>), use --porta ou rode sem --dev-ip"
+    die "porta $PORTA ocupada por outro servico. Pare o banco antigo (ex.: docker stop <container_mysql>), use --porta ou rode --recriar sem --dev-ip"
   fi
 fi
-if $PUBLICAR; then
-  info "Docker ok; porta $SITE_IP:$PORTA livre (ou ja do $CONTAINER); dev: ${DEV_IPS[*]}."
+if $PORTA_LEGADA; then
+  info "Docker ok; porta $SITE_IP:$PORTA ja do $CONTAINER; transicao: ${DEV_IPS[*]}."
 else
   info "Docker ok; sem --dev-ip: nenhuma porta publicada (so a rede $REDE_NOME)."
 fi
@@ -642,13 +694,16 @@ fi
 for u in root "$DB_APP" "$DB_ADMIN" "$DB_BACKUP"; do
   senha_arquivo "$SEGREDOS_DIR/$u.senha"
 done
-# CHORE-17: casaos.senha so com --dev-ip (sem --dev-ip nao ha conta casaos).
-# Lista vazia com o arquivo ja existente: o arquivo fica (a senha volta a ser
-# usada se --dev-ip voltar; reexecucao nunca troca senha).
-if $PUBLICAR; then
-  senha_arquivo "$SEGREDOS_DIR/$DB_MAKE.senha"
-elif [[ -e "$SEGREDOS_DIR/$DB_MAKE.senha" ]]; then
-  info "Sem --dev-ip: conta $DB_MAKE removida; $SEGREDOS_DIR/$DB_MAKE.senha mantido (reaproveitado se --dev-ip voltar). Para descartar: shred -u."
+# DEPLOY-10: senha do DBA e option file em dba-cliente/ (root, 700), fora de
+# container/. Nomes neutros: nada de rotaperfumes-admin.senha ao lado de
+# rotaperfumes_admin.senha.
+[[ ! -L "$DBA_DIR" ]] || die "$DBA_DIR e um link simbolico: precisa ser diretorio real"
+install -d -m 700 -o root -g root "$DBA_DIR"
+conferir_dir_privado --segredos-dir "$DBA_DIR" existe
+senha_arquivo "$DBA_SENHA"
+# DEPLOY-10: casaos.senha nunca e criado, lido nem apagado; a senha nao e reaproveitada.
+if [[ -e "$SEGREDOS_DIR/$DB_LEGADO.senha" ]]; then
+  info "$SEGREDOS_DIR/$DB_LEGADO.senha mantido; leve ao pendrive seguro."
 fi
 ROOT_SENHA=$(<"$SEGREDOS_DIR/root.senha")
 install -m 400 -o "$MYSQL_UID" -g "$MYSQL_GID" "$SEGREDOS_DIR/root.senha" "$SEGREDOS_DIR/container/root.senha"
@@ -664,7 +719,7 @@ etapa "Rede $REDE_NOME e firewall"
 subnet_atual=$(docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' "$REDE_NOME" 2>/dev/null || true)
 subnet_atual=${subnet_atual% }
 if [[ -z "$subnet_atual" ]] && ! docker network inspect "$REDE_NOME" >/dev/null 2>&1; then
-  # IPs dinamicos so em .128-.255: .2/.10/.20/.21 ficam livres para os fixos.
+  # IPs dinamicos so em .128-.255: .2/.10/.20/.21/.22 ficam livres para os fixos.
   docker network create --driver bridge --subnet "$REDE_DOCKER" --gateway "$REDE_PREFIXO.1" \
     --ip-range "$REDE_PREFIXO.128/25" --label rotaperfumes.rede=db "$REDE_NOME" >/dev/null
   info "Rede $REDE_NOME criada ($REDE_DOCKER; dinamicos em $REDE_PREFIXO.128/25)."
@@ -674,9 +729,9 @@ else
   info "Rede $REDE_NOME ja existe ($REDE_DOCKER)."
   faixa=$(docker network inspect -f '{{range .IPAM.Config}}{{.IPRange}}{{end}}' "$REDE_NOME" 2>/dev/null || true)
   [[ "$faixa" == "$REDE_PREFIXO.128/25" ]] \
-    || aviso "a rede $REDE_NOME nao tem --ip-range $REDE_PREFIXO.128/25 (atual: '${faixa:-nenhum}'): um container com IP dinamico pode ocupar $IP_API/$IP_ADMIN/$IP_BACKUP. Recrie a rede quando puder."
+    || aviso "a rede $REDE_NOME nao tem --ip-range $REDE_PREFIXO.128/25 (atual: '${faixa:-nenhum}'): um container com IP dinamico pode ocupar $IP_API/$IP_ADMIN/$IP_BACKUP/$IP_DBA. Recrie a rede quando puder."
 fi
-info "IPs fixos: MariaDB $IP_DB, API $IP_API, admin/import $IP_ADMIN, backup $IP_BACKUP."
+info "IPs fixos: MariaDB $IP_DB, API $IP_API, admin/import $IP_ADMIN, backup $IP_BACKUP, DBA $IP_DBA."
 
 # Script persistente do firewall (SEC-45). iptables-restore --noflush: a
 # declaracao da chain a esvazia e a recarga e atomica (sem janela aberta).
@@ -739,10 +794,110 @@ WantedBy=multi-user.target
 EOF
 }
 
-# Com --dev-ip: instala/atualiza e aplica. Sem --dev-ip mas com a unit de uma
+# DEPLOY-10: comando pronto do DBA (mesma ideia do gerar_script_firewall). A senha
+# fica so no option file montado read-only; o comando nunca le esse arquivo, nem
+# repassa argumentos ao cliente.
+gerar_script_dba() {
+  cat <<EOF
+#!/bin/bash
+# Gerado por deploy/mariadb-docker.sh (DEPLOY-10). Nao edite: o script regrava.
+# $DBA_AVISO_NOMES
+set -euo pipefail
+umask 077
+readonly NOME="$DBA_CLIENTE" CONTA="$DB_DBA" AVISO="$DBA_AVISO_NOMES"
+readonly CNF="$DBA_CNF" CA="$SSL_DIR/ca.pem" C_DIR="$C_DBA" LOG_RESERVA="$DBA_LOG_RESERVA"
+readonly REDE="$REDE_NOME" IP="$IP_DBA" SERVIDOR="$CONTAINER" BANCO="$DB_NOME" IMAGEM="$IMAGEM"
+EOF
+  cat <<'EOF_DBA'
+die() { printf 'rotaperfumes-dba: %s\n' "$*" >&2; exit 1; }
+uso() {
+  cat <<TXT
+Uso, como root no servidor:
+  sudo rotaperfumes-dba                    sessao interativa (--safe-updates)
+  sudo rotaperfumes-dba < arquivo.sql      por stdin (--batch; para no primeiro erro)
+  sudo rotaperfumes-dba --encerrar-sessao  remove o cliente $NOME, se ficou aberto
+  sudo rotaperfumes-dba --help             esta ajuda
+Nenhum outro argumento e aceito. ATENCAO: banco de PRODUCAO, dados reais.
+$AVISO
+TXT
+}
+# Sem o logger: anexa em LOG_RESERVA so pelo dd com O_NOFOLLOW (um link
+# simbolico, mesmo trocado na hora, faz o dd falhar) e o umask 077 (arquivo novo
+# nasce 600). Nada de chmod: ele seguiria um link. O stat (sem -L) so confere.
+registrar() { # evento (nunca SQL)
+  local quem=${SUDO_USER:-root} linha
+  quem=${quem//[^A-Za-z0-9._-]/?}
+  linha="$(date -Is) usuario=$quem $1"
+  logger -t rotaperfumes-dba -- "$linha" 2>/dev/null && return 0
+  if ! printf '%s\n' "$linha" | dd of="$LOG_RESERVA" oflag=append,nofollow conv=notrunc status=none 2>/dev/null; then
+    printf 'rotaperfumes-dba: AVISO: logger falhou e %s nao foi gravado; sessao sem registro\n' "$LOG_RESERVA" >&2
+  elif [[ "$(stat -c '%u %a %F' -- "$LOG_RESERVA" 2>/dev/null)" != "0 600 regular file" ]]; then
+    printf 'rotaperfumes-dba: AVISO: logger falhou; evento gravado em %s, que precisa ser do root com modo 600 (chown root:root; chmod 600)\n' "$LOG_RESERVA" >&2
+  else
+    printf 'rotaperfumes-dba: AVISO: logger falhou; evento gravado em %s\n' "$LOG_RESERVA" >&2
+  fi
+}
+sessao_aberta() { [[ -n "$(docker ps -aq --filter "name=^${NOME}\$")" ]]; }
+
+ACAO=sessao
+case "$#:${1:-}" in
+  0:) ;;
+  1:--help) uso; exit 0 ;;
+  1:--encerrar-sessao) ACAO=encerrar ;;
+  *) uso >&2; exit 2 ;;
+esac
+[[ $EUID -eq 0 ]] || die "rode como root: sudo rotaperfumes-dba"
+
+if [[ "$ACAO" == encerrar ]]; then
+  if sessao_aberta; then
+    docker rm -f "$NOME" >/dev/null
+    registrar "encerrar-sessao"
+    printf 'Sessao %s removida.\n' "$NOME"
+  else
+    printf 'Nenhuma sessao %s aberta.\n' "$NOME"
+  fi
+  exit 0
+fi
+
+[[ -f "$CNF" && ! -L "$CNF" ]] || die "$CNF nao e arquivo regular; rode deploy/mariadb-docker.sh"
+[[ "$(stat -c '%u %a' -- "$CNF")" == "0 400" ]] || die "$CNF precisa ser do root com modo 400; rode deploy/mariadb-docker.sh"
+if sessao_aberta; then
+  die "ja ha uma sessao aberta ($NOME). Feche-a; se estiver abandonada: sudo rotaperfumes-dba --encerrar-sessao"
+fi
+
+TTY=()
+# Achado do SecBrain (Lote 42): stdin no terminal com a saida redirecionada seria
+# uma sessao interativa sem tela (o prompt e os avisos iriam para o arquivo).
+if [[ -t 0 && ! -t 1 ]]; then
+  die "stdin no terminal com a saida redirecionada: rode sem redirecionar (interativo) ou passe o SQL pelo stdin (sudo rotaperfumes-dba < arquivo.sql)"
+fi
+if [[ -t 0 && -t 1 ]]; then
+  TTY=(-t)
+  MODO=interativo
+  CLIENTE_MODO=(--safe-updates "--prompt=PRD $CONTA> ")
+  printf 'PRODUCAO, dados reais. %s\n' "$AVISO" >&2
+else
+  MODO=stdin
+  CLIENTE_MODO=(--batch)
+fi
+registrar "sessao modo=$MODO"
+exec docker run --rm -i "${TTY[@]+"${TTY[@]}"}" --pull never --name "$NOME" \
+  --network "$REDE" --ip "$IP" --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --log-driver none --tmpfs /tmp:rw,nosuid,nodev,noexec \
+  -e MYSQL_HISTFILE=/dev/null \
+  --mount "type=bind,source=$CA,target=$C_DIR/ca.pem,readonly" \
+  --mount "type=bind,source=$CNF,target=$C_DIR/cliente.cnf,readonly" \
+  --entrypoint mariadb "$IMAGEM" "--defaults-extra-file=$C_DIR/cliente.cnf" \
+  -h "$SERVIDOR" -P 3306 "--ssl-ca=$C_DIR/ca.pem" --ssl-verify-server-cert \
+  --local-infile=0 --default-character-set=utf8mb4 \
+  "--init-command=SET time_zone='-03:00'" "${CLIENTE_MODO[@]}" "$BANCO"
+EOF_DBA
+}
+
+# Na transicao do --dev-ip: instala/atualiza e aplica. Sem --dev-ip mas com a unit de uma
 # execucao anterior: recarrega com a lista vazia (so DROP; fail closed).
 # Container de teste (--container diferente): nunca mexe no firewall de producao.
-if $PUBLICAR || { [[ -f "$FW_UNIT_ARQ" ]] && [[ "$CONTAINER" == "$CONTAINER_PADRAO" ]]; }; then
+if $PORTA_LEGADA || { [[ -f "$FW_UNIT_ARQ" ]] && [[ "$CONTAINER" == "$CONTAINER_PADRAO" ]]; }; then
   for cmd in iptables iptables-restore systemctl; do
     command -v "$cmd" >/dev/null || die "comando '$cmd' nao encontrado (firewall $FW_CHAIN)"
   done
@@ -758,7 +913,7 @@ if $PUBLICAR || { [[ -f "$FW_UNIT_ARQ" ]] && [[ "$CONTAINER" == "$CONTAINER_PADR
   iptables -w -C DOCKER-USER -p tcp -m conntrack --ctorigdst "$SITE_IP" --ctorigdstport "$PORTA" --ctdir ORIGINAL -j "$FW_CHAIN" 2>/dev/null \
     || die "salto para $FW_CHAIN nao esta em DOCKER-USER apos a unit; porta NAO publicada"
   iptables -w -S "$FW_CHAIN" | grep -qx -- "-A $FW_CHAIN -j DROP" || die "chain $FW_CHAIN sem o DROP final"
-  if $PUBLICAR; then
+  if $PORTA_LEGADA; then
     info "Firewall: $SITE_IP:$PORTA so para ${DEV_IPS[*]} (chain $FW_CHAIN, unit $FW_UNIT habilitada)."
   else
     info "Firewall: sem --dev-ip; chain $FW_CHAIN recarregada so com DROP (unit $FW_UNIT mantida)."
@@ -771,7 +926,7 @@ fi
 etapa "Container $CONTAINER"
 if [[ -n "$CONTAINER_ID" ]] && $RECRIAR; then
   # BACKUP-01: registro antes do docker rm. Falhar aqui mantem o container.
-  printf '%s backup=%s motivo=%s imagem_base=%s\n' "$(date -Is)" "${BACKUP_USADO:-nenhum}" "${SEM_BACKUP_MOTIVO:-nenhum}" "$IMAGEM_BASE" >>"$SEGREDOS_DIR/recriar.registro"
+  printf '%s janela=%s backup=%s motivo=%s imagem_base=%s\n' "$(date -Is)" "$BACKUP_JANELA_MIN" "${BACKUP_USADO:-nenhum}" "${SEM_BACKUP_MOTIVO:-nenhum}" "$IMAGEM_BASE" >>"$SEGREDOS_DIR/recriar.registro"
   chmod 600 "$SEGREDOS_DIR/recriar.registro"
   info "Removendo o container antigo (--recriar; dados ficam em $DADOS_DIR)."
   docker rm -f "$CONTAINER" >/dev/null
@@ -799,10 +954,9 @@ if [[ -z "$CONTAINER_ID" ]]; then
     --log-opt max-size=10m --log-opt max-file=5
   )
   $READ_ONLY && RUN_ARGS+=(--read-only)
-  # SEC-45: nunca 0.0.0.0; so o IP da LAN e so com --dev-ip (firewall ja ativo).
-  $PUBLICAR && RUN_ARGS+=(-p "$SITE_IP:$PORTA:3306")
+  # DEPLOY-10: nenhuma porta publicada, nunca (acesso so pela rede $REDE_NOME).
   docker run "${RUN_ARGS[@]}" "$IMAGEM" >/dev/null
-  info "Container criado (imagem $IMAGEM, $REDE_NOME/$IP_DB, read-only=$READ_ONLY$($PUBLICAR && printf ', publicado em %s:%s' "$SITE_IP" "$PORTA"))."
+  info "Container criado (imagem $IMAGEM, $REDE_NOME/$IP_DB, read-only=$READ_ONLY)."
 elif ! $CONTAINER_RODANDO; then
   docker start "$CONTAINER" >/dev/null
   info "Container existente iniciado."
@@ -839,26 +993,20 @@ etapa "Banco $DB_NOME e contas"
 SENHA_APP=$(<"$SEGREDOS_DIR/$DB_APP.senha")
 SENHA_ADMIN=$(<"$SEGREDOS_DIR/$DB_ADMIN.senha")
 SENHA_BACKUP=$(<"$SEGREDOS_DIR/$DB_BACKUP.senha")
-SENHAS_CONFERIR=("$SENHA_APP" "$SENHA_ADMIN" "$SENHA_BACKUP")
-SENHA_MAKE=""
-if $PUBLICAR; then # CHORE-17: casaos.senha so existe/importa com --dev-ip
-  SENHA_MAKE=$(<"$SEGREDOS_DIR/$DB_MAKE.senha")
-  SENHAS_CONFERIR+=("$SENHA_MAKE")
-fi
+SENHA_DBA=$(<"$DBA_SENHA")
+SENHAS_CONFERIR=("$SENHA_APP" "$SENHA_ADMIN" "$SENHA_BACKUP" "$SENHA_DBA")
 for s in "${SENHAS_CONFERIR[@]}"; do
   [[ "$s" =~ ^[A-Za-z0-9]{20,}$ ]] || die "senha em $SEGREDOS_DIR fora do formato [A-Za-z0-9]{20,} (gerada fora do script?)"
 done
 unset SENHAS_CONFERIR
 
 # Contas desejadas (user@host); o resto das contas do projeto sai (convergencia).
-DESEJADAS=("$DB_APP@$IP_API" "$DB_ADMIN@$IP_ADMIN" "$DB_BACKUP@$IP_BACKUP")
-for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do DESEJADAS+=("$DB_MAKE@$ip"); done
+DESEJADAS=("$DB_APP@$IP_API" "$DB_ADMIN@$IP_ADMIN" "$DB_BACKUP@$IP_BACKUP" "$DB_DBA@$IP_DBA")
 
 # SQL pelo stdin (nunca no argv). As senhas sao [A-Za-z0-9]: sem escape.
 # ALTER USER a cada execucao: converge plugin (ed25519), senha e REQUIRE SSL.
 # REVOKE + GRANT: converge os privilegios (some o que nao for o desejado).
 sql_contas() {
-  local ip
   cat <<EOF
 CREATE DATABASE IF NOT EXISTS \`$DB_NOME\` CHARACTER SET utf8mb4 COLLATE $COLLATION;
 
@@ -879,24 +1027,12 @@ CREATE USER IF NOT EXISTS '$DB_BACKUP'@'$IP_BACKUP' IDENTIFIED VIA ed25519 USING
 ALTER USER '$DB_BACKUP'@'$IP_BACKUP' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_BACKUP') REQUIRE SSL;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM '$DB_BACKUP'@'$IP_BACKUP';
 GRANT SELECT ON \`$DB_NOME\`.* TO '$DB_BACKUP'@'$IP_BACKUP';
-EOF
-  for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do
-    cat <<EOF
 
--- make db-* da maquina do admin $ip (db-down/db-create precisam de DROP/CREATE).
--- DEPLOY-07: so o banco $DB_NOME (bancos de teste nao existem em producao).
-CREATE USER IF NOT EXISTS '$DB_MAKE'@'$ip' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_MAKE') REQUIRE SSL;
-ALTER USER '$DB_MAKE'@'$ip' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_MAKE') REQUIRE SSL;
-REVOKE ALL PRIVILEGES, GRANT OPTION FROM '$DB_MAKE'@'$ip';
-GRANT ALL PRIVILEGES ON \`$DB_NOME\`.* TO '$DB_MAKE'@'$ip';
-EOF
-    if [[ -n "$CASAOS_NATIVE_MOTIVO" ]]; then
-      # SEC-30, saida de emergencia (so casaos): cliente sem ed25519.
-      printf "ALTER USER '%s'@'%s' IDENTIFIED VIA mysql_native_password USING PASSWORD('%s') REQUIRE SSL;\n" \
-        "$DB_MAKE" "$ip" "$SENHA_MAKE"
-    fi
-  done
-  cat <<EOF
+-- DEPLOY-10: DBA ($IP_DBA), so local, sem privilegio global nem GRANT OPTION.
+CREATE USER IF NOT EXISTS '$DB_DBA'@'$IP_DBA' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_DBA') REQUIRE SSL;
+ALTER USER '$DB_DBA'@'$IP_DBA' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_DBA') REQUIRE SSL;
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM '$DB_DBA'@'$IP_DBA';
+GRANT ALL PRIVILEGES ON \`$DB_NOME\`.* TO '$DB_DBA'@'$IP_DBA';
 
 -- Higiene: sem contas anonimas e sem o banco test.
 DELETE FROM mysql.global_priv WHERE User = '';
@@ -905,31 +1041,32 @@ FLUSH PRIVILEGES;
 EOF
 }
 sql_contas | root_sql
-unset SENHA_APP SENHA_MAKE
+unset SENHA_APP
 
-# BACKUP-01: option file do cliente de backup, montado read-only so nesse
-# cliente. Fica FORA de container/, que e montado no container do banco. O
-# temporario esta no mesmo diretorio 700 e o mv troca o arquivo de uma vez.
-# So depois do ALTER USER: o arquivo nunca aponta para uma conta sem essa senha.
+# Option file de um cliente, montado read-only so nele. O temporario esta no
+# mesmo diretorio 700 e o mv troca o arquivo de uma vez. So depois do ALTER USER:
+# o arquivo nunca aponta para uma conta sem essa senha.
+gravar_option_file() { # usuario senha destino
+  rm -f "$3.tmp"
+  printf '[client]\nuser=%s\npassword=%s\n' "$1" "$2" > "$3.tmp"
+  chown root:root "$3.tmp"
+  chmod 400 "$3.tmp"
+  mv -f "$3.tmp" "$3"
+  [[ "$(stat -c '%u %a' -- "$3")" == "0 400" ]] || die "$3 precisa ser do root com modo 400"
+}
+# BACKUP-01: fica FORA de container/, que e montado no container do banco.
 BACKUP_CNF_DIR="$SEGREDOS_DIR/backup-cliente"
 BACKUP_CNF="$BACKUP_CNF_DIR/$DB_BACKUP.cnf"
 [[ ! -L "$BACKUP_CNF_DIR" ]] || die "$BACKUP_CNF_DIR e um link simbolico: precisa ser diretorio real"
 install -d -m 700 -o root -g root "$BACKUP_CNF_DIR"
 conferir_dir_privado --segredos-dir "$BACKUP_CNF_DIR" existe
-rm -f "$BACKUP_CNF.tmp"
-printf '[client]\nuser=%s\npassword=%s\n' "$DB_BACKUP" "$SENHA_BACKUP" > "$BACKUP_CNF.tmp"
-chown root:root "$BACKUP_CNF.tmp"
-chmod 400 "$BACKUP_CNF.tmp"
-mv -f "$BACKUP_CNF.tmp" "$BACKUP_CNF"
-[[ "$(stat -c '%u %a' -- "$BACKUP_CNF")" == "0 400" ]] || die "$BACKUP_CNF precisa ser do root com modo 400"
+gravar_option_file "$DB_BACKUP" "$SENHA_BACKUP" "$BACKUP_CNF"
 unset SENHA_BACKUP
 info "Option file do backup pronto (so root le; fora de container/)."
-
-if [[ -n "$CASAOS_NATIVE_MOTIVO" ]]; then
-  printf '%s %s\n' "$(date -Is)" "$CASAOS_NATIVE_MOTIVO" >> "$SEGREDOS_DIR/casaos-native.motivo"
-  chmod 600 "$SEGREDOS_DIR/casaos-native.motivo"
-  aviso "SEC-30: casaos com mysql_native_password (saida de emergencia). Motivo registrado em $SEGREDOS_DIR/casaos-native.motivo. Volte ao ed25519 assim que possivel (rode sem --casaos-native-motivo)."
-fi
+# DEPLOY-10: o mesmo para o DBA.
+gravar_option_file "$DB_DBA" "$SENHA_DBA" "$DBA_CNF"
+unset SENHA_DBA
+info "Option file do DBA pronto (so root le; fora de container/)."
 
 # Convergencia (SEC-45 item 2): contas do projeto com host fora do desejado saem.
 eh_desejada() { local c; for c in "${DESEJADAS[@]}"; do [[ "$c" == "$1" ]] && return 0; done; return 1; }
@@ -938,14 +1075,36 @@ while IFS=$'\t' read -r u h; do
   [[ -n "$u" ]] || continue
   eh_desejada "$u@$h" && continue
   if [[ ! "$h" =~ ^[A-Za-z0-9.:/%_-]*$ ]]; then
-    aviso "conta $u com host fora do padrao NAO removida automaticamente; confira: SELECT User, Host FROM mysql.global_priv"
+    if [[ "$u" == "$DB_LEGADO" ]]; then
+      info "Removendo conta fora do desejado: $DB_LEGADO com host fora do padrao (DROP gerado pelo servidor, com QUOTE)"
+    else
+      aviso "conta $u com host fora do padrao NAO removida automaticamente; confira: SELECT User, Host FROM mysql.global_priv"
+    fi
     continue
   fi
-  REMOVER_SQL+="DROP USER IF EXISTS '$u'@'$h';"$'\n'
   info "Removendo conta fora do desejado: $u@$h"
-done < <(root_sql -e "SELECT User, Host FROM mysql.global_priv WHERE User IN ('$DB_APP', '$DB_ADMIN', '$DB_BACKUP', '$DB_MAKE') ORDER BY User, Host")
+  # A conta legada sai toda pelo DROP gerado no servidor, logo abaixo.
+  [[ "$u" == "$DB_LEGADO" ]] && continue
+  REMOVER_SQL+="DROP USER IF EXISTS '$u'@'$h';"$'\n'
+done < <(root_sql -e "SELECT User, Host FROM mysql.global_priv WHERE User IN ('$DB_APP', '$DB_ADMIN', '$DB_BACKUP', '$DB_DBA', '$DB_LEGADO') ORDER BY User, Host")
 if [[ -n "$REMOVER_SQL" ]]; then
   printf '%s' "$REMOVER_SQL" | root_sql
+fi
+# Achado do SecBrain (Lote 42): a conta legada sai em QUALQUER host, inclusive
+# fora do charset. O texto do DROP vem so do QUOTE() do proprio servidor (nunca
+# do valor lido pelo shell); --raw evita o escape do modo batch, que trocaria o
+# host. Sobrou alguma linha: para, sem seguir com a conta antiga viva.
+LEGADO_SQL=$(root_sql --raw -e "SELECT CONCAT('DROP USER IF EXISTS ', QUOTE(User), '@', QUOTE(Host), ';') FROM mysql.global_priv WHERE User = '$DB_LEGADO' ORDER BY Host")
+if [[ -n "$LEGADO_SQL" ]]; then
+  printf '%s\n' "$LEGADO_SQL" | root_sql
+fi
+LEGADO_RESTA=$(root_sql -e "SELECT COUNT(*) FROM mysql.global_priv WHERE User = '$DB_LEGADO'")
+[[ "$LEGADO_RESTA" == 0 ]] \
+  || die "a conta $DB_LEGADO continua no servidor ($LEGADO_RESTA host(s)) depois do DROP USER; confira: SELECT QUOTE(Host) FROM mysql.global_priv WHERE User = '$DB_LEGADO'"
+# DEPLOY-10: DROP USER nao derruba quem ja esta conectado. So avisa, sem matar.
+SESSOES_LEGADO=$(root_sql -e "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE USER = '$DB_LEGADO'")
+if [[ "$SESSOES_LEGADO" != 0 ]]; then
+  aviso "ha sessao aberta da conta $DB_LEGADO, removida ($SESSOES_LEGADO): ela segue ativa ate fechar e nao foi encerrada. Confira: SELECT ID, HOST FROM information_schema.PROCESSLIST WHERE USER = '$DB_LEGADO'"
 fi
 
 info "Contas:"
@@ -954,7 +1113,7 @@ root_sql -e "SELECT CONCAT('    ', User, '@', Host, '  ', COALESCE(JSON_VALUE(Pr
 # oficial (healthcheck.sh, so USAGE): esperadas, nao removidas. Avisa so se
 # tiverem algo alem de USAGE (global, banco, tabela, coluna, rotina, papel, proxy).
 readonly HC_HOSTS="'localhost', '127.0.0.1', '::1'"
-OUTRAS=$(root_sql -e "SELECT CONCAT(User, '@', Host) FROM mysql.global_priv WHERE NOT (User = 'root' AND Host = 'localhost') AND NOT (User = 'healthcheck' AND Host IN ($HC_HOSTS)) AND User NOT IN ('mariadb.sys', 'PUBLIC', '$DB_APP', '$DB_ADMIN', '$DB_BACKUP', '$DB_MAKE') ORDER BY User, Host")
+OUTRAS=$(root_sql -e "SELECT CONCAT(User, '@', Host) FROM mysql.global_priv WHERE NOT (User = 'root' AND Host = 'localhost') AND NOT (User = 'healthcheck' AND Host IN ($HC_HOSTS)) AND User NOT IN ('mariadb.sys', 'PUBLIC', '$DB_APP', '$DB_ADMIN', '$DB_BACKUP', '$DB_DBA') ORDER BY User, Host")
 if [[ -n "$OUTRAS" ]]; then
   aviso "contas fora do esperado (root@localhost, mariadb.sys, healthcheck locais e as do projeto): $(tr '\n' ' ' <<<"$OUTRAS")- confira e remova se nao forem suas."
 fi
@@ -962,7 +1121,7 @@ HC_ALEM_USAGE=$(root_sql -e "SELECT CONCAT(hc.User, '@', hc.Host) FROM mysql.glo
 if [[ -n "$HC_ALEM_USAGE" ]]; then
   aviso "contas healthcheck locais com privilegios ALEM de USAGE: $(tr '\n' ' ' <<<"$HC_ALEM_USAGE")- o entrypoint da imagem so concede USAGE; confira SHOW GRANTS e revogue o excedente."
 fi
-FALTANDO=$(root_sql -e "SELECT COUNT(*) FROM mysql.global_priv WHERE User IN ('$DB_APP', '$DB_ADMIN', '$DB_BACKUP', '$DB_MAKE') AND COALESCE(JSON_VALUE(Priv, '$.ssl_type'), '0') <> '1'")
+FALTANDO=$(root_sql -e "SELECT COUNT(*) FROM mysql.global_priv WHERE User IN ('$DB_APP', '$DB_ADMIN', '$DB_BACKUP', '$DB_DBA', '$DB_LEGADO') AND COALESCE(JSON_VALUE(Priv, '$.ssl_type'), '0') <> '1'")
 [[ "$FALTANDO" == 0 ]] || die "ha conta do projeto sem REQUIRE SSL (ssl_type <> ANY)"
 
 # ---------------------------------------------------------------------------
@@ -1003,6 +1162,33 @@ if [[ "$SERVIDO" != *"|"* || "$SERV_FIM" != "$ARQ_FIM" || "$SERV_INI" != "$ARQ_I
 fi
 info "Certificado em uso = $SSL_DIR/server-cert.pem (mesma validade): OK."
 
+# DEPLOY-10: comando pronto do DBA. So o container padrao instala em $DBA_CMD (o
+# caminho e unico no host); outro --container testa o mesmo script gerado.
+gerar_script_dba > "$BUILD_DIR/dba.tmp"
+bash -n "$BUILD_DIR/dba.tmp" || die "comando do DBA gerado invalido"
+if [[ "$CONTAINER" == "$CONTAINER_PADRAO" ]]; then
+  install -m 700 -o root -g root "$BUILD_DIR/dba.tmp" "$DBA_CMD"
+  rm -f "$BUILD_DIR/dba.tmp"
+  DBA_TESTE="$DBA_CMD"
+else
+  DBA_TESTE="$BUILD_DIR/dba.tmp"
+fi
+DBA_SAIDA=$(printf 'SELECT CURRENT_USER();\n' | bash "$DBA_TESTE") \
+  || die "falhou a conexao do DBA pelo comando pronto (confira a conta $DB_DBA@$IP_DBA e se o IP $IP_DBA esta livre)"
+grep -qxF "$DB_DBA@$IP_DBA" <<<"$DBA_SAIDA" \
+  || die "o comando do DBA nao entrou como $DB_DBA@$IP_DBA"
+info "Comando do DBA conectado como $DB_DBA@$IP_DBA: OK."
+# O comando nao repassa argumentos: a recusa sem TLS usa os mesmos limites dele.
+if docker run --rm -i --name "$DBA_CLIENTE" --network "$REDE_NOME" --ip "$IP_DBA" \
+     --read-only --cap-drop ALL --security-opt no-new-privileges:true --log-driver none \
+     --mount "type=bind,source=$DBA_CNF,target=$C_DBA/cliente.cnf,readonly" \
+     --entrypoint mariadb "$IMAGEM" "--defaults-extra-file=$C_DBA/cliente.cnf" \
+     -h "$CONTAINER" -P 3306 --skip-ssl -N -B -e 'SELECT 1' >/dev/null 2>&1; then
+  die "conexao SEM TLS do DBA foi aceita (require_secure_transport/REQUIRE SSL nao estao valendo)"
+fi
+info "Conexao sem TLS do DBA recusada: OK."
+rm -f "$BUILD_DIR/dba.tmp"
+
 # DEPLOY-08: le os primeiros bytes da porta e devolve "greeting", "erro1130"
 # ou outra coisa. O mariadbd fala primeiro: pacote = 3 bytes de tamanho +
 # 1 de sequencia (00) + payload (0x0a = greeting do protocolo 10; 0xff + codigo
@@ -1021,11 +1207,11 @@ resposta_porta() { # ip porta
   fi
 }
 
-if $PUBLICAR; then
-  # DEPLOY-08: daqui o s_client na porta publicada NAO funciona: a conexao sai
-  # do proprio servidor, chega ao mariadbd pelo DNAT com origem no gateway da
-  # rede/IP do host, sem conta para esse host, e o mariadbd manda o ERRO 1130
-  # antes do greeting (o -starttls mysql desiste: "Cipher is (NONE)"). Entao:
+if $PORTA_LEGADA; then
+  # DEPLOY-08: o s_client na porta publicada NAO funciona: a conexao chega ao
+  # mariadbd por um host sem conta, e o mariadbd manda o ERRO 1130 antes do
+  # greeting (o -starttls mysql desiste: "Cipher is (NONE)"). DEPLOY-10: sem a
+  # conta casaos, isso vale tambem para a maquina do --dev-ip. Entao:
   # (a) o certificado do arquivo (o que esta em uso, conferido acima) vale para
   #     $SITE_IP pela CA;
   openssl verify -CAfile "$SSL_DIR/ca.pem" -verify_ip "$SITE_IP" "$SSL_DIR/server-cert.pem" >/dev/null 2>&1 \
@@ -1035,18 +1221,9 @@ if $PUBLICAR; then
   RESP=$(resposta_porta "$SITE_IP" "$PORTA")
   case "$RESP" in
     greeting) info "Porta publicada $SITE_IP:$PORTA: greeting do mariadbd: OK." ;;
-    erro1130) info "Porta publicada $SITE_IP:$PORTA: mariadbd respondeu (erro 1130, esperado vindo do servidor, que nao esta em --dev-ip): OK." ;;
+    erro1130) info "Porta publicada $SITE_IP:$PORTA: mariadbd respondeu (erro 1130, esperado: nenhuma conta aceita este host): OK." ;;
     *) die "a porta publicada $SITE_IP:$PORTA nao respondeu como o mariadbd (${RESP}; esperado greeting ou erro 1130). Confira docker port $CONTAINER e o firewall." ;;
   esac
-  # (c) o TLS real da porta publicada so pode ser testado de um --dev-ip.
-  cat <<EOF
-  Teste TLS da porta publicada: rode NA MAQUINA DO ADMIN (${DEV_IPS[*]}), com a
-  copia da CA (deploy/ca-producao.pem, passo 3 abaixo):
-    openssl s_client -starttls mysql -connect $SITE_IP:$PORTA -CAfile deploy/ca-producao.pem -verify_return_error -verify_ip $SITE_IP </dev/null 2>/dev/null | grep -E 'Verify return code|Cipher is'
-  Esperado: "Cipher is" com uma cifra (TLS_AES_...), NUNCA "(NONE)", e
-  "Verify return code: 0 (ok)". Sem handshake o s_client tambem imprime
-  "Verify return code: 0 (ok)" (enganoso): so vale junto com a cifra.
-EOF
 fi
 
 # DEPLOY-07 / SEC-71: fingerprints das CAs de DEV (MariaDB do CasaOS, porta
@@ -1068,7 +1245,7 @@ CA_SUBJECT=$(openssl x509 -in "$SSL_DIR/ca.pem" -noout -subject)
 cat <<EOF
 
 Pronto. MariaDB no container $CONTAINER (imagem $IMAGEM, base $IMAGEM_BASE),
-rede $REDE_NOME ($IP_DB:3306)$($PUBLICAR && printf ', publicado em %s:%s para %s' "$SITE_IP" "$PORTA" "${DEV_IPS[*]}").
+rede $REDE_NOME ($IP_DB:3306)$($PORTA_LEGADA && printf ', porta %s:%s ainda publicada ate o --recriar sem --dev-ip' "$SITE_IP" "$PORTA").
 
 CA do banco de PRODUCAO ($SSL_DIR/ca.pem):
   $CA_SUBJECT
@@ -1080,11 +1257,10 @@ Senhas (so root le; nao foram impressas):
   $SEGREDOS_DIR/$DB_APP.senha   API: DB_SENHA do Secret file rotaperfumes-api-env
   $SEGREDOS_DIR/$DB_ADMIN.senha credencial Jenkins rotaperfumes-db-admin (import) e seed-producao.sh
   $SEGREDOS_DIR/$DB_BACKUP.senha origem do option file $DB_BACKUP.cnf em backup-cliente/ (400)
-EOF
-if $PUBLICAR; then
-  printf '  %s/%s.senha             .env.producao da maquina do admin (--dev-ip)\n' "$SEGREDOS_DIR" "$DB_MAKE"
-fi
-cat <<EOF
+  $DBA_SENHA origem do option file cliente.cnf em dba-cliente/ (400)
+
+DBA, so no servidor (por SSH): sudo rotaperfumes-dba  ou  sudo rotaperfumes-dba < arquivo.sql
+  $DBA_AVISO_NOMES
 
 Proximos passos:
   1. api.env (Secret file rotaperfumes-api-env): DB_HOST=$CONTAINER DB_PORT=3306
@@ -1108,22 +1284,6 @@ cat <<EOF
   3. NAO copie esta CA para deploy/ca-cert.pem: esse arquivo e a CA do MariaDB
      de DEV (CasaOS, 3307).
 EOF
-if $PUBLICAR; then
-  cat <<EOF
-     Na maquina do admin (so as de --dev-ip), copie $SSL_DIR/ca.pem para
-     deploy/ca-producao.pem (no .gitignore) e use um arquivo SEPARADO,
-     .env.producao (no .gitignore), nunca o .env de dev:
-       # ATENCAO: este .env aponta para PRODUCAO; make db-* apaga dados reais.
-       DB_HOST=$SITE_IP
-       DB_PORT=$PORTA
-       DB_USUARIO=$DB_MAKE
-       DB_SENHA=<conteudo de $SEGREDOS_DIR/$DB_MAKE.senha>
-       DB_TLS_CA=deploy/ca-producao.pem
-     Uso: make <alvo> ENV_ARQUIVO=.env.producao CONFIRMO_PRODUCAO=$SITE_IP/$DB_NOME
-     (o .env nao e lido; sem o CONFIRMO_PRODUCAO os alvos make db-* recusam
-     este host). Cliente mariadb com o plugin client_ed25519.
-EOF
-fi
 cat <<EOF
   4. Seed inicial: sudo bash deploy/seed-producao.sh (docs/deploy-servidor.md
      §11); nunca make db-seed contra este banco.

@@ -295,7 +295,7 @@ func TestBACKUP01_Backup_Estatico(t *testing.T) {
 	assert.Equal(t, m[1], v[1], "mesma string do IMAGEM_BASE")
 	fontes := regexp.MustCompile(`(?m)^IMAGENS_FIXADAS_EM\s*:?=\s*(.+)$`).FindStringSubmatch(lerRaiz(t, "Makefile"))
 	require.NotNil(t, fontes)
-	for _, f := range []string{"Jenkinsfile", "deploy/mariadb-docker.sh", "deploy/seed-producao.sh", "deploy/backup-banco.sh", "deploy/verificar-backup.sh"} {
+	for _, f := range []string{"Jenkinsfile", "deploy/mariadb-docker.sh", "deploy/seed-producao.sh", "deploy/backup-banco.sh", "deploy/verificar-backup.sh", "deploy/restaurar-maquina.sh"} {
 		assert.Contains(t, strings.Fields(fontes[1]), f)
 	}
 
@@ -1131,13 +1131,17 @@ func TestBACKUP01_GuardaRecriar_Aceita(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), st.Mode().Perm())
 	})
-	t.Run("janela configuravel", func(t *testing.T) {
+	t.Run("janela configuravel ate 60", func(t *testing.T) {
 		e, dir := novaGuarda(t)
-		p := dumpRecente(t, dir, "rotaperfumes-"+carimboAgora(-2*time.Hour)+".sql.gz")
-		velho := time.Now().Add(-2 * time.Hour)
+		p := dumpRecente(t, dir, "rotaperfumes-"+carimboAgora(-50*time.Minute)+".sql.gz")
+		velho := time.Now().Add(-50 * time.Minute)
 		require.NoError(t, os.Chtimes(p, velho, velho))
-		r := e.rodar("--recriar", "--backup-dir", dir, "--backup-janela-min", "180")
+		r := e.rodar("--recriar", "--backup-dir", dir, "--backup-janela-min", "40")
+		require.Error(t, r.err, r.out)
+		assert.Contains(t, r.out, "tem mais de 40 min")
+		r = e.rodar("--recriar", "--backup-dir", dir, "--backup-janela-min", "60")
 		require.NoError(t, r.err, r.out)
+		assert.Contains(t, registro(e), "janela=60 backup="+p)
 	})
 	t.Run("motivo registrado antes do docker rm", func(t *testing.T) {
 		e, dir := novaGuarda(t)
@@ -1167,7 +1171,7 @@ func TestBACKUP01_GuardaRecriar_Aceita(t *testing.T) {
 		dirInvalido := filepath.Join(e.dir, "nao-existe")
 		r := e.rodar("--recriar", "--backup-dir", dirInvalido)
 		require.NoError(t, r.err, r.out)
-		assert.Contains(t, registro(e), "backup=nenhum motivo=nenhum")
+		assert.Contains(t, registro(e), "janela=60 backup=nenhum motivo=nenhum")
 	})
 	t.Run("reexecucao sem --recriar nao dispara", func(t *testing.T) {
 		e, _ := novaGuarda(t)
@@ -1241,5 +1245,357 @@ func TestBACKUP01_GuardaSeedForcar(t *testing.T) {
 		require.Error(t, err, out)
 		assert.Contains(t, out, "--sem-backup-motivo so com --forcar")
 		assert.Empty(t, e.ler("log"))
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Achados do TestBrain: carimbo futuro, status só pelo mtime, par corrompido.
+// ---------------------------------------------------------------------------
+func (e *ensaioBackup) pares() []string {
+	e.t.Helper()
+	var out []string
+	for _, n := range e.arquivos() {
+		if regexp.MustCompile(`^rotaperfumes-\d{8}-\d{6}Z(-manual)?\.sql\.gz$`).MatchString(n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (e *ensaioBackup) caminhoDump(carimbo string) string {
+	return filepath.Join(e.backups(), "rotaperfumes-"+carimbo+".sql.gz")
+}
+
+func TestBACKUP01_Retencao_DataFutura(t *testing.T) {
+	semApagar := func(t *testing.T, e *ensaioBackup, antes []string, out string, rc int, esperado string) {
+		t.Helper()
+		assert.Equal(t, 1, rc, out)
+		assert.Contains(t, out, esperado)
+		assert.Contains(t, out, "nada foi apagado")
+		assert.NotContains(t, out, "par removido")
+		assert.NotContains(t, out, "backup: ok")
+		assert.Subset(t, e.arquivos(), antes, "nada apagado")
+		assert.Len(t, e.pares(), len(antes)/2+1, "o par novo fica")
+		var novo string
+		for _, n := range e.pares() {
+			if !strings.Contains(strings.Join(antes, " "), n) {
+				novo = n
+			}
+		}
+		require.NotEmpty(t, novo, "par novo publicado")
+		cAtual := strings.TrimSuffix(strings.TrimPrefix(novo, "rotaperfumes-"), ".sql.gz")
+		assert.FileExists(t, filepath.Join(e.backups(), "rotaperfumes-imagens-"+cAtual+".tar.gz"))
+	}
+	t.Run("dois pares futuros: reproducao do TestBrain", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia("RETENCAO_DIARIOS=2\n")
+		e.par("20991231-235958Z", "")
+		e.par("20991231-235959Z", "")
+		antes := e.arquivos()
+		out, rc := e.instalada("--agendado")
+		semApagar(t, e, antes, out, rc, "rotaperfumes-20991231-235958Z.sql.gz tem data futura")
+	})
+	t.Run("par futuro falha mesmo sem nada a apagar", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		e.par("20991231-235959Z", "-manual")
+		antes := e.arquivos()
+		out, rc := e.instalada("--agendado")
+		semApagar(t, e, antes, out, rc, "rotaperfumes-20991231-235959Z-manual.sql.gz tem data futura")
+	})
+	t.Run("mtime futuro tambem falha", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		e.par(carimboAntigoDump, "")
+		futuro := time.Now().Add(2 * time.Hour)
+		require.NoError(t, os.Chtimes(e.caminhoDump(carimboAntigoDump), futuro, futuro))
+		antes := e.arquivos()
+		out, rc := e.instalada("--agendado")
+		semApagar(t, e, antes, out, rc, "rotaperfumes-"+carimboAntigoDump+".sql.gz tem data futura")
+	})
+	t.Run("carimbo que nao existe falha", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		e.par("20261399-033000Z", "")
+		antes := e.arquivos()
+		out, rc := e.instalada("--agendado")
+		semApagar(t, e, antes, out, rc, "rotaperfumes-20261399-033000Z.sql.gz tem carimbo invalido")
+	})
+	t.Run("dentro da folga do relogio passa", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		e.par(carimboAgora(time.Minute), "")
+		out, rc := e.instalada("--agendado")
+		assert.Equal(t, 0, rc, out)
+	})
+	t.Run("nunca apaga o par recem-publicado", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia("RETENCAO_DIARIOS=2\n")
+		e.par(carimboAgora(2*time.Minute), "")
+		e.par(carimboAgora(3*time.Minute), "")
+		antes := e.arquivos()
+		out, rc := e.instalada("--agendado")
+		semApagar(t, e, antes, out, rc, "apagaria o par recem-publicado")
+	})
+}
+
+func TestBACKUP01_Retencao_ParCorrompido(t *testing.T) {
+	const antigo, meio, recente = "20260101-033000Z", "20260102-033000Z", "20260103-033000Z"
+	semMarcador := comprimir(t, strings.TrimSuffix(dumpBackupBom(), marcadorDump))
+	novo := func(t *testing.T) *ensaioBackup {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia("RETENCAO_DIARIOS=2\n")
+		for _, c := range []string{antigo, meio, recente} {
+			e.par(c, "")
+		}
+		return e
+	}
+	for nome, c := range map[string]struct{ arquivo, conteudo, esperado string }{
+		"dump com gzip ruim":    {"rotaperfumes-" + recente + ".sql.gz", "nao e gzip", "gzip invalido"},
+		"dump sem marcador":     {"rotaperfumes-" + recente + ".sql.gz", semMarcador, "sem o marcador"},
+		"imagens com gzip ruim": {"rotaperfumes-imagens-" + recente + ".tar.gz", "nao e gzip", "imagens com gzip invalido"},
+	} {
+		t.Run(nome, func(t *testing.T) {
+			e := novo(t)
+			escrever(t, filepath.Join(e.backups(), c.arquivo), c.conteudo, 0o600)
+			antes := e.arquivos()
+			out, rc := e.instalada("--agendado")
+			assert.Equal(t, 1, rc, out)
+			assert.Contains(t, out, "o par rotaperfumes-"+recente+".sql.gz foi reprovado")
+			assert.Contains(t, out, c.esperado)
+			assert.NotContains(t, out, "par removido")
+			assert.Subset(t, e.arquivos(), antes, "nada apagado")
+			assert.Len(t, e.pares(), 4, "o par novo fica")
+		})
+	}
+	t.Run("corrompido e o mais novo no carimbo, dentro da folga", func(t *testing.T) {
+		e := novo(t)
+		c := carimboAgora(time.Minute)
+		e.par(c, "")
+		escrever(t, e.caminhoDump(c), "nao e gzip", 0o600)
+		antes := e.arquivos()
+		out, rc := e.instalada("--agendado")
+		assert.Equal(t, 1, rc, out)
+		assert.Contains(t, out, "o par rotaperfumes-"+c+".sql.gz foi reprovado")
+		assert.Subset(t, e.arquivos(), antes)
+	})
+	t.Run("pares antigos nao sao relidos", func(t *testing.T) {
+		e := novo(t)
+		escrever(t, e.caminhoDump(meio), "nao e gzip", 0o600)
+		out, rc := e.instalada("--agendado")
+		require.Equal(t, 0, rc, out)
+		assert.NoFileExists(t, e.caminhoDump(antigo))
+		assert.NoFileExists(t, e.caminhoDump(meio))
+		assert.FileExists(t, e.caminhoDump(recente))
+	})
+	t.Run("sem nada a apagar nao rele e nao falha", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		e.par(recente, "")
+		escrever(t, e.caminhoDump(recente), "nao e gzip", 0o600)
+		out, rc := e.instalada("--agendado")
+		assert.Equal(t, 0, rc, out)
+	})
+}
+
+func TestBACKUP01_Status_CarimboEDump(t *testing.T) {
+	verificado := func(e *ensaioBackup) {
+		escrever(e.t, filepath.Join(e.backups(), ".ultima-verificacao"), fmt.Sprintf("epoch=%d\n", time.Now().Unix()), 0o600)
+	}
+	novo := func(t *testing.T, carimbo string) *ensaioBackup {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		e.par(carimbo, "")
+		verificado(e)
+		return e
+	}
+	t.Run("carimbo antigo com mtime atual: reproducao do TestBrain", func(t *testing.T) {
+		out, rc := novo(t, "20200101-033000Z").instalada("--status")
+		assert.Equal(t, 1, rc, out)
+		assert.Contains(t, out, "rotaperfumes-20200101-033000Z.sql.gz) tem mais de 26 h")
+		assert.NotContains(t, out, "STATUS: ok")
+	})
+	t.Run("carimbo futuro", func(t *testing.T) {
+		out, rc := novo(t, "20991231-235959Z").instalada("--status")
+		assert.Equal(t, 1, rc, out)
+		assert.Contains(t, out, "rotaperfumes-20991231-235959Z.sql.gz) tem data futura")
+		assert.NotContains(t, out, "min atras")
+	})
+	t.Run("carimbo que nao existe", func(t *testing.T) {
+		out, rc := novo(t, "20261399-033000Z").instalada("--status")
+		assert.Equal(t, 1, rc, out)
+		assert.Contains(t, out, "carimbo invalido")
+	})
+	t.Run("carimbo recente com mtime antigo", func(t *testing.T) {
+		c := carimboAgora(0)
+		e := novo(t, c)
+		velho := time.Now().Add(-27 * time.Hour)
+		require.NoError(t, os.Chtimes(e.caminhoDump(c), velho, velho))
+		out, rc := e.instalada("--status")
+		assert.Equal(t, 1, rc, out)
+		assert.Contains(t, out, "tem mais de 26 h")
+	})
+	t.Run("dentro da folga do relogio", func(t *testing.T) {
+		out, rc := novo(t, carimboAgora(time.Minute)).instalada("--status")
+		assert.Equal(t, 0, rc, out)
+		assert.Contains(t, out, "(0 min atras")
+	})
+	semMarcador := strings.TrimSuffix(dumpBackupBom(), marcadorDump)
+	for nome, c := range map[string]struct{ conteudo, esperado string }{
+		"gzip ruim":        {"nao e gzip", "gzip invalido"},
+		"sem marcador":     {comprimir(t, semMarcador), "sem o marcador"},
+		"marcador no meio": {comprimir(t, marcadorDump+semMarcador), "sem o marcador"},
+	} {
+		t.Run("dump: "+nome, func(t *testing.T) {
+			cb := carimboAgora(0)
+			e := novo(t, cb)
+			escrever(t, e.caminhoDump(cb), c.conteudo, 0o600)
+			out, rc := e.instalada("--status")
+			assert.Equal(t, 1, rc, out)
+			assert.Contains(t, out, "foi reprovado")
+			assert.Contains(t, out, c.esperado)
+		})
+	}
+	t.Run("dump grande sem falso negativo por SIGPIPE", func(t *testing.T) {
+		cb := carimboAgora(0)
+		e := novo(t, cb)
+		var b strings.Builder
+		for i := 0; i < 400000; i++ {
+			fmt.Fprintf(&b, "(%d,'linha sintetica de preenchimento'),\n", i)
+		}
+		escrever(t, e.caminhoDump(cb), comprimir(t, dumpBackupBom()+b.String()+marcadorDump), 0o600)
+		out, rc := e.instalada("--status")
+		assert.Equal(t, 0, rc, out)
+	})
+	t.Run("verificacao com data futura avisa sem dia negativo", func(t *testing.T) {
+		e := novo(t, carimboAgora(0))
+		escrever(t, filepath.Join(e.backups(), ".ultima-verificacao"), "epoch=9999999999\n", 0o600)
+		out, rc := e.instalada("--status")
+		assert.Equal(t, 0, rc, out)
+		assert.Contains(t, out, "AVISO: a ultima verificacao tem data futura")
+		assert.NotContains(t, out, "ha -")
+		assert.NotContains(t, out, "Ultima verificacao: ha")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// BACKUP-02: OK visível do marcador. O texto é fixo: nada do dump vai para a saída.
+// ---------------------------------------------------------------------------
+const (
+	okMarcadorBackup = "backup: dump validado: marcador '-- Dump completed' na ultima linha: OK\n"
+	okMarcadorStatus = "Dump validado: marcador '-- Dump completed' na ultima linha: OK\n"
+	// Última linha válida para o script, mas que não pode aparecer na saída.
+	ultimaLinhaSentinela = "-- Dump completed SENTINELA_ULTIMA_LINHA\n"
+)
+
+func dumpComUltimaLinhaSentinela() string {
+	return strings.TrimSuffix(dumpBackupBom(), marcadorDump) + ultimaLinhaSentinela
+}
+
+func semConteudoDoDump(t *testing.T, out string) {
+	t.Helper()
+	assert.NotContains(t, out, "SENTINELA_ULTIMA_LINHA", "a última linha do dump fica fora da saída")
+	assert.NotContains(t, out, "dado de cliente", "linha do dump fora da saída")
+	assert.NotContains(t, out, "-- Dump completed on", "linha do dump fora da saída")
+}
+
+func TestBACKUP02_Backup_MostraOKDoMarcador(t *testing.T) {
+	for _, modo := range []string{"--agora", "--agendado"} {
+		t.Run(modo, func(t *testing.T) {
+			e := novoEnsaioBackup(t)
+			e.instalarCopia()
+			e.state("dump", dumpComUltimaLinhaSentinela())
+			out, rc := e.instalada(modo)
+			require.Equal(t, 0, rc, out)
+			assert.Equal(t, 1, strings.Count(out, okMarcadorBackup), out)
+			assert.Less(t, strings.Index(out, okMarcadorBackup), strings.Index(out, "backup: ok "), "o OK vem antes do fim do backup")
+			semConteudoDoDump(t, out)
+		})
+	}
+}
+
+// Todas as reprovações do conferir_dump, no --agora e no --agendado.
+func TestBACKUP02_Backup_DumpReprovadoSemOK(t *testing.T) {
+	semMarcador := strings.TrimSuffix(dumpBackupBom(), marcadorDump)
+	casos := []struct {
+		nome, dump, rc, esperado string
+	}{
+		{"mariadb-dump falha", dumpBackupBom(), "1", "o dump falhou"},
+		{"dump vazio", "", "", "a ultima linha do dump nao tem o marcador '-- Dump completed'"},
+		{"sem marcador", semMarcador, "", "a ultima linha do dump nao tem o marcador '-- Dump completed'"},
+		{"marcador no meio", marcadorDump + semMarcador, "", "a ultima linha do dump nao tem o marcador '-- Dump completed'"},
+		{"marcador valido e poucas tabelas", strings.Replace(dumpBackupBom(), "CREATE TABLE `tabela_00`", "-- removida", 1), "", "tabela(s)"},
+		{"marcador valido e usuarios sem dados", strings.Replace(dumpBackupBom(), "INSERT INTO `usuarios` VALUES\n", "", 1), "", "sem dados"},
+	}
+	for _, modo := range []string{"--agora", "--agendado"} {
+		for _, c := range casos {
+			t.Run(modo+" "+c.nome, func(t *testing.T) {
+				e := novoEnsaioBackup(t)
+				e.instalarCopia()
+				e.state("dump", c.dump)
+				if c.rc != "" {
+					e.state("dump_rc", c.rc)
+				}
+				out, rc := e.instalada(modo)
+				assert.Equal(t, 1, rc, out)
+				assert.Contains(t, out, c.esperado)
+				assert.NotContains(t, out, "dump validado")
+				assert.NotContains(t, out, ": OK")
+			})
+		}
+	}
+}
+
+// O OK fala só da validação do dump: as etapas seguintes ainda podem falhar.
+func TestBACKUP02_Backup_OKNaoSignificaBackupConcluido(t *testing.T) {
+	e := novoEnsaioBackup(t)
+	e.instalarCopia()
+	e.state("sem_volume", "")
+	out, rc := e.instalada("--agendado")
+	assert.Equal(t, 1, rc, out)
+	assert.Contains(t, out, okMarcadorBackup)
+	assert.Contains(t, out, "Backup NAO concluido")
+	assert.NotContains(t, out, "backup: ok ")
+}
+
+func TestBACKUP02_Status_MostraOKDoMarcador(t *testing.T) {
+	novo := func(t *testing.T, dump string) *ensaioBackup {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		c := carimboAgora(0)
+		e.par(c, "")
+		escrever(t, e.caminhoDump(c), dump, 0o600)
+		escrever(t, filepath.Join(e.backups(), ".ultima-verificacao"), fmt.Sprintf("epoch=%d\n", time.Now().Unix()), 0o600)
+		return e
+	}
+	t.Run("marcador valido", func(t *testing.T) {
+		out, rc := novo(t, comprimir(t, dumpComUltimaLinhaSentinela())).instalada("--status")
+		assert.Equal(t, 0, rc, out)
+		assert.Equal(t, 1, strings.Count(out, okMarcadorStatus), out)
+		assert.Contains(t, out, "STATUS: ok")
+		semConteudoDoDump(t, out)
+	})
+
+	semMarcador := strings.TrimSuffix(dumpBackupBom(), marcadorDump)
+	for nome, c := range map[string]struct{ conteudo, esperado string }{
+		"gzip ruim":        {"nao e gzip", "foi reprovado: gzip invalido ou truncado"},
+		"sem marcador":     {comprimir(t, semMarcador), "foi reprovado: ultima linha sem o marcador '-- Dump completed'"},
+		"marcador no meio": {comprimir(t, marcadorDump+semMarcador), "foi reprovado: ultima linha sem o marcador '-- Dump completed'"},
+	} {
+		t.Run(nome, func(t *testing.T) {
+			out, rc := novo(t, c.conteudo).instalada("--status")
+			assert.Equal(t, 1, rc, out)
+			assert.Contains(t, out, c.esperado)
+			assert.Contains(t, out, "STATUS: 1 problema(s)")
+			assert.NotContains(t, out, "Dump validado")
+			assert.NotContains(t, out, ": OK")
+		})
+	}
+	t.Run("sem backup", func(t *testing.T) {
+		e := novoEnsaioBackup(t)
+		e.instalarCopia()
+		out, rc := e.instalada("--status")
+		assert.Equal(t, 1, rc, out)
+		assert.NotContains(t, out, "Dump validado")
 	})
 }

@@ -290,7 +290,7 @@ db-check-env: ## Confere DB_USUARIO/DB_SENHA (SEC-11), o TLS exigido para host r
 # make db-*/fix-*/import por engano. Todo alvo que escreve no banco depende
 # desta guarda. Producao =
 #   DB_HOST em PRODUCAO_HOSTS_LAN (IP/hostname do servidor) com DB_PORT vazio
-#   ou 3306 (a porta publicada com --dev-ip), OU
+#   ou 3306 (a porta de um container antigo, ate o --recriar: DEPLOY-10), OU
 #   DB_HOST em PRODUCAO_HOSTS_REDE (nome/IP na rede docker), qualquer porta.
 # O MariaDB de DEV do CasaOS roda no MESMO host, porta 3307: passa.
 # Producao aborta, salvo CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME> NA LINHA DE
@@ -707,20 +707,20 @@ deps-audit-frontend: ## SEC-13: npm audit (falha em severidade high+) e npm outd
 # SEC-31: imagens fixadas por digest (tag@sha256:...) no Jenkinsfile (GO_IMAGE,
 # GO_TEST_IMAGE, NODE_IMAGE, DB_CLIENT_IMAGE), no deploy/mariadb-docker.sh
 # (IMAGEM_BASE), no deploy/seed-producao.sh (GO_IMAGE, DB_CLIENT_IMAGE) e nos
-# deploy/backup-banco.sh e deploy/verificar-backup.sh (IMAGEM_BASE). Só
+# deploy/backup-banco.sh, deploy/verificar-backup.sh e deploy/restaurar-maquina.sh (IMAGEM_BASE). Só
 # informa: para cada referência, compara o digest
 # fixado com o digest atual da mesma tag e o da tag sem o patch (ex.: 11.4,
 # 1.26-alpine) no Docker Hub (docker buildx imagetools ou, sem docker, curl ao
 # registry com token anônimo). Nunca falha. Para atualizar: trocar a string em
-# todos os arquivos onde ela aparece: mariadb nos cinco (mesmo digest), GO_IMAGE
+# todos os arquivos onde ela aparece: mariadb nos seis (mesmo digest), GO_IMAGE
 # no Jenkinsfile e no seed-producao.sh; GO_TEST_IMAGE e NODE_IMAGE só existem no
 # Jenkinsfile. Depois, make test e, se o mariadb mudou, no servidor:
 # sudo bash deploy/backup-banco.sh --instalar, sudo rotaperfumes-backup-banco --agora
 # e sudo bash deploy/mariadb-docker.sh --recriar (ver deploy/mariadb-docker.sh).
-IMAGENS_FIXADAS_EM = Jenkinsfile deploy/mariadb-docker.sh deploy/seed-producao.sh deploy/backup-banco.sh deploy/verificar-backup.sh
+IMAGENS_FIXADAS_EM = Jenkinsfile deploy/mariadb-docker.sh deploy/seed-producao.sh deploy/backup-banco.sh deploy/verificar-backup.sh deploy/restaurar-maquina.sh
 IMAGEM_ACCEPT = application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json
 
-deps-audit-imagens: ## SEC-31: compara os digests fixados (Jenkinsfile: GO_IMAGE, GO_TEST_IMAGE, NODE_IMAGE e mariadb; mariadb-docker.sh; seed-producao.sh; backup-banco.sh; verificar-backup.sh) com os das tags atuais no Docker Hub (informativo, nunca falha)
+deps-audit-imagens: ## SEC-31: compara os digests fixados (Jenkinsfile: GO_IMAGE, GO_TEST_IMAGE, NODE_IMAGE e mariadb; mariadb-docker.sh; seed-producao.sh; backup-banco.sh; verificar-backup.sh; restaurar-maquina.sh) com os das tags atuais no Docker Hub (informativo, nunca falha)
 	@digest_remoto() { \
 	  if command -v docker >/dev/null 2>&1 && docker buildx version >/dev/null 2>&1; then \
 	    docker buildx imagetools inspect "$$1:$$2" --format '{{.Manifest.Digest}}' 2>/dev/null && return; \

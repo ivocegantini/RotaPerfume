@@ -8,9 +8,14 @@ package deploy_test
 const stubDocker = `#!/bin/bash
 S="$FAKE/state"
 echo "docker $*" >>"$FAKE/log"
+# DEPLOY-10: remover o cliente do DBA não apaga o container do banco. Fora do case:
+# testes do BACKUP-01 trocam a linha "rm)" abaixo por texto.
+if [[ "$1" == rm && "$*" == *rotaperfumes-dba-cliente* ]]; then rm -f "$S/dba_ocupado"; exit 0; fi
 case "$1" in
   info|build|pull) exit 0 ;;
   ps)
+    # DEPLOY-10: cliente do DBA aberto ($S/dba_ocupado) nao e o container do banco.
+    if [[ "$*" == *rotaperfumes-dba-cliente* ]]; then [[ -f "$S/dba_ocupado" ]] && echo dba123; exit 0; fi
     if [[ "$*" == *-aq* ]]; then [[ -f "$S/criado" ]] && echo cid123; fi
     exit 0 ;;
   network)
@@ -70,6 +75,16 @@ case "$1" in
       exit 0
     fi
     case "$*" in
+      *rotaperfumes-dba-cliente*)
+        # DEPLOY-10: argv e ambiente do cliente do DBA, para as sentinelas.
+        echo "$*" >>"$S/dba_argv"; env >>"$S/dba_env"
+        if [[ "$*" == *--skip-ssl* ]]; then [[ -f "$S/aceita_sem_tls_dba" ]] && exit 0; exit 1; fi
+        [[ " $* " == *" -t "* ]] && exit 0
+        cat >>"$S/dba_stdin"
+        [[ -f "$S/dba_falha" ]] && exit 1
+        ip=$(grep -oE -- '--ip [0-9.]+' <<<"$*" | cut -d' ' -f2)
+        printf 'CURRENT_USER()\n%s\n' "$(cat "$S/dba_usuario" 2>/dev/null || echo "rotaperfumes-admin@$ip")"
+        exit 0 ;;
       *"--entrypoint mariadbd"*) echo "mariadbd  Ver 11.4.13-MariaDB for debian-linux-gnu" ;;
       *"--entrypoint id"*"-u mysql"*) echo 999 ;;
       *"--entrypoint id"*"-g mysql"*) echo 999 ;;
@@ -94,7 +109,25 @@ case "$1" in
       *"SELECT VERSION()"*) echo 11.4.13-MariaDB ;;
       *have_ssl*) printf 'have_ssl\tYES\n' ;;
       *PLUGINS*) echo 1 ;;
-      *"SELECT User, Host"*) cat "$S/contas" 2>/dev/null ;;
+      *PROCESSLIST*) cat "$S/sessoes_legado" 2>/dev/null || echo 0 ;;
+      *"QUOTE(User)"*)
+        # Lote 42: o DROP da conta legada, gerado como o QUOTE() do servidor.
+        echo "$a" >>"$S/sql_legado"
+        if [[ -f "$S/contas" ]]; then
+          while IFS=$'\t' read -r u h; do
+            [[ "$u" == casaos ]] || continue
+            h=${h//\\/\\\\}; h=${h//\'/\\\'}
+            printf "DROP USER IF EXISTS 'casaos'@'%s';\n" "$h"
+          done <"$S/contas"
+        fi ;;
+      *"COUNT(*) FROM mysql.global_priv WHERE User = 'casaos'"*) cat "$S/legado_resta" 2>/dev/null || echo 0 ;;
+      *"SELECT User, Host"*)
+        # So os usuarios citados no User IN, como o servidor real.
+        if [[ -f "$S/contas" ]]; then
+          while IFS=$'\t' read -r u h; do
+            [[ "$a" == *"'$u'"* ]] && printf '%s\t%s\n' "$u" "$h"
+          done <"$S/contas"
+        fi ;;
       *"CONCAT('    '"*) echo "    (contas)" ;;
       *"mysql.global_priv hc"*) echo "$a" >>"$S/sql_healthcheck"; cat "$S/healthcheck_alem_usage" 2>/dev/null ;;
       *"CONCAT(User, '@', Host)"*) echo "$a" >>"$S/sql_outras"; cat "$S/outras" 2>/dev/null ;;
@@ -184,6 +217,10 @@ fi
 
 const stubChown = "#!/bin/bash\nexit 0\n"
 
+// DEPLOY-10: o registro do comando do DBA vai para $FAKE/log, não para o syslog.
+// Lote 42: com $S/logger_falha, falha como um logger sem syslog.
+const stubLogger = "#!/bin/bash\necho \"logger $*\" >>\"$FAKE/log\"\n[[ -f \"$FAKE/state/logger_falha\" ]] && exit 1\nexit 0\n"
+
 const stubGetent = `#!/bin/bash
 [[ "$1" == passwd ]] && exit 2
 exec /usr/bin/getent "$@"
@@ -233,6 +270,8 @@ mount --bind "$FAKE/root" "$NR/root"
 mount --bind "$FAKE/opt" "$NR/opt"
 mount --bind "$FAKE/sbin" "$NR/usr/local/sbin"
 mount --bind "$FAKE/systemd" "$NR/etc/systemd/system"
+# Lote 42: o registro de reserva do rotaperfumes-dba (/var/log) fica no $FAKE.
+mount --bind "$FAKE/varlog" "$NR/var/log"
 cd /
 export PATH="$FAKE/bin:$PATH"
 umask 077

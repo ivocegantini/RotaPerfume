@@ -59,7 +59,7 @@ pipeline {
         //   a mesma linha 22 do NODE_VERSION do frontend/Dockerfile)
         //   -> trocar "<tag com patch>@sha256:<digest>" aqui; o do mariadb TAMBEM
         //   no IMAGEM_BASE dos deploy/mariadb-docker.sh, deploy/backup-banco.sh e
-        //   deploy/verificar-backup.sh e no DB_CLIENT_IMAGE do deploy/seed-producao.sh
+        //   deploy/verificar-backup.sh e deploy/restaurar-maquina.sh e no DB_CLIENT_IMAGE do deploy/seed-producao.sh
         //   (mesma string) -> make test -> no servidor: sudo bash deploy/backup-banco.sh
         //   --instalar -> sudo rotaperfumes-backup-banco --agora
         //   -> sudo bash deploy/mariadb-docker.sh --recriar.

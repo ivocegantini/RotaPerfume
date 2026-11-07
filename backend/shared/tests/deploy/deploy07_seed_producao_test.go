@@ -201,7 +201,6 @@ func TestDEPLOY07_CADevNuncaEmProducao(t *testing.T) {
 	}
 	assert.Contains(t, md, "NAO copie esta CA para deploy/ca-cert.pem")
 	assert.NotRegexp(t, `copie \$SSL_DIR/ca\.pem para\s+deploy/ca-cert\.pem`, md)
-	assert.Contains(t, md, "deploy/ca-producao.pem")
 	assert.Contains(t, md, "sudo bash deploy/seed-producao.sh")
 	assert.NotContains(t, codigoSemComentarios(md), "rotaperfumes\\\\_%", "sem GRANT em bancos de teste")
 	gi := lerRaiz(t, ".gitignore")

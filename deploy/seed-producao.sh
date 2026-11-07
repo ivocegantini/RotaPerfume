@@ -72,6 +72,7 @@ TRABALHO_DIR=$TRABALHO_DIR_PADRAO
 FORCAR=false
 BACKUP_DIR="/var/backups/rotaperfumes"
 BACKUP_JANELA_MIN=60
+readonly BACKUP_JANELA_LIVRE_MAX=60
 SEM_BACKUP_MOTIVO=""
 BACKUP_USADO=""
 PEPPER_FILE=""
@@ -140,10 +141,14 @@ para uma instalacao de teste criada por ele com as mesmas opcoes):
                         (sudo rotaperfumes-backup-banco --agora).
   --backup-dir DIR      onde o --forcar procura o dump (padrao $BACKUP_DIR;
                         root, modo 700)
-  --backup-janela-min N idade maxima do dump, em minutos (padrao $BACKUP_JANELA_MIN; 1 a 1440)
+  --backup-janela-min N idade maxima do dump, em minutos (padrao $BACKUP_JANELA_MIN; 1 a 1440).
+                        Acima de $BACKUP_JANELA_MIN exige --sem-backup-motivo (justificativa);
+                        o dump continua conferido, com a janela informada.
   --sem-backup-motivo TEXTO
-                        so com --forcar: dispensa o dump. 10 a 300 caracteres
-                        imprimiveis, registrados em <segredos-dir>/seed-forcar.registro.
+                        so com --forcar: dispensa o dump, ou justifica a
+                        --backup-janela-min acima de $BACKUP_JANELA_MIN. 10 a 300 caracteres
+                        imprimiveis, registrados com janela=N em
+                        <segredos-dir>/seed-forcar.registro.
   -h, --help            esta ajuda
 
 O que o script faz (nesta ordem):
@@ -252,6 +257,11 @@ validar_sintaxe_opcoes() {
   # shellcheck disable=SC2015 # die deve rodar se o formato OU a faixa falhar (pretendido)
   [[ "$BACKUP_JANELA_MIN" =~ ^[0-9]{1,4}$ ]] && (( 10#$BACKUP_JANELA_MIN >= 1 && 10#$BACKUP_JANELA_MIN <= 1440 )) \
     || die "--backup-janela-min precisa ser um numero de 1 a 1440"
+  BACKUP_JANELA_MIN=$((10#$BACKUP_JANELA_MIN))
+  # Achado do SecBrain (Lote 42): a mesma regra do deploy/mariadb-docker.sh.
+  if (( BACKUP_JANELA_MIN > BACKUP_JANELA_LIVRE_MAX )) && [[ -z "$SEM_BACKUP_MOTIVO" ]]; then
+    die "--backup-janela-min acima de $BACKUP_JANELA_LIVRE_MAX exige --sem-backup-motivo TEXTO (a justificativa fica registrada; o dump continua conferido)"
+  fi
   if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
     $FORCAR || die "--sem-backup-motivo so com --forcar"
     [[ "$SEM_BACKUP_MOTIVO" =~ ^[[:print:]]{10,300}$ ]] || die "--sem-backup-motivo precisa de 10 a 300 caracteres imprimiveis"
@@ -544,17 +554,21 @@ if (( LINHAS > 0 )); then
   $FORCAR || die "a tabela usuarios ja tem $LINHAS linha(s): este banco ja foi semeado. Nada foi alterado. (--forcar reaplica e INATIVA todos os nao-admin)"
   tem_tty || die "--forcar exige um terminal para a confirmacao"
   # BACKUP-01 (D6): a mesma exigencia do --recriar, antes de pedir a confirmacao.
-  if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
+  if (( BACKUP_JANELA_MIN > BACKUP_JANELA_LIVRE_MAX )); then
+    aviso "--backup-janela-min $BACKUP_JANELA_MIN (acima de $BACKUP_JANELA_LIVRE_MAX): dump de ate $BACKUP_JANELA_MIN min aceito. Motivo: $SEM_BACKUP_MOTIVO"
+    conferir_backup_recente "$BACKUP_DIR" "$BACKUP_JANELA_MIN"
+    info "Backup conferido (janela de $BACKUP_JANELA_MIN min): $BACKUP_USADO."
+  elif [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
     aviso "--sem-backup-motivo: --forcar SEM conferir backup. Motivo: $SEM_BACKUP_MOTIVO"
   else
-    conferir_backup_recente "$BACKUP_DIR" "$((10#$BACKUP_JANELA_MIN))"
+    conferir_backup_recente "$BACKUP_DIR" "$BACKUP_JANELA_MIN"
     info "Backup recente conferido: $BACKUP_USADO."
   fi
   aviso "--forcar: usuarios tem $LINHAS linha(s). A DDL e os seeds serao reaplicados, a senha do admin trocada e TODOS os usuarios nao-admin INATIVADOS."
   IFS= read -r -p "Digite o nome do banco ($DB_NOME) para confirmar: " RESPOSTA < /dev/tty \
     || die "--forcar: leitura da confirmacao falhou; nada foi alterado"
   [[ "$RESPOSTA" == "$DB_NOME" ]] || die "confirmacao nao confere; nada foi alterado"
-  printf '%s backup=%s motivo=%s\n' "$(date -Is)" "${BACKUP_USADO:-nenhum}" "${SEM_BACKUP_MOTIVO:-nenhum}" >>"$SEGREDOS_DIR/seed-forcar.registro"
+  printf '%s janela=%s backup=%s motivo=%s\n' "$(date -Is)" "$BACKUP_JANELA_MIN" "${BACKUP_USADO:-nenhum}" "${SEM_BACKUP_MOTIVO:-nenhum}" >>"$SEGREDOS_DIR/seed-forcar.registro"
   chmod 600 "$SEGREDOS_DIR/seed-forcar.registro"
 else
   info "Banco sem usuarios (instalacao nova): seguindo."

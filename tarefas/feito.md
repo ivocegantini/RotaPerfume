@@ -2,11 +2,13 @@
 
 > Histórico de tarefas finalizadas.
 >
-> 2026-11-06 (abertura do Lote 42, 🔵 SubBrain): o **Lote 41** foi commitado em `3685901`, na `main` local, sem push. A `main` local está 2 commits à frente de `origin/main` (`87f5c64`). O `CLAUDE.md` ficou de fora do commit (edição do usuário). Onde as notas abaixo dizem que o Lote 41 não foi commitado, vale esta nota.
+> Atualizado em 2026-11-07 (fechamento do Lote 42, 🔵 SubBrain): o **Lote 42** foi fechado (bloco "Lote 42 de 2026-11-06/07: 4 cards concluídos" logo abaixo): **BACKUP-01**, **BACKUP-02**, **DEPLOY-10** e **DEPLOY-09** concluídos no código, nos testes e nas docs. **Sem commit** e **pendentes de validação no servidor**, sem push. A **D7** foi revista só para máquina nova. Entraram 12 cards em `afazer.md` (bloco "Achados do Lote 42"): **SEC-73** e **TST-28** (MÉDIA) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05**, **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12**, **SEC-75** e **BACKUP-07** (BAIXA). O **DEPLOY-08** ganhou a ordem da migração do DEPLOY-10. Decisões do usuário de 2026-11-06 e decisões em aberto registradas no bloco do lote. O `fazendo.md` voltou a ficar sem cards.
+>
+> Antes, ainda em 2026-11-06 (abertura do Lote 42, 🔵 SubBrain): o **Lote 41** foi commitado em `3685901`, na `main` local, sem push. A `main` local está 2 commits à frente de `origin/main` (`87f5c64`). O `CLAUDE.md` ficou de fora do commit (edição do usuário). Onde as notas abaixo dizem que o Lote 41 não foi commitado, vale esta nota.
 >
 > 2026-11-06 (🤍 MegaBrain): os Lotes 37 a 40 foram commitados juntos na branch `lote-37-40`, a pedido do usuário, sem merge na `main` remota. A branch foi enviada ao remoto em 2026-11-06 07:57 e aponta para `b8fa988`; `origin/main` segue em `87f5c64`, e a `main` local tem o mesmo `b8fa988`, à frente de `origin/main` (conferido com `git ls-remote` e o reflog). Onde os blocos abaixo desses lotes dizem "não commitado", vale esta nota.
 >
-> Atualizado em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain): o **Lote 41** foi fechado (bloco "Lote 41 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-71** concluído. **Não commitado** (pendente do ok do usuário), sem push. Entrou 1 card BAIXA em `afazer.md` (bloco "Achados do Lote 41"): **SEC-72**. No mesmo fechamento: **DEPLOY-08** corrigido para o estado real (produção no ar; resta a limpeza pós-instalação, pendente do usuário), **BACKUP-01** subiu para ALTA e o bloco do **DB-08** ganhou uma nota de correção. O `fazendo.md` voltou a ficar sem cards.
+> Antes, ainda em 2026-11-06 (fechamento do Lote 41, 🔵 SubBrain): o **Lote 41** foi fechado (bloco "Lote 41 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-71** concluído. **Não commitado** (pendente do ok do usuário), sem push. Entrou 1 card BAIXA em `afazer.md` (bloco "Achados do Lote 41"): **SEC-72**. No mesmo fechamento: **DEPLOY-08** corrigido para o estado real (produção no ar; resta a limpeza pós-instalação, pendente do usuário), **BACKUP-01** subiu para ALTA e o bloco do **DB-08** ganhou uma nota de correção. O `fazendo.md` voltou a ficar sem cards.
 >
 > Antes, ainda em 2026-11-06 (fechamento do Lote 40, 🔵 SubBrain): o **Lote 40** foi fechado (bloco "Lote 40 de 2026-11-06: 1 card concluído" logo abaixo): **SEC-63** concluído. **Não commitado** (Lotes 37 a 40 juntos). Entraram 5 cards BAIXA em `afazer.md` (bloco "Achados do Lote 40"): **SEC-66**, **SEC-67**, **SEC-68**, **SEC-69** e **SEC-70**; o **SEC-64** ganhou um acréscimo. Pendência do usuário no bloco do lote: sugestão de texto para o `CLAUDE.md`. Registro do reinício da máquina de 2026-11-06 no bloco do lote. O `fazendo.md` voltou a ficar sem cards.
 >
@@ -23,6 +25,123 @@
 > Antes, ainda em 2026-11-05 (fechamento do Lote 35, 🔵 SubBrain): o **Lote 35** (BUG-27, SEC-54, TST-19, SEC-55, TST-20, TST-21, FE-18 e CHORE-16) foi concluído (bloco "Lote 35 de 2026-11-05" logo abaixo; commitado na `main` pelo 🤍 MegaBrain, a pedido do usuário). Dele saíram 3 cards em `afazer.md` (bloco "Achados do Lote 35"): SEC-56, SEC-57 e BUG-28 (BAIXA).
 >
 > Antes, ainda em 2026-11-04 (decisões do usuário após o Lote 34, repassadas pelo 🤍 MegaBrain; 🔵 SubBrain): **OPS-02** (SMTP de produção configurado pelo usuário, por ora via Gmail) e **CHORE-18** (hostname do servidor confirmado, sem alteração de código) foram concluídos (bloco "Decisões do usuário de 2026-11-04 (após o Lote 34)" abaixo). O DOC-09 continua em `afazer.md` (o `CLAUDE.md` não foi alterado pelo agente).
+
+---
+
+## Lote 42 de 2026-11-06/07: 4 cards concluídos
+
+Aberto em 2026-11-06, a pedido do usuário ("siga para o próximo card"), com o **BACKUP-01**; **BACKUP-02**, **DEPLOY-09** e **DEPLOY-10** entraram no mesmo dia, também a pedido do usuário. Fechado em 2026-11-07. Passos: 🟣 SecBrain (especificações `tarefas/lote-42-backup-01-spec.md` e `tarefas/lote-42-deploy-09-10-spec.md`) → 🌸 DataBrain/🟡 BackBrain → 🔴 TestBrain → 🟣 SecBrain (revisão) → 🔵 SubBrain fechando. **Sem commit e pendente de validação no servidor**, sem push (um push na `main` é deploy em sistema vivo). Caminhos: `SH` = `backend/shared`.
+
+**Evidência (relatada pelos agentes, não reexecutada pelo 🔵 SubBrain):**
+- `make shellcheck`, `make lint` e `make -k test` com código 0 na rodada final, com `GO_TEST_FLAGS=-timeout=45m` (sem isso, `tests/deploy` chega perto dos 10 min padrão do `go test`: ver **TST-28**).
+- Mutações: DEPLOY-09 107/107; DEPLOY-10 30 com stub, mais 6 reais, mais 2; correções da revisão do 🟣 SecBrain 24/24.
+- Testes Docker reais, com dados sintéticos: `TestDEPLOY10_Real`, `TestDEPLOY09_Real` e `TestBACKUP01_ContaBackup_Real`.
+
+**Não validado (só em máquina real):**
+- `mariadb-docker.sh` de ponta a ponta (`TestTST15_MariadbDocker_Real`, como root, fora do servidor; ver TST-17);
+- systemd real (timer do backup e unit do túnel);
+- `docker compose up --no-start` (esta máquina não tem o plugin compose);
+- `apt` real (repositório da Cloudflare);
+- `cloudflared` com token: `IPAddressDeny`, docker-proxy com `userland-proxy=true`, `/ready` e `MemoryDenyWriteExecute`;
+- login com o pepper;
+- ensaio completo do `restaurar-maquina.sh --sem-tunel` em máquina que não seja a produção.
+
+**Revisão (🟣 SecBrain): nada bloqueia o push.** Os 7 achados foram corrigidos:
+1. `--backup-janela-min` acima de 60 exige motivo, e o registro grava `janela=N`;
+2. unit do túnel endurecida e túnel conferido depois de subir;
+3. rollback do túnel em caso de falha;
+4. `casaos` removida com qualquer host;
+5. `--porta` sem `--dev-ip` recusado;
+6. `rotaperfumes-dba` com `--pull never`, recusa de stdout redirecionado e registro de reserva;
+7. `restaurar-maquina.sh` com `unset DOCKER_*`, mais sinais de produção e aviso de `shred` para `--api-env`/`--pepper-file`.
+
+**Decisões do usuário (2026-11-06):**
+- **Imagens de produto entram no backup**, junto do dump (par com o mesmo carimbo).
+- **Sem descarte** de `casaos.senha` nem de `/root/rotaperfumes.antigo`; as senhas vão para pendrive seguro.
+- **Banco local:** API e MariaDB no mesmo host, conversando pela rede Docker. O servidor é o `192.168.168.106`; o "105" escrito pelo usuário foi tratado como engano (`192.168.168.105` é a máquina de dev).
+- **CasaOS:** gerencia containers e pastas de rede, mas fica no mesmo servidor e **não é cópia externa** (a D1 segue em aberto).
+- **Conta DBA `rotaperfumes-admin`:** só local, por SSH no servidor.
+- **Script de restauração com `cloudflared`:** pedido do usuário (DEPLOY-09), para troca de servidor.
+
+**Fatos conferidos na documentação da Cloudflare (🤍 MegaBrain, 2026-11-06):** seção final de `tarefas/lote-42-deploy-09-10-spec.md` ("Cloudflare: o que foi conferido em 2026-11-06"): repositório apt e `Origin: cloudflared`; chave `CloudFlare Software Packaging 2025`, fingerprint `CC94B39C77AE7342A68B89628A682D308D4E5E73`, obtida só pelo HTTPS da própria Cloudflare (segundo canal pendente: **SEC-73**); `service install <token>` proibido (token em `/proc/<pid>/cmdline`); `TUNNEL_TOKEN` em `EnvironmentFile` 600; dois conectores com o mesmo token viram réplicas ativas (daí a declaração `ANTIGA PARADA`); rotação do token não derruba conectores atuais. Não confirmados: caminho do binário no pacote e o nome `noTLSVerify` no painel.
+
+**Decisões em aberto do usuário (recomendação entre parênteses):**
+- **D1, cópia externa** (semanal, em disco USB cifrado guardado fora do local; com outra máquina, cópia por pull com chave SSH restrita). O SSD no mesmo servidor só cobre falha de disco, não perda da máquina nem root comprometido. Até a D1, o DEPLOY-09 não tem o que restaurar se o servidor se perder.
+- **D2, aviso de falha** (dead-man's switch externo, ex.: healthchecks.io: só o sucesso envia ping; URL em arquivo de root, via `curl -K`; falha no ping não derruba o backup).
+- **Disco do sistema cifrado?** (confirmar; num notebook, um roubo expõe datadir e backups).
+- **`admin-app.senha`** (`shred`, sem cópia: a senha já não vale desde a troca feita pelo usuário).
+- **Pepper** (copiar para pendrive cifrado, **longe dos dumps**, antes do `shred` do `/root/pepper-producao.txt`; junto do dump, ele perde a função).
+- **`.env.producao` local da máquina de dev** (apagar, junto do `deploy/ca-producao.pem`: sem uso depois da migração; item 10 do DEPLOY-08).
+
+**Docs:** `docs/deploy-servidor.md` (§3.3, §3.4 com o comando do DBA, §9 "Backup do banco e das imagens de produto", §10, §11 com o passo 11 virando a migração da `casaos`, §12 nova "Restaurar em máquina nova"), `docs/manual-base-de-dados.md` (seção 24 nova; no fechamento, a lista de contas do cabeçalho trocou a `casaos` pela `rotaperfumes-admin`) e `docs/Instal_SSL.md`. Conferido no fechamento: a §11, passo 2, já não sugere `shred -u` do `casaos.senha`; as duas docs citam o `restaurar-maquina.sh`, e o `docs/deploy-servidor.md` cita o `rotaperfumes-dba`. Sem endpoint novo nem tela nova: coleção Postman e manual de telas sem mudança.
+
+**Pendência do usuário:** sugestão de texto para o `CLAUDE.md` (digest também em `deploy/restaurar-maquina.sh`, conta DBA, `--dev-ip`, backup e restauração), entregue na resposta do fechamento; o agente não edita o `CLAUDE.md`.
+
+**Cards criados em `afazer.md`** (bloco "Achados do Lote 42"): SEC-73 e TST-28 (MÉDIA); BACKUP-03, BACKUP-04, BACKUP-05, BACKUP-06, DEPLOY-11, SEC-74, DB-10, DEPLOY-12, SEC-75 e BACKUP-07 (BAIXA). **DEPLOY-08** atualizado com a ordem da migração.
+
+---
+
+## BACKUP-01: backup diário do MariaDB de produção e das imagens de produto — 2026-11-06/07
+
+**Status:** ✅ concluído (Lote 42). **Sem commit, pendente de validação no servidor.**
+**Camadas:** Database, Deploy, Testes, Documentação
+**Responsável:** 🟣 SecBrain (especificação) → 🌸 DataBrain/🟡 BackBrain → 🔴 TestBrain → 🟣 SecBrain (revisão) → 🔵 SubBrain (fechamento)
+**Origem:** 🟣 SecBrain, Lote 30 (2026-11-02); subiu para ALTA em 2026-11-06 (produção no ar sem backup).
+
+**Entregas:**
+- `deploy/backup-banco.sh` (instalado como `/usr/local/sbin/rotaperfumes-backup-banco`, com o timer `rotaperfumes-backup-banco.timer`): `--instalar`, `--agora`, `--agendado`, `--status` e `--conferir-imagens`. Dump e tar das imagens de produto em par, com o mesmo carimbo, modo 600, validação (`PIPESTATUS`, `gzip -t`, última linha `-- Dump completed`, mínimo de tabelas, tamanho) e retenção por par.
+- `deploy/verificar-backup.sh`: importa o dump num container descartável e reprova o que não passa.
+- Conta `rotaperfumes_backup@172.30.42.21`, `ed25519`, `REQUIRE SSL`, só `SELECT` em `rotaperfumes`, criada pelo `mariadb-docker.sh`, com option file 400 fora de `container/`.
+- **Guarda do `--recriar`** (`mariadb-docker.sh`) e do `seed-producao.sh --forcar`: exige backup recente (janela padrão de 60 min) ou `--sem-backup-motivo`, com registro.
+- **Correções posteriores:** retenção com carimbo futuro e com par corrompido; `--status` pelo carimbo do nome e pelo mtime (um `touch` ou `cp` de arquivo antigo não passa).
+
+**Desvios e limites registrados na especificação:** `clientes` vazia gera só `AVISO` (vira **BACKUP-06**); `parcial-*` fora da guarda (**BACKUP-04**); `--recriar --dados /vazio` não dispara a guarda (**BACKUP-07**).
+
+---
+
+## BACKUP-02: OK visível da validação do dump — 2026-11-06/07
+
+**Status:** ✅ concluído (Lote 42). **Sem commit, pendente de validação no servidor.**
+**Camadas:** Deploy, Testes
+**Responsável:** 🟡 BackBrain → 🔴 TestBrain
+**Origem:** pedido do usuário (2026-11-06).
+
+**Entrega:** linha de OK **fixa** quando o marcador `-- Dump completed` é encontrado, no backup (`--agora`/`--agendado`) e no `--status`. A linha é um texto fixo e não repete a última linha do arquivo, então nem a tela nem o log expõem conteúdo do dump.
+
+---
+
+## DEPLOY-10: conta `casaos` de produção substituída pela `rotaperfumes-admin` — 2026-11-06/07
+
+**Status:** ✅ concluído (Lote 42). **Sem commit, pendente de validação no servidor** (a migração é do usuário, entre os itens 6 e 7 do DEPLOY-08).
+**Camadas:** Database, Deploy, Testes, Documentação
+**Responsável:** 🟣 SecBrain → 🌸 DataBrain/🟡 BackBrain → 🔴 TestBrain → 🟣 SecBrain (revisão) → 🔵 SubBrain
+**Origem:** decisão do usuário de 2026-11-06.
+
+**Entregas:**
+- Conta `'rotaperfumes-admin'@'172.30.42.22'`, `ed25519`, `REQUIRE SSL`, **só local** (sem porta publicada), `ALL PRIVILEGES` só em `rotaperfumes`, sem privilégio global, `GRANT OPTION`, `PROCESS` ou acesso a `mysql.*`.
+- Comando pronto `/usr/local/sbin/rotaperfumes-dba` (700, root), gerado pelo `mariadb-docker.sh` com a mesma `$IMAGEM`: `sudo rotaperfumes-dba` (interativo, `--safe-updates`) e `sudo rotaperfumes-dba < arquivo.sql` (`--batch`), `--encerrar-sessao`; registro no syslog sem SQL.
+- **`casaos` removida com qualquer host:** o `DROP USER` é gerado pelo próprio servidor, com `QUOTE` e `--raw`; sessão antiga só gera aviso.
+- **`--dev-ip`:** fica só como transição, sem conta (fase 2, remoção: **DEPLOY-11**). `--porta` sem `--dev-ip` é recusado.
+- **`--casaos-native-motivo`:** recusado com mensagem própria; um `casaos-native.motivo` existente fica como histórico.
+- **`casaos.senha`:** nenhum script lê ou apaga; mensagem "mantido; leve ao pendrive seguro".
+- Hífen de `DB_USUARIO` confirmado em teste (`SH/tests/config/deploy10_db_usuario_linux_test.go`). Conta e CasaOS de dev (`:3307`) sem alteração.
+- Para não confundir: `rotaperfumes-admin` = DBA, `.22`; `rotaperfumes_admin` = Jenkins e seed, `.20` (teste cruzado e teste estático).
+
+---
+
+## DEPLOY-09: restauração do ambiente em máquina nova (`deploy/restaurar-maquina.sh`) — 2026-11-06/07
+
+**Status:** ✅ concluído (Lote 42). **Sem commit, pendente de validação em máquina real** (lista "Não validado" no bloco do lote).
+**Camadas:** Deploy, Database, Testes, Documentação
+**Responsável:** 🟣 SecBrain (especificação) → 🟡 BackBrain → 🔴 TestBrain → 🟣 SecBrain (revisão) → 🔵 SubBrain
+**Origem:** pedido do usuário (2026-11-06), para troca de servidor.
+
+**Entregas:**
+- `deploy/restaurar-maquina.sh`: sobe o MariaDB (`mariadb-docker.sh`) e o compose, restaura dump, imagens e pepper (`--api-env` além do trio), instala a rotina de backup e o `cloudflared`; `--listar-manuais` imprime só nomes (Cloudflare, Jenkins, Secret file). Recusa a produção ativa e um banco com dados, sem válvula; confirmações digitadas; retomada por estado com `machine-id` e sha256.
+- `deploy/cloudflare-apt.asc` e `deploy/cloudflare-apt.fingerprint` (fingerprint a confirmar por segundo canal: **SEC-73**; até lá, só `--sem-tunel`).
+- Unit própria `rotaperfumes-cloudflared.service`, endurecida (`systemd-analyze security` 1.5), com o token em `EnvironmentFile` 600 (nunca em argv, log ou tela).
+- **D7 revista só para máquina nova:** `deploy/restaurar-banco.sh` continua **proibido** para o servidor em uso, onde a restauração segue pelo runbook de `docs/manual-base-de-dados.md`, seção 24.5.
+- Docs: `docs/deploy-servidor.md` §12 e `docs/manual-base-de-dados.md` §24.6.
 
 ---
 
