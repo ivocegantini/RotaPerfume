@@ -2,7 +2,9 @@
 
 > Histórico de tarefas finalizadas.
 >
-> Atualizado em 2026-11-07 (fechamento do Lote 42, 🔵 SubBrain): o **Lote 42** foi fechado (bloco "Lote 42 de 2026-11-06/07: 4 cards concluídos" logo abaixo): **BACKUP-01**, **BACKUP-02**, **DEPLOY-10** e **DEPLOY-09** concluídos no código, nos testes e nas docs. **Sem commit** e **pendentes de validação no servidor**, sem push. A **D7** foi revista só para máquina nova. Entraram 12 cards em `afazer.md` (bloco "Achados do Lote 42"): **SEC-73** e **TST-28** (MÉDIA) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05**, **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12**, **SEC-75** e **BACKUP-07** (BAIXA). O **DEPLOY-08** ganhou a ordem da migração do DEPLOY-10. Decisões do usuário de 2026-11-06 e decisões em aberto registradas no bloco do lote. O `fazendo.md` voltou a ficar sem cards.
+> Atualizado em 2026-11-07 (abertura do Lote 43, 🔵 SubBrain): o **Lote 42** foi commitado em `4c32ab4` ("Lote 42: BACKUP-01/02, DEPLOY-09 e DEPLOY-10 (backup, restauração da máquina e conta DBA)"), na branch `lote-42`, **sem push** (push na `main` é deploy em produção viva). Continua pendente a validação no servidor. Onde as notas e o bloco do Lote 42 abaixo dizem "sem commit", vale esta nota. O **Lote 43** (SEC-73, TST-28, BACKUP-03, BACKUP-04, BACKUP-05 e BACKUP-07) está em execução (`fazendo.md`).
+>
+> Antes, ainda em 2026-11-07 (fechamento do Lote 42, 🔵 SubBrain): o **Lote 42** foi fechado (bloco "Lote 42 de 2026-11-06/07: 4 cards concluídos" logo abaixo): **BACKUP-01**, **BACKUP-02**, **DEPLOY-10** e **DEPLOY-09** concluídos no código, nos testes e nas docs. **Sem commit** e **pendentes de validação no servidor**, sem push. A **D7** foi revista só para máquina nova. Entraram 12 cards em `afazer.md` (bloco "Achados do Lote 42"): **SEC-73** e **TST-28** (MÉDIA) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05**, **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12**, **SEC-75** e **BACKUP-07** (BAIXA). O **DEPLOY-08** ganhou a ordem da migração do DEPLOY-10. Decisões do usuário de 2026-11-06 e decisões em aberto registradas no bloco do lote. O `fazendo.md` voltou a ficar sem cards.
 >
 > Antes, ainda em 2026-11-06 (abertura do Lote 42, 🔵 SubBrain): o **Lote 41** foi commitado em `3685901`, na `main` local, sem push. A `main` local está 2 commits à frente de `origin/main` (`87f5c64`). O `CLAUDE.md` ficou de fora do commit (edição do usuário). Onde as notas abaixo dizem que o Lote 41 não foi commitado, vale esta nota.
 >
@@ -31,6 +33,8 @@
 ## Lote 42 de 2026-11-06/07: 4 cards concluídos
 
 Aberto em 2026-11-06, a pedido do usuário ("siga para o próximo card"), com o **BACKUP-01**; **BACKUP-02**, **DEPLOY-09** e **DEPLOY-10** entraram no mesmo dia, também a pedido do usuário. Fechado em 2026-11-07. Passos: 🟣 SecBrain (especificações `tarefas/lote-42-backup-01-spec.md` e `tarefas/lote-42-deploy-09-10-spec.md`) → 🌸 DataBrain/🟡 BackBrain → 🔴 TestBrain → 🟣 SecBrain (revisão) → 🔵 SubBrain fechando. **Sem commit e pendente de validação no servidor**, sem push (um push na `main` é deploy em sistema vivo). Caminhos: `SH` = `backend/shared`.
+
+> **Commit (2026-11-07):** commitado em `4c32ab4`, na branch `lote-42`, sem push. Continua pendente a validação no servidor. Onde os cards abaixo dizem "Sem commit", vale esta nota.
 
 **Evidência (relatada pelos agentes, não reexecutada pelo 🔵 SubBrain):**
 - `make shellcheck`, `make lint` e `make -k test` com código 0 na rodada final, com `GO_TEST_FLAGS=-timeout=45m` (sem isso, `tests/deploy` chega perto dos 10 min padrão do `go test`: ver **TST-28**).

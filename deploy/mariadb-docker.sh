@@ -456,29 +456,46 @@ fi
 # nome e nunca valem. A idade vale pelo carimbo do nome (inicio do dump) e pelo
 # mtime. So o dump: quem chama nao toca no volume de imagens.
 conferir_backup_recente() { # dir janela_min -> define BACKUP_USADO
-  local dir=$1 janela=$2 LC_ALL=C arq="" f nome agora mtime carimbo dica
+  local dir=$1 janela=$2 LC_ALL=C arq="" melhor="" chave f nome agora mtime carimbo dica
   dica="gere um com: sudo rotaperfumes-backup-banco --agora (ou use --sem-backup-motivo TEXTO, que fica registrado)"
   command -v gzip >/dev/null || die "comando 'gzip' nao encontrado"
   [[ -d "$dir" && ! -L "$dir" ]] || die "nenhum backup: $dir nao existe. Instale com sudo bash deploy/backup-banco.sh --instalar; $dica"
   conferir_dir_privado --backup-dir "$dir" existe
-  for f in "$dir"/rotaperfumes-*.sql.gz; do
-    [[ "${f##*/}" =~ ^rotaperfumes-[0-9]{8}-[0-9]{6}Z(-manual)?\.sql\.gz$ ]] && arq=$f
+  # BACKUP-04: o mais novo pelo carimbo, completo ou parcial. Chave = carimbo +
+  # rank (completo 2, parcial 1): no mesmo carimbo vence o completo.
+  for f in "$dir"/rotaperfumes-*.sql.gz "$dir"/parcial-rotaperfumes-*.sql.gz; do
+    if [[ "${f##*/}" =~ ^rotaperfumes-([0-9]{8}-[0-9]{6}Z)(-manual)?\.sql\.gz$ ]]; then
+      chave="${BASH_REMATCH[1]}2"
+    elif [[ "${f##*/}" =~ ^parcial-rotaperfumes-([0-9]{8}-[0-9]{6}Z)(-manual)?\.sql\.gz$ ]]; then
+      chave="${BASH_REMATCH[1]}1"
+    else
+      continue
+    fi
+    if [[ -z "$melhor" ]] || ! [[ "$chave" < "$melhor" ]]; then
+      melhor=$chave
+      arq=$f
+    fi
   done
   [[ -n "$arq" ]] || die "nenhum backup em $dir; $dica"
   nome=${arq##*/}
   [[ ! -L "$arq" && -f "$arq" ]] || die "o backup mais recente ($nome) nao e arquivo regular; $dica"
   [[ "$(stat -c '%u %a' -- "$arq")" == "0 600" ]] || die "o backup mais recente ($nome) precisa ser do root com modo 600; $dica"
-  [[ "$nome" =~ ^rotaperfumes-([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})Z ]] || die "carimbo invalido em $nome"
-  carimbo=$(date -u -d "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}" +%s) \
+  [[ "$nome" =~ ^(parcial-)?rotaperfumes-([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})Z ]] || die "carimbo invalido em $nome"
+  carimbo=$(date -u -d "${BASH_REMATCH[2]}-${BASH_REMATCH[3]}-${BASH_REMATCH[4]} ${BASH_REMATCH[5]}:${BASH_REMATCH[6]}:${BASH_REMATCH[7]}" +%s) \
     || die "carimbo invalido em $nome"
   agora=$(date +%s)
   mtime=$(stat -c %Y -- "$arq")
+  # BACKUP-03: folga de TOLERANCIA_RELOGIO_S para ajuste de relogio (a mesma do
+  # backup-banco.sh). Ate essa folga no futuro, a idade fica negativa e passa.
   for f in "$carimbo" "$mtime"; do
-    (( f <= agora )) || die "o backup mais recente ($nome) tem data futura; $dica"
+    (( f <= agora + TOLERANCIA_RELOGIO_S )) || die "o backup mais recente ($nome) tem data futura (mais de ${TOLERANCIA_RELOGIO_S} s a frente do relogio); $dica"
     (( agora - f <= janela * 60 )) || die "o backup mais recente ($nome) tem mais de $janela min; $dica"
   done
   gzip -t -- "$arq" 2>/dev/null || die "o backup mais recente ($nome) esta corrompido; $dica"
   [[ "$(gzip -dc -- "$arq" | tail -n 1)" == "-- Dump completed"* ]] || die "o backup mais recente ($nome) nao tem o marcador na ultima linha; $dica"
+  if [[ "$nome" == parcial-* ]]; then
+    aviso "o backup usado e parcial ($nome): o dump vale para o banco, mas o tar de imagens desse backup falhou; confira com journalctl -u rotaperfumes-backup-banco.service"
+  fi
   BACKUP_USADO=$arq
 }
 

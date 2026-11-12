@@ -1,6 +1,8 @@
 # A Fazer
 
-> Atualizado em 2026-11-07 (fechamento do Lote 42, 🔵 SubBrain). O **Lote 42** foi fechado: **BACKUP-01**, **BACKUP-02**, **DEPLOY-10** e **DEPLOY-09** concluídos (`feito.md`, "Lote 42 de 2026-11-06/07: 4 cards concluídos"; **sem commit e pendentes de validação no servidor**). Entraram 12 cards no bloco novo "Achados do Lote 42" (logo abaixo): **SEC-73** e **TST-28** (MÉDIA) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05**, **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12**, **SEC-75** e **BACKUP-07** (BAIXA); os três últimos são os cards pedidos nas especificações do lote (`IMPORTAR_DUMP`, `-e MYSQL_PWD` e `--recriar --dados /vazio`). O **DEPLOY-08** ganhou a ordem da migração do DEPLOY-10 (entre os itens 6 e 7), o item 2 aponta para a seção "Backup do banco e das imagens de produto" e o item 7 já não remove a `casaos`. **Antes de tudo:** push (deploy) e `TestTST15_MariadbDocker_Real` como root, fora do servidor. O restante do backlog não mudou.
+> Atualizado em 2026-11-07 (abertura do Lote 43, 🔵 SubBrain). O 🤍 MegaBrain abriu o **Lote 43 de 2026-11-07** e 6 cards do bloco "Achados do Lote 42" saíram desta lista para `fazendo.md`, com o texto completo: **SEC-73** e **TST-28** (MÉDIA, agora com as decisões do usuário de 2026-11-07) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05** e **BACKUP-07** (BAIXA). Ficam no bloco: **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12** e **SEC-75**. O **Lote 42** foi commitado em `4c32ab4`, na branch `lote-42`, sem push (push na `main` é deploy em produção viva). Restrição do lote: banco só no descartável local (`rp-descartavel-l36`, `127.0.0.1:33306`); nada no CasaOS nem na produção. O restante do backlog não mudou.
+>
+> Antes, ainda em 2026-11-07 (fechamento do Lote 42, 🔵 SubBrain). O **Lote 42** foi fechado: **BACKUP-01**, **BACKUP-02**, **DEPLOY-10** e **DEPLOY-09** concluídos (`feito.md`, "Lote 42 de 2026-11-06/07: 4 cards concluídos"; **sem commit e pendentes de validação no servidor**). Entraram 12 cards no bloco novo "Achados do Lote 42" (logo abaixo): **SEC-73** e **TST-28** (MÉDIA) e **BACKUP-03**, **BACKUP-04**, **BACKUP-05**, **BACKUP-06**, **DEPLOY-11**, **SEC-74**, **DB-10**, **DEPLOY-12**, **SEC-75** e **BACKUP-07** (BAIXA); os três últimos são os cards pedidos nas especificações do lote (`IMPORTAR_DUMP`, `-e MYSQL_PWD` e `--recriar --dados /vazio`). O **DEPLOY-08** ganhou a ordem da migração do DEPLOY-10 (entre os itens 6 e 7), o item 2 aponta para a seção "Backup do banco e das imagens de produto" e o item 7 já não remove a `casaos`. **Antes de tudo:** push (deploy) e `TestTST15_MariadbDocker_Real` como root, fora do servidor. O restante do backlog não mudou.
 >
 > Antes, ainda em 2026-11-06 (novos cards do Lote 42, 🔵 SubBrain). A pedido do usuário, **BACKUP-02** (BAIXA), **DEPLOY-09** (ALTA) e **DEPLOY-10** (MÉDIA) foram registrados direto em `fazendo.md`, no Lote 42. Nenhum card saiu desta lista e o backlog não mudou.
 >
@@ -108,75 +110,8 @@
 # Achados do Lote 42, 2026-11-07
 
 > Pendências do Lote 42 (`feito.md`, "Lote 42 de 2026-11-06/07: 4 cards concluídos"), levantadas nas especificações e na revisão do 🟣 SecBrain e na rodada final de testes. Nenhuma bloqueou o fechamento do lote nem o push. Especificações: `tarefas/lote-42-backup-01-spec.md` e `tarefas/lote-42-deploy-09-10-spec.md`. Caminhos: `SH` = `backend/shared`.
-
----
-
-## SEC-73: confirmar o fingerprint da chave apt da Cloudflare por um segundo canal — prioridade MÉDIA (pendente do usuário)
-
-**Status:** pendente **do usuário**.
-**Camadas:** Deploy, Segurança
-**Responsável:** usuário (conferência) → 🟣 SecBrain (registro) → 🔵 SubBrain
-**Origem:** DEPLOY-09 (Lote 42); fatos conferidos pelo 🤍 MegaBrain em 2026-11-06 (`tarefas/lote-42-deploy-09-10-spec.md`, seção "Cloudflare").
-
-**Descrição:** `deploy/cloudflare-apt.fingerprint` traz `CC94B39C77AE7342A68B89628A682D308D4E5E73` (`CloudFlare Software Packaging 2025`). A chave veio só pelo HTTPS da própria Cloudflare (`pkg.cloudflare.com`), e a página não publica o fingerprint. Um único canal comprometido levaria uma chave falsa ao `restaurar-maquina.sh`.
-
-**Até a conferência:** rodar o `deploy/restaurar-maquina.sh` **só com `--sem-tunel`**.
-
-**Critério de aceite:** fingerprint `CC94B39C…5E73` confirmado por um canal independente (ex.: keyserver público, outra rede ou outro meio indicado pela Cloudflare), com o canal registrado neste card; se divergir, chave e fingerprint trocados e testes do DEPLOY-09 verdes.
-
----
-
-## TST-28: timeout do `make test` (`tests/deploy` perto dos 10 min padrão do `go test`) — prioridade MÉDIA (decisão do usuário)
-
-**Status:** pendente; **depende de decisão do usuário**.
-**Camadas:** Testes, CI
-**Responsável:** usuário (decisão) → 🟡 BackBrain → 🔴 TestBrain
-**Origem:** rodada final do Lote 42.
-
-**Descrição:** o pacote `SH/tests/deploy` leva cerca de 580 s, perto dos 10 min padrão do `go test`, e estourou com a máquina carregada. A rodada final do lote só passou com `GO_TEST_FLAGS=-timeout=45m`. Hoje o `test-shared` (`Makefile:~620`) não fixa `-timeout`, e o `Jenkinsfile` (`:~132-133`, `go test ./...` no estágio "Testes Go") também não; o job tem `timeout(time: 60, unit: 'MINUTES')` (`:~32`).
-
-**Proposta:** `-timeout=30m` no `go test` do `test-shared`. Conferir também o `Jenkinsfile`: o mesmo `-timeout` nas duas linhas, dentro dos 60 min do job.
-
-**Critério de aceite:** decisão do usuário registrada; `-timeout` aplicado no `Makefile` e no `Jenkinsfile` (ou risco aceito); teste de paridade, se couber; `make -k test` verde sem `GO_TEST_FLAGS`.
-
----
-
-## BACKUP-03: a mesma tolerância de relógio (300 s) nas guardas do `mariadb-docker.sh` e do seed — prioridade BAIXA
-
-**Status:** pendente.
-**Camadas:** Deploy, Testes
-**Responsável:** 🟡 BackBrain → 🔴 TestBrain
-**Origem:** revisão do 🟣 SecBrain, Lote 42.
-
-**Descrição:** o `deploy/backup-banco.sh` usa `TOLERANCIA_RELOGIO_S=300` ao conferir o carimbo e o mtime. As guardas do `--recriar` (`deploy/mariadb-docker.sh`) e do `--forcar` (`deploy/seed-producao.sh`) precisam da mesma folga, com a mesma regra para carimbo futuro.
-
-**Critério de aceite:** a mesma tolerância nos três scripts, com valor único conferido por teste de paridade; testes de borda (dentro e fora da folga, carimbo futuro) nas duas guardas.
-
----
-
-## BACKUP-04: aceitar `parcial-*` na guarda do `--recriar`/seed — prioridade BAIXA
-
-**Status:** pendente.
-**Camadas:** Deploy, Testes
-**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
-**Origem:** revisão do 🟣 SecBrain, Lote 42 ("parciais fora da guarda").
-
-**Descrição:** hoje a guarda do `--recriar` e do `seed-producao.sh --forcar` não aceita um par `parcial-*` como backup recente.
-
-**Critério de aceite:** `parcial-*` aceito pela guarda com as mesmas conferências do par completo (idade, carimbo, mtime, marcador, tamanho) e registro igual; testes de aceite e de recusa.
-
----
-
-## BACKUP-05: retenção relendo todos os pares mantidos da série — prioridade BAIXA
-
-**Status:** pendente.
-**Camadas:** Deploy, Testes
-**Responsável:** 🟡 BackBrain → 🔴 TestBrain
-**Origem:** revisão do 🟣 SecBrain, Lote 42.
-
-**Descrição:** a retenção do `deploy/backup-banco.sh` deve reler todos os pares que mantém na série, não só o mais recente, para não guardar como "bom" um par corrompido depois de gravado.
-
-**Critério de aceite:** a retenção confere cada par mantido; par corrompido sinalizado sem apagar o último bom; testes com par corrompido no meio da série.
+>
+> Em 2026-11-07, **SEC-73**, **TST-28**, **BACKUP-03**, **BACKUP-04**, **BACKUP-05** e **BACKUP-07** saíram deste bloco para `fazendo.md` (Lote 43).
 
 ---
 
@@ -255,19 +190,6 @@
 **Descrição:** com `-e MYSQL_PWD`, o valor fica no `Config.Env` do container e aparece em `docker inspect`. O risco prático é moderado (o grupo `docker` já equivale a root), mas evita vazamento em diagnósticos. Os scripts novos do Lote 42 usam option file montado. Usos antigos: `deploy/mariadb-docker.sh` (`cliente()`, `:~1131`), `deploy/seed-producao.sh` (`:~532`), `Jenkinsfile` (`:~227-255`, estágio "Importar dump") e o `admin_sql` de `docs/deploy-servidor.md` §11, passo 7 (`:~736-737`).
 
 **Critério de aceite:** os quatro usos trocados por option file montado só para leitura (fora de `container/`), ou risco aceito e registrado por uso; teste estático de ausência de `-e MYSQL_PWD`; docs atualizadas.
-
----
-
-## BACKUP-07: `--recriar --dados /vazio` não dispara a guarda de backup — prioridade BAIXA
-
-**Status:** pendente.
-**Camadas:** Deploy, Testes
-**Responsável:** 🟣 SecBrain → 🟡 BackBrain → 🔴 TestBrain
-**Origem:** especificação e entrega do BACKUP-01 (`tarefas/lote-42-backup-01-spec.md`, seção 5 e desvio 8 do 🟡 BackBrain): card próprio pedido e ainda não aberto (conferido no fechamento do Lote 42).
-
-**Descrição:** o `mariadb-docker.sh --recriar` com `--dados` apontando para um diretório vazio não dispara a guarda e sobe um banco vazio, embora os dados antigos continuem no caminho original. O site passaria a usar o banco vazio.
-
-**Critério de aceite:** troca de `--dados` num container existente recusada ou sujeita à mesma guarda (backup recente ou motivo registrado); testes com diretório vazio e com o caminho original.
 
 ---
 

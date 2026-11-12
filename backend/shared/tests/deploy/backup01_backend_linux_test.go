@@ -1089,9 +1089,6 @@ func TestBACKUP01_GuardaRecriar_Recusas(t *testing.T) {
 		{"pre-restauracao nao vale", func(t *testing.T, dir string) {
 			dumpRecente(t, dir, "pre-restauracao-"+carimboAgora(0)+".sql.gz")
 		}, "nenhum backup"},
-		{"parcial nao vale", func(t *testing.T, dir string) {
-			dumpRecente(t, dir, "parcial-rotaperfumes-"+carimboAgora(0)+".sql.gz")
-		}, "nenhum backup"},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
@@ -1130,6 +1127,15 @@ func TestBACKUP01_GuardaRecriar_Aceita(t *testing.T) {
 		st, err := os.Stat(filepath.Join(e.dir, segredos, "recriar.registro"))
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), st.Mode().Perm())
+	})
+	t.Run("parcial vale, com aviso (BACKUP-04)", func(t *testing.T) {
+		e, dir := novaGuarda(t)
+		p := dumpRecente(t, dir, "parcial-rotaperfumes-"+carimboAgora(0)+".sql.gz")
+		r := e.rodar("--recriar", "--backup-dir", dir)
+		require.NoError(t, r.err, r.out)
+		assert.Contains(t, r.out, "o backup usado e parcial (parcial-rotaperfumes-")
+		assert.Contains(t, e.log(), "docker rm -f rotaperfumes-mariadb")
+		assert.Contains(t, registro(e), "backup="+p)
 	})
 	t.Run("janela configuravel ate 60", func(t *testing.T) {
 		e, dir := novaGuarda(t)
@@ -1231,6 +1237,19 @@ func TestBACKUP01_GuardaSeedForcar(t *testing.T) {
 		s.digitar(promptNomeDoBanco, "rotaperfumes")
 		out, err := s.terminar()
 		require.NoError(t, err, out)
+		assert.Contains(t, e.ler("root/rotaperfumes-mariadb/seed-forcar.registro"), "backup="+p)
+	})
+	t.Run("parcial recente segue, avisa e registra (BACKUP-04)", func(t *testing.T) {
+		e := novoEnsaioTTY(t)
+		e.state("linhas", "5\n")
+		dir := filepath.Join(e.dir, "backups")
+		require.NoError(t, os.MkdirAll(dir, 0o700))
+		p := dumpRecente(t, dir, "parcial-rotaperfumes-"+carimboAgora(0)+".sql.gz")
+		s := e.rodarComTerminal("--pepper-file", "/root/pepper.txt", "--forcar", "--backup-dir", dir)
+		s.digitar(promptNomeDoBanco, "rotaperfumes")
+		out, err := s.terminar()
+		require.NoError(t, err, out)
+		assert.Contains(t, out, "o backup usado e parcial (parcial-rotaperfumes-")
 		assert.Contains(t, e.ler("root/rotaperfumes-mariadb/seed-forcar.registro"), "backup="+p)
 	})
 	t.Run("banco vazio nao exige backup", func(t *testing.T) {
