@@ -2,13 +2,38 @@
 
 > Histórico de tarefas finalizadas.
 >
-> Atualizado em 2026-11-05 (fechamento do Lote 36, 🔵 SubBrain): o **Lote 36** foi fechado (bloco "Lote 36 de 2026-11-05" logo abaixo): **TST-22**, **DB-07** e **TST-16** concluídos (o TST-16 com a execução real como root pendente); o **TST-17** ficou **parcial** e voltou para `afazer.md`. Registro do incidente do `MAKEFLAGS=-k` no bloco do lote. Entraram em `afazer.md` (bloco "Achados do Lote 36"): BUG-29 (MÉDIA), SEC-58 e TST-23 (BAIXA), além do TST-17 parcial. Commit do lote na `main` pelo 🤍 MegaBrain, sem push (inclui o `CLAUDE.md` alterado pelo usuário).
+> Atualizado em 2026-11-13 (🔵 SubBrain, pedido do usuário via 🤍 MegaBrain): o **SETUP-02** (`setup-linux.sh` instala o Docker via apt, `docker.io`) foi criado e concluído no mesmo dia (card logo abaixo; **não commitado**, pendente do usuário).
+>
+> Antes, em 2026-11-05 (fechamento do Lote 36, 🔵 SubBrain): o **Lote 36** foi fechado (bloco "Lote 36 de 2026-11-05" logo abaixo): **TST-22**, **DB-07** e **TST-16** concluídos (o TST-16 com a execução real como root pendente); o **TST-17** ficou **parcial** e voltou para `afazer.md`. Registro do incidente do `MAKEFLAGS=-k` no bloco do lote. Entraram em `afazer.md` (bloco "Achados do Lote 36"): BUG-29 (MÉDIA), SEC-58 e TST-23 (BAIXA), além do TST-17 parcial. Commit do lote na `main` pelo 🤍 MegaBrain, sem push (inclui o `CLAUDE.md` alterado pelo usuário).
 >
 > Antes, ainda em 2026-11-05 (abertura do Lote 36, 🔵 SubBrain): a pendência do usuário do bloco "Lote 35 de 2026-11-05" (citar SEC-54, SEC-55 e BUG-27 no `CLAUDE.md`) foi **atendida**: o usuário alterou ele mesmo o `CLAUDE.md`. O **Lote 36** (TST-22, DB-07, TST-17 e TST-16) está em execução (`fazendo.md`).
 >
 > Antes, ainda em 2026-11-05 (fechamento do Lote 35, 🔵 SubBrain): o **Lote 35** (BUG-27, SEC-54, TST-19, SEC-55, TST-20, TST-21, FE-18 e CHORE-16) foi concluído (bloco "Lote 35 de 2026-11-05" logo abaixo; commitado na `main` pelo 🤍 MegaBrain, a pedido do usuário). Dele saíram 3 cards em `afazer.md` (bloco "Achados do Lote 35"): SEC-56, SEC-57 e BUG-28 (BAIXA).
 >
 > Antes, ainda em 2026-11-04 (decisões do usuário após o Lote 34, repassadas pelo 🤍 MegaBrain; 🔵 SubBrain): **OPS-02** (SMTP de produção configurado pelo usuário, por ora via Gmail) e **CHORE-18** (hostname do servidor confirmado, sem alteração de código) foram concluídos (bloco "Decisões do usuário de 2026-11-04 (após o Lote 34)" abaixo). O DOC-09 continua em `afazer.md` (o `CLAUDE.md` não foi alterado pelo agente).
+
+---
+
+## SETUP-02: setup-linux.sh instala o Docker via apt (docker.io) — 2026-11-13
+
+**Status:** ✅ concluído (**não commitado**, pendente do usuário; modo instalar ainda não executado).
+**Camadas:** Infra (script de setup)
+**Responsável:** 🟡 BackBrain (pedido do usuário via 🤍 MegaBrain).
+**Origem:** pedido do usuário em 2026-11-13; até então o Docker só era conferido, nunca instalado.
+
+**Entregas (só em `scripts/setup-linux.sh`):**
+- `etapa_docker` instala `docker.io` pelo apt quando não há `docker`, salvo `--check`, distro sem apt ou a opção nova `--sem-docker`; um docker já presente (ex.: docker-ce) não é alterado.
+- Plugin compose best-effort: `docker-compose-v2` só se existir no apt (`apt-cache show`); senão, AVISO lembrando compose >= 2.17 para o deploy.
+- Docker continua opcional: nunca entra como FALTA (não quebra o `make setup-check`).
+- Após instalar: só avisa sugerindo `sudo usermod -aG docker "$USER"` (não executa: grupo docker equivale a root) e avisa se o serviço não estiver ativo.
+- O aviso de distro sem apt agora lista `shellcheck` e `docker.io`.
+
+**Validação (🟡 BackBrain):** `bash -n` ok; `shellcheck` 0.9.0 sem achados; `make shellcheck` ok; `--check` e `--check --sem-docker` ok (docker como AVISO). O modo instalar não foi executado pelos agentes (precisa de sudo).
+
+**Pendências do usuário:**
+1. Atualizar o `CLAUDE.md`, linha "Docker: opcional (deploy); só é conferido, nunca instalado." → sugestão: "Docker: opcional (deploy); no Linux o `setup-linux.sh` instala o `docker.io` pelo apt (pule com `--sem-docker`); no Windows só é conferido."
+2. Rodar `make setup` real para confirmar a instalação.
+3. Commit.
 
 ---
 

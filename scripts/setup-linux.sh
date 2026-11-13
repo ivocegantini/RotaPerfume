@@ -22,6 +22,7 @@ GO_MODS=("$RAIZ/backend/rotaperfumes-api/go.mod" "$RAIZ/backend/shared/go.mod")
 MODO=instalar
 DEPS=0
 SEM_SUDO=0
+SEM_DOCKER=0
 GO_DESTINO="$HOME/.local/go"
 POSTMAN_VIA=auto
 MARIADB_OFICIAL=1
@@ -43,6 +44,7 @@ Uso: scripts/setup-linux.sh [opções]
   --sem-sudo            Não usa sudo: passos de sistema (apt) viram FALTA.
   --mariadb-distro      Instala o mariadb-client do repositório da distro
                         (padrão: repositório oficial do MariaDB na série de versoes.conf).
+  --sem-docker          Não instala o Docker (docker.io pelo apt); só confere.
   --postman-script      Instala o Postman CLI pelo script oficial (dl-cli.pstmn.io)
                         em vez do pacote npm oficial "postman-cli".
   --manter-gotoolchain  Não grava GOTOOLCHAIN=local no "go env".
@@ -63,6 +65,7 @@ while [ $# -gt 0 ]; do
 	--go-sistema) GO_DESTINO=/usr/local/go ;;
 	--sem-sudo) SEM_SUDO=1 ;;
 	--mariadb-distro) MARIADB_OFICIAL=0 ;;
+	--sem-docker) SEM_DOCKER=1 ;;
 	--postman-script) POSTMAN_VIA=script ;;
 	--manter-gotoolchain) AJUSTAR_GOTOOLCHAIN=0 ;;
 	--sem-perfil) AJUSTAR_PERFIL=0 ;;
@@ -159,7 +162,7 @@ detectar_distro() {
 	*" debian "* | *" ubuntu "*) tem apt-get && APT=1 ;;
 	esac
 	if [ "$APT" -eq 0 ]; then
-		aviso "distro sem apt (ou não Debian/Ubuntu): os pacotes do sistema (git, make, curl, openssl, mariadb-client) não serão instalados; instale-os pelo gerenciador da distro. Go, Node (nvm), govulncheck e Postman CLI continuam funcionando."
+		aviso "distro sem apt (ou não Debian/Ubuntu): os pacotes do sistema (git, make, curl, openssl, mariadb-client, shellcheck, docker.io) não serão instalados; instale-os pelo gerenciador da distro. Go, Node (nvm), govulncheck e Postman CLI continuam funcionando."
 	fi
 }
 
@@ -615,17 +618,52 @@ etapa_shellcheck() {
 }
 
 # ----------------------------------------------------------------------------
-# Docker (opcional, só para deploy): só confere
+# Docker (opcional, só para deploy; SETUP-02): nunca FALTA (não quebra o
+# make setup-check). Sem docker, instala o docker.io do apt (salvo --check ou
+# --sem-docker); com docker já presente (ex.: docker-ce oficial) não mexe, para
+# não conflitar. O plugin compose (docker-compose-v2, Ubuntu) é best-effort; o
+# deploy exige compose >= 2.17 (docs/deploy-servidor.md). Não roda usermod:
+# entrar no grupo docker equivale a root, decisão do usuário.
 # ----------------------------------------------------------------------------
+docker_pode_instalar() { [ "$MODO" != check ] && [ "$APT" -eq 1 ] && [ "$SEM_DOCKER" -eq 0 ]; }
+
+docker_compose_instalar() {
+	docker compose version >/dev/null 2>&1 && return
+	docker_pode_instalar || return
+	if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
+		info "Instalando docker-compose-v2..."
+		apt_instalar docker-compose-v2 || true
+	else
+		info "docker-compose-v2 não existe no apt desta distro: instale o plugin compose à parte (docs/deploy-servidor.md)"
+	fi
+}
+
+docker_avisos_pos_instalacao() {
+	if [ "$(id -u)" -ne 0 ] && ! id -nG "$(id -un)" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+		aviso "seu usuário não está no grupo docker (equivale a root; decisão sua): sudo usermod -aG docker \"\$USER\" e faça login de novo"
+	fi
+	if tem systemctl && ! systemctl is-active --quiet docker 2>/dev/null; then
+		aviso "o serviço docker não está ativo (veja: systemctl status docker)"
+	fi
+}
+
 etapa_docker() {
 	titulo "Docker (opcional, deploy)"
-	if ! tem docker; then registrar docker AVISO "não encontrado (opcional; ver docs/deploy-servidor.md)"; return; fi
-	local v c
+	local instalou=0 v c
+	if ! tem docker && docker_pode_instalar; then
+		info "Instalando docker.io..."
+		apt_instalar docker.io || true
+		tem docker && instalou=1
+	fi
+	if ! tem docker; then registrar docker AVISO "não encontrado (opcional; apt: docker.io; ver docs/deploy-servidor.md)"; return; fi
+	[ "$instalou" -eq 1 ] && docker_avisos_pos_instalacao
+	docker_compose_instalar
 	v="$(docker --version 2>/dev/null | extrair_versao)"
+	[ "$instalou" -eq 1 ] && v="$v (instalado)"
 	if c="$(docker compose version --short 2>/dev/null)"; then
 		registrar docker OK "$v, compose $c"
 	else
-		registrar docker AVISO "$v, sem o plugin 'docker compose' (opcional)"
+		registrar docker AVISO "$v, sem o plugin 'docker compose' (opcional; o deploy exige compose >= 2.17)"
 	fi
 }
 
