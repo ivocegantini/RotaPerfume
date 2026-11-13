@@ -79,6 +79,18 @@
 
 ---
 
+# Limpeza de arquivo afazer.md
+
+> esse arquivo nao deve conter nenhuma mensagem de tarefa ja feita, tudo que tiver feito deve ser mudado para feito.md e apagado daqui
+
+---
+
+# Correção de log
+
+> nas mensagens de log deve conter a data e hora e segundo que a linha foi gerada alem das outras informações ja presentes.
+
+---
+
 # Achados do Lote 36, 2026-11-05
 
 > Pendências do Lote 36 (`feito.md`, "Lote 36 de 2026-11-05"), levantadas pelo 🔴 TestBrain, pelo 🟣 SecBrain e no incidente do `MAKEFLAGS=-k`. Nenhuma bloqueou o fechamento do lote. Caminhos: `SH` = `backend/shared`.
