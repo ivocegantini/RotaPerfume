@@ -81,7 +81,7 @@
 
 # Limpeza de arquivo afazer.md
 
-> esse arquivo nao deve conter nenhuma mensagem de tarefa ja feita, tudo que tiver feito deve ser mudado para feito.md e apagado daqui
+> esse arquivo nao deve conter nenhuma mensagem de tarefa ja feita, tudo que tiver feito deve ser mudado para feito.md de forma resumida e apagado daqui.
 
 ---
 
