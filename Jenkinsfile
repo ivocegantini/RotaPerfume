@@ -57,14 +57,14 @@ pipeline {
         //   a mesma linha 22 do NODE_VERSION do frontend/Dockerfile)
         //   -> trocar "<tag com patch>@sha256:<digest>" aqui; o do mariadb TAMBEM
         //   no IMAGEM_BASE do deploy/mariadb-docker.sh (mesma string) -> make test
-        //   -> backup do banco -> sudo bash deploy/mariadb-docker.sh --recriar.
+        //   -> sudo bash deploy/mariadb-docker.sh --recriar --backup-agora (BACKUP-01).
         // "make deps-audit-imagens" mostra se ha digest novo (so informa).
         GO_IMAGE             = 'golang:1.26.11-alpine@sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb'
         // TST-18: estagio "Testes Frontend" (npm ci + lint + vitest).
-        NODE_IMAGE           = 'node:22.23.4-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914'
+        NODE_IMAGE           = 'node:22.23.4-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202'
         // Cliente do MariaDB 11.4 LTS (mesma imagem do servidor); a imagem 11.x
         // so tem o comando "mariadb" (sem o symlink "mysql").
-        DB_CLIENT_IMAGE      = 'mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620'
+        DB_CLIENT_IMAGE      = 'mariadb:11.4.13@sha256:5e73baf8179b29f115101bb102763a47a017361f3e9792daccba6646c3ab1532'
         DB_NAME              = 'rotaperfumes'
         // DEPLOY-06: o banco so e alcancado pela rede Docker rotaperfumes-db,
         // pelo nome do container (que esta no SAN do certificado). Porta = a
@@ -100,13 +100,16 @@ pipeline {
                 // .sql da raiz, e os de tests/deploy e o sec37 leem deploy/*, o
                 // Jenkinsfile e o .gitignore (falham de proposito se ausentes). O TST-18
                 // le frontend/.nvmrc, frontend/Dockerfile, frontend/package*.json e
-                // frontend/tests (estagio "Testes Frontend"). Ficam de fora os
-                // dumps e o api.env (segredo) do deploy/.
+                // frontend/tests (estagio "Testes Frontend"). SEC-47/SEC-58 leem o
+                // backend/Dockerfile e scripts/; BACKUP-01/SEC-51 leem o
+                // docs/deploy-servidor.md. Ficam de fora os dumps e o api.env
+                // (segredo) do deploy/.
                 sh '''#!/bin/bash
                     set -euo pipefail
                     tar -cf - --exclude=deploy/dumps --exclude=deploy/api.env \
                         backend/shared backend/rotaperfumes-api sql Makefile deploy Jenkinsfile .gitignore \
                         frontend/.nvmrc frontend/Dockerfile frontend/package.json frontend/package-lock.json frontend/tests \
+                        backend/Dockerfile scripts docs/deploy-servidor.md \
                       | docker run --rm -i -e CGO_ENABLED=0 -e GOFLAGS=-mod=readonly "$GO_IMAGE" sh -ec '
                           mkdir -p /src && tar -xf - -C /src
                           cd /src/backend/shared && go vet ./... && go test ./...

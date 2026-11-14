@@ -12,7 +12,7 @@
 
 | Item | Valor |
 |---|---|
-| Banco | MariaDB 11.4 LTS, container `rotaperfumes-mariadb`, imagem local `rotaperfumes-mariadb:11.4-<12 hex do digest>` construída sobre `mariadb:11.4.13@sha256:d1891ede…` (SEC-31) |
+| Banco | MariaDB 11.4 LTS, container `rotaperfumes-mariadb`, imagem local `rotaperfumes-mariadb:11.4-<12 hex do digest>` construída sobre `mariadb:11.4.13@sha256:5e73baf8…` (SEC-31) |
 | Rede | rede Docker `rotaperfumes-db`, `172.30.42.0/24`: MariaDB `.2`, API `.10`, admin/import `.20` (dinâmicos só em `.128/25`) |
 | Porta no host | **nenhuma** por padrão. Só com `--dev-ip IP`: `192.168.168.106:3306`, liberada **só** para esses IPs (chain `ROTAPERFUMES-DB` em `DOCKER-USER`) |
 | TLS no servidor | `require_secure_transport = ON`, `tls_version = TLSv1.2,TLSv1.3`; cliente Go exige **TLS 1.3** (TST-12) |
@@ -100,7 +100,7 @@ Guarde uma segunda cópia (outro pendrive cifrado ou cofre de senhas). Sem a cha
 **Pela rede interna** (como a API e o Jenkins enxergam o banco), no host:
 
 ```bash
-IMG='mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620'   # = IMAGEM_BASE do script
+IMG='mariadb:11.4.13@sha256:5e73baf8179b29f115101bb102763a47a017361f3e9792daccba6646c3ab1532'   # = IMAGEM_BASE do script
 docker run --rm --network rotaperfumes-db --cap-drop ALL \
   --mount type=bind,source=/etc/mysql/ssl/ca.pem,target=/ca.pem,readonly \
   --entrypoint openssl "$IMG" s_client -starttls mysql -connect rotaperfumes-mariadb:3306 \

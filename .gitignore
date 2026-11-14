@@ -81,6 +81,7 @@ deploy/db-ca.sha256
 # Nunca versionar; o deploy/db-ca.fingerprint (versionado) so leva o SHA-256.
 deploy/ca-producao.pem
 .env.producao
+.env.producao.ro
 *.sql.gz
 
 # IMG-01: imagens de produto geradas/enviadas (PRODUTO_IMAGENS_DIR, padrão

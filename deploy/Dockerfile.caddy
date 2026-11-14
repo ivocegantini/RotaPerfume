@@ -1,5 +1,7 @@
 # Imagem do Caddy com o Caddyfile embutido (contexto de build: deploy/).
 # Arquivo real em vez de dockerfile_inline: o builder classico (sem BuildKit/
 # buildx) ignora dockerfile_inline e procura deploy/Dockerfile.
-FROM caddy:2-alpine
+# SEC-47: tag com patch + digest (indice multi-arch); "make deps-audit-imagens"
+# compara com caddy:2.11.9-alpine e caddy:2.11-alpine no Docker Hub.
+FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 COPY Caddyfile /etc/caddy/Caddyfile

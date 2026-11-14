@@ -10,7 +10,18 @@
 - 2026-11-02: Lotes 30 e 31 fechados; Lote 32 (ARQ-09) adiado; merge de todas as branches na `main`.
 - 2026-11-04: Lote 33 (DEPLOY-07; 1º build falhou sem a CA do banco), TST-18 e Lote 34.
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
-- 2026-11-13: Lote 37. 2026-11-14: Lote 38 (ARQ-09 aplicado na `main`); nenhum card em execução.
+- 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
+
+## Lote 39 de 2026-11-14: 8 cards concluídos (não commitado)
+> Testes: `make test` rc=0 (10529 PASS, 0 FAIL, 50 SKIP); `lint`, `shellcheck` ok; frontend 1816 ok. 🟣 SecBrain: aprovado com ressalvas, corrigidas no lote.
+- BACKUP-01: `deploy/backup-mariadb.sh` (dump conferido, 600/700, `flock`, retenção 14 d); container novo sobre dados exige backup recente ou `--sem-backup` (vai ao journal). Restauração real pendente (ver DEPLOY-09).
+- SEC-51: conta `casaos_ro` com `--dev-ip`: SELECT por tabela (sem `usuarios`, `refresh_tokens`, `senha_historico`), ed25519, SSL, 5 conexões, 30 s.
+- DEP-05: digests novos do `mariadb:11.4.13` e do `node:22.23.4-alpine`; o tar do "Testes Go" leva `backend/Dockerfile`, `scripts` e a doc.
+- SEC-47: `Dockerfile`s da API, frontend e Caddy com `tag@sha256`, conferidos pelo `deps-audit-imagens`.
+- SEC-58: chave do MariaDB conferida (fingerprint, sem `sec`/`ssb`, 1 primária, não revogada/expirada); instala só o export-minimal.
+- SEC-48: `limpezaimagens -reprocessar-webp` (com `-dry-run`), UPDATE condicional, sem órfãos; rodar com o UID 65532.
+- FE-19: `frontend/src/lib/dinheiro.ts` valida até 2 casas e o teto do `DECIMAL(15,2)` nos 7 campos de dinheiro.
+- TST-23 (decisão: corrigir testes): `sec12` sem `NOW()`; teste em 3 fusos de sessão; catraca `tst23_catraca_relogio_banco_test.go`. DSN sem `time_zone`.
 
 ## Lote 38 de 2026-11-14: decisões do usuário (push feito pelo usuário)
 - DEPLOY-08: §11 do `deploy-servidor.md` executada pelo usuário no servidor; libera o 1º deploy.

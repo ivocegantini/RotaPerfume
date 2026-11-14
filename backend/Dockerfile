@@ -12,10 +12,14 @@
 # /usr/share/zoneinfo. O fuso do processo e fixado em -03:00 pelo pacote
 # shared/tz (time.FixedZone), que nao depende de base tz.
 
+# SEC-47: bases fixadas por digest (indice multi-arch). Com tag@digest o Docker
+# usa so o digest: GO_VERSION e GO_DIGEST mudam JUNTOS, iguais ao GO_IMAGE do
+# Jenkinsfile (teste confere). "make deps-audit-imagens" avisa digest novo.
 ARG GO_VERSION=1.26.11
+ARG GO_DIGEST=sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb
 
 # ---------- build ----------
-FROM golang:${GO_VERSION}-alpine AS build
+FROM golang:${GO_VERSION}-alpine@${GO_DIGEST} AS build
 WORKDIR /src
 
 ENV CGO_ENABLED=0 \
@@ -38,7 +42,7 @@ RUN cd rotaperfumes-api && \
 RUN mkdir -p /out/data/produtos-imagens && chmod 0750 /out/data/produtos-imagens
 
 # ---------- runtime ----------
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 WORKDIR /app
 COPY --from=build /out/server /app/server
 COPY --from=build --chown=65532:65532 /out/data /data

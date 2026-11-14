@@ -7,74 +7,52 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| BACKUP-01 | MÉDIA | pendente | 🌸 DataBrain |
-| DEP-05 | MÉDIA | pendente (backup + `--recriar`) | 🌸 DataBrain + usuário |
-| SEC-58 | BAIXA | pendente | 🟣 → 🟡 → 🔴 |
-| FE-19 | BAIXA | pendente | 🟢 FrontBrain → 🔴 |
-| TST-23 | BAIXA | informativo | 🔴 TestBrain |
-| SEC-47, SEC-48 | BAIXA | pendente | 🟡/🟢 → 🔴 |
-| SEC-51 | BAIXA | pendente | 🟣 → 🌸/🟡 |
+| DEPLOY-09 | MÉDIA | execução assistida | usuário + 🌸 DataBrain |
+| DEP-06 | BAIXA | pendente | 🟡 BackBrain |
+| SEC-59 | BAIXA | decisão do usuário | 🟣 → 🌸 |
+| TST-26 | BAIXA | pendente | 🔴 TestBrain + 🟣 |
+| DOC-10 | BAIXA | só o usuário edita | usuário |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
 
-## BACKUP-01: backup diário do MariaDB de produção — MÉDIA
+## DEPLOY-09: aplicar o Lote 39 (BACKUP-01, DEP-05, SEC-47) — MÉDIA
 
-**Descrição:** não há backup; um `--recriar`, troca de digest ou engano apaga os dados sem volta.
-**Ação:** dump diário (`600`, retenção configurável), backup obrigatório antes de `--recriar`/upgrade, restauração testada.
-**Aceite:** backup gerado, restauração testada em banco descartável, `docs/deploy-servidor.md` atualizado.
-
----
-
-## DEP-05: digests novos do MariaDB 11.4.13 e do Node 22.23.4 (SEC-31) — MÉDIA
-
-**Descrição:** o `make deps-audit-imagens` (2026-11-14) mostrou digests novos para `mariadb:11.4.13` e `node:22.23.4-alpine` (rebuilds das mesmas tags).
-**Ação:** trocar as strings no `Jenkinsfile`/`deploy/mariadb-docker.sh`/`seed-producao.sh`, `make test`; em produção, backup e `sudo bash deploy/mariadb-docker.sh --recriar` (execução assistida). Depende do BACKUP-01.
+**Ação (execução assistida):**
+1. Restauração real, numa máquina com Docker que não seja o servidor: `cd backend/shared && sudo -E env "PATH=$PATH" BACKUP01_DOCKER=1 go test -count=1 -run TestBACKUP01_RestauracaoReal_Docker ./tests/deploy/`.
+2. Build dos Dockerfiles (SEC-47): `docker build backend/`, `docker build frontend/`, `docker build -f deploy/Dockerfile.caddy deploy/`.
+3. No servidor, depois do push: `sudo git -C /root/rotaperfumes pull --ff-only && cd /root/rotaperfumes && sudo bash deploy/mariadb-docker.sh --recriar --backup-agora`; timer diário da §9 de `docs/deploy-servidor.md`.
 
 ---
 
-## FE-19: validar no máximo 2 casas decimais nos campos de dinheiro — BAIXA
+## DEP-06: patches novos do Go e do Node — BAIXA
 
-**Descrição:** desde o ARQ-09 a API responde 400 "<campo> deve ter no máximo 2 casas decimais"; o frontend pode validar antes (campos já têm `step="0.01"`).
-**Aceite:** mensagem amigável no formulário; testes vitest.
-
----
-
-## SEC-58: chave do repositório MariaDB sem conferir o fingerprint (`scripts/setup-linux.sh`) — BAIXA
-
-**Correção:** fingerprint fixado em `scripts/versoes.conf`, conferido com `gpg --show-keys` antes do `install`.
-**Aceite:** teste que recusa fingerprint divergente; `make shellcheck` verde.
+**Descrição:** `make deps-audit-imagens` mostra `golang:1.26-alpine` e `node:22.23-alpine` mais novos que os fixados.
+**Ação:** subir versão + digest juntos (`Jenkinsfile`, `Dockerfile`s, `go.mod`/`.nvmrc` se for o caso); `make test`.
 
 ---
 
-## TST-23: testes que comparam `NOW()` do banco com o relógio da API dependem do `time_zone` — BAIXA (informativo)
+## SEC-59: `casaos_ro` na produção e PII de `clientes` — BAIXA
 
-**Ação:** decidir entre fixar o `time_zone` no DSN ou criar uma catraca nos testes contra esse padrão.
-**Aceite:** decisão registrada; se corrigido, integração verde com o servidor em UTC e em -03.
-
----
-
-## SEC-47: fixar por digest as imagens base dos `Dockerfile` — BAIXA
-
-**Descrição:** `backend/Dockerfile`, `frontend/Dockerfile` e `deploy/Dockerfile.caddy` usam tags mutáveis.
-**Aceite:** bases com `tag@sha256:`, cobertas pelo `make deps-audit-imagens`; build verde.
+**Decisão do usuário:** a produção roda sem `--dev-ip`, então a conta `_ro` não existe lá; ativar muda essa decisão (`--dev-ip 192.168.168.105`, rodar de novo após o seed).
+**Ação opcional:** views sem CNPJ/contatos de `clientes` para a conta `_ro`.
 
 ---
 
-## SEC-48: reprocessar os `.webp` de produto já gravados — BAIXA
+## TST-26: fuso opt-in no `integracao.Abrir` e `test-integration` concorrente — BAIXA
 
-**Ação:** opção no `SH/cmd/limpezaimagens` (com `-dry-run`) que reprocessa os `.webp` antigos e atualiza `produtos.imagem` sem órfãos.
-**Aceite:** testes com diretório temporário (conversão, referência, dry-run, falha sem perda); docs atualizadas.
+**Descrição:** a rodada inteira em UTC (TST-23) só foi feita com patch local; duas execuções simultâneas apagam o mesmo `rotaperfumes_teste`. A catraca TST-23 age por arquivo.
+**Ação:** gancho opt-in de fuso (revisado pelo 🟣, SEC-50) e trava/nome por execução no `make test-integration`.
 
 ---
 
-## SEC-51: conta somente-leitura em produção para a máquina do admin — BAIXA
+## DOC-10: `CLAUDE.md` com as versões e digests do Lote 39 — BAIXA
 
-**Descrição:** com `--dev-ip`, a conta `casaos` tem `ALL` na produção; avaliar uma conta `*_ro` só com `SELECT` e deixar o `ALL` para migrações.
+**Sugestão (só o usuário edita):** na seção "Versões", citar `GO_VERSION`/`GO_DIGEST` do `backend/Dockerfile`, `NODE_DIGEST` do `frontend/Dockerfile` e `MARIADB_CHAVE_FINGERPRINT` em `scripts/versoes.conf` (mudam junto com a versão).
 
 ---
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 
-**Status:** 0 altas; 16 moderadas do `minimatch` via `eslint` (só dev).
+**Status (2026-11-14):** 0 altas; 8 moderadas do `minimatch` via `eslint` (só dev), correção só com `--force`.
 **Ação:** quando o upstream corrigir, atualizar ou usar `overrides`; validar `tsc`, `eslint`, vitest, `next build` e `npm audit`. Nunca `npm audit fix --force`.

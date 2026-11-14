@@ -41,7 +41,7 @@ A skill `megabrain-router` é o **roteador padrão** — toda execução nova pa
 - `fazendo.md` — em execução (com passo atual)
 - `feito.md` — concluídas (histórico)
 
-Toda mudança de estado é refletida movendo o card entre os três arquivos.
+Toda mudança de estado é refletida movendo o card entre os três arquivos. Esses cards devem ser resumidos e não deve haver historico no fazendo.md
 
 ## Como Usar
 

@@ -1285,6 +1285,8 @@ O comando (`backend/rotaperfumes-api/cmd/gerarimagens`) aceita `-confirmar` (obr
 
 **Limpeza de órfãos (CHORE-09, Lote 31):** `cd backend/shared && go run ./cmd/limpezaimagens -dry-run` (só totais) e sem `-dry-run` para apagar. Apaga imagens sem referência em `produtos.imagem` com mais de 1 h e `.tmp-*` com mais de 24 h; ignora symlinks e nomes fora do padrão; referência para arquivo inexistente só é reportada. Detalhes em `docs/manual-base-de-dados.md` §13.1.
 
+**Reprocessar `.webp` antigos (SEC-48, Lote 39):** `go run ./cmd/limpezaimagens -reprocessar-webp [-dry-run]` reencoda para PNG/JPEG e troca `produtos.imagem` sem órfãos (ver o manual §13.1).
+
 ### Importação de pedidos (ERP)
 
 `make db-up`/`make db-reset` criam as tabelas `pedidos` e `itens_pedido` (via `sql/04_ddl_pedidos.sql` e `sql/11_ddl_itens_pedido.sql`), mas **não** carregam os dados nelas. Para popular as tabelas a partir de `dados/erp/pedidos.csv` (28.729 linhas) e `dados/erp/itens_pedido.csv` (197.724 linhas), rode adicionalmente:

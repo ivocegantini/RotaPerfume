@@ -15,6 +15,7 @@ import {
   validarArquivoImagem,
 } from "@/lib/imagemProduto";
 import { vlog } from "@/lib/vlog";
+import { validarDinheiro } from "@/lib/dinheiro";
 
 const F = "ProdutoModal.tsx";
 
@@ -148,25 +149,23 @@ export function ProdutoModal({
       return;
     }
     vlog(F, "ProdutoModal.handleSubmit", "convertendo preço de tabela");
-    const precoNum = Number(precoTabela);
-    vlog(F, "ProdutoModal.handleSubmit", "validando preço de tabela:", precoNum);
-    if (precoTabela.trim() === "" || Number.isNaN(precoNum) || precoNum < 0) {
+    const precoRes = validarDinheiro(precoTabela, "Preco de tabela");
+    vlog(F, "ProdutoModal.handleSubmit", "validando preço de tabela:", precoRes.ok);
+    if (!precoRes.ok) {
       vlog(F, "ProdutoModal.handleSubmit", "preço de tabela inválido");
-      setError("Preco de tabela deve ser um numero maior ou igual a zero.");
+      setError(precoRes.erro);
       return;
     }
+    const precoNum = precoRes.valor;
     vlog(F, "ProdutoModal.handleSubmit", "convertendo custo unitário");
-    const custoNum = Number(custoUnitario);
-    vlog(F, "ProdutoModal.handleSubmit", "validando custo unitário:", custoNum);
-    if (
-      custoUnitario.trim() === "" ||
-      Number.isNaN(custoNum) ||
-      custoNum < 0
-    ) {
+    const custoRes = validarDinheiro(custoUnitario, "Custo unitario");
+    vlog(F, "ProdutoModal.handleSubmit", "validando custo unitário:", custoRes.ok);
+    if (!custoRes.ok) {
       vlog(F, "ProdutoModal.handleSubmit", "custo unitário inválido");
-      setError("Custo unitario deve ser um numero maior ou igual a zero.");
+      setError(custoRes.erro);
       return;
     }
+    const custoNum = custoRes.valor;
 
     vlog(F, "ProdutoModal.handleSubmit", "marcando envio em andamento");
     setSubmitting(true);

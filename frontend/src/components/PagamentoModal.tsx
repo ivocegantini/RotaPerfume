@@ -17,6 +17,7 @@ import { useResetOnOpen } from "@/lib/useResetOnOpen";
 import { useSessionUser } from "@/lib/session";
 import { formatarData } from "@/lib/formatarData";
 import { vlog } from "@/lib/vlog";
+import { validarDinheiro } from "@/lib/dinheiro";
 
 const F = "PagamentoModal.tsx";
 
@@ -250,13 +251,14 @@ export function PagamentoModal({
       return;
     }
     vlog(F, "PagamentoModal.handleSubmit", "convertendo valor");
-    const valorNum = Number(valor);
-    vlog(F, "PagamentoModal.handleSubmit", "validando valor:", valorNum);
-    if (valor.trim() === "" || Number.isNaN(valorNum) || valorNum < 0) {
+    const valorRes = validarDinheiro(valor, "Valor");
+    vlog(F, "PagamentoModal.handleSubmit", "validando valor:", valorRes.ok);
+    if (!valorRes.ok) {
       vlog(F, "PagamentoModal.handleSubmit", "valor inválido");
-      setError("Valor deve ser um numero maior ou igual a zero.");
+      setError(valorRes.erro);
       return;
     }
+    const valorNum = valorRes.valor;
     vlog(F, "PagamentoModal.handleSubmit", "convertendo taxa");
     const taxaPctNum = Number(taxaPct);
     vlog(F, "PagamentoModal.handleSubmit", "validando taxa:", taxaPctNum);
@@ -271,17 +273,14 @@ export function PagamentoModal({
       return;
     }
     vlog(F, "PagamentoModal.handleSubmit", "convertendo valor líquido");
-    const valorLiquidoNum = Number(valorLiquido);
-    vlog(F, "PagamentoModal.handleSubmit", "validando valor líquido:", valorLiquidoNum);
-    if (
-      valorLiquido.trim() === "" ||
-      Number.isNaN(valorLiquidoNum) ||
-      valorLiquidoNum < 0
-    ) {
+    const valorLiquidoRes = validarDinheiro(valorLiquido, "Valor liquido");
+    vlog(F, "PagamentoModal.handleSubmit", "validando valor líquido:", valorLiquidoRes.ok);
+    if (!valorLiquidoRes.ok) {
       vlog(F, "PagamentoModal.handleSubmit", "valor líquido inválido");
-      setError("Valor liquido deve ser um numero maior ou igual a zero.");
+      setError(valorLiquidoRes.erro);
       return;
     }
+    const valorLiquidoNum = valorLiquidoRes.valor;
     vlog(F, "PagamentoModal.handleSubmit", "validando data de vencimento");
     if (!dataVencimento) {
       vlog(F, "PagamentoModal.handleSubmit", "data de vencimento ausente");

@@ -550,10 +550,18 @@ deps-audit-frontend: ## SEC-13: npm audit (falha em severidade high+) e npm outd
 # nos dois arquivos (mesmo digest do mariadb), make test, backup e
 # sudo bash deploy/mariadb-docker.sh --recriar (ver comentário no Jenkinsfile).
 IMAGENS_FIXADAS_EM = Jenkinsfile deploy/mariadb-docker.sh deploy/seed-producao.sh
+# SEC-47: bases dos Dockerfile. O FROM é resolvido com os ARG padrão do próprio
+# arquivo (ex.: ${GO_VERSION} e ${GO_DIGEST} do backend/Dockerfile); FROM sem digest vira AVISO.
+IMAGENS_DOCKERFILES = backend/Dockerfile frontend/Dockerfile deploy/Dockerfile.caddy
 IMAGEM_ACCEPT = application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json
 
-deps-audit-imagens: ## SEC-31: compara os digests fixados (Jenkinsfile: go, node e mariadb; mariadb-docker.sh) com os das tags atuais no Docker Hub (informativo, nunca falha)
+deps-audit-imagens: ## SEC-31/SEC-47: compara os digests fixados (Jenkinsfile, mariadb-docker.sh e Dockerfiles) com os das tags atuais no registry (informativo, nunca falha)
 	@digest_remoto() { \
+	  case "$$1" in *.*/*) \
+	    command -v curl >/dev/null 2>&1 || return 1; \
+	    curl -fsSI --max-time 15 -H "Accept: $(IMAGEM_ACCEPT)" "https://$${1%%/*}/v2/$${1#*/}/manifests/$$2" \
+	      | tr -d '\r' | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}' | grep -E '^sha256:[0-9a-f]{64}$$'; return ;; \
+	  esac; \
 	  if command -v docker >/dev/null 2>&1 && docker buildx version >/dev/null 2>&1; then \
 	    docker buildx imagetools inspect "$$1:$$2" --format '{{.Manifest.Digest}}' 2>/dev/null && return; \
 	  fi; \
@@ -564,7 +572,10 @@ deps-audit-imagens: ## SEC-31: compara os digests fixados (Jenkinsfile: go, node
 	  curl -fsSI --max-time 15 -H "Authorization: Bearer $$tok" -H "Accept: $(IMAGEM_ACCEPT)" \
 	    "https://registry-1.docker.io/v2/$$repo/manifests/$$2" | tr -d '\r' | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}' | grep -E '^sha256:[0-9a-f]{64}$$'; \
 	}; \
-	refs=$$(grep -hoE '[a-z0-9._/-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' $(IMAGENS_FIXADAS_EM) 2>/dev/null | sort -u); \
+	froms=$$(awk 'FNR==1{split("",v)} $$1=="ARG" && $$2 ~ /^[A-Za-z_][A-Za-z0-9_]*=/{i=index($$2,"="); v[substr($$2,1,i-1)]=substr($$2,i+1); next} toupper($$1)=="FROM"{r=$$2; for(k in v) gsub("[$$][{]" k "[}]", v[k], r); print FILENAME": "r}' $(IMAGENS_DOCKERFILES) 2>/dev/null); \
+	printf '%s\n' "$$froms" | grep -vE '@sha256:[0-9a-f]{64}$$' | grep . | sed 's/^/AVISO (SEC-47): FROM sem digest em /'; \
+	refs=$$( { grep -hoE '[a-z0-9._/-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}' $(IMAGENS_FIXADAS_EM) 2>/dev/null; \
+	  printf '%s\n' "$$froms" | grep -oE '[a-z0-9._/-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$$'; } | sort -u); \
 	[ -n "$$refs" ] || { echo "AVISO (SEC-31): nenhuma imagem fixada por digest em $(IMAGENS_FIXADAS_EM)"; exit 0; }; \
 	command -v docker >/dev/null 2>&1 || echo "AVISO (SEC-31): docker nao encontrado; consultando o registry por curl"; \
 	for ref in $$refs; do \

@@ -360,12 +360,18 @@ func novoEnsaio(t *testing.T) *ensaio {
 	bins := map[string]string{
 		"docker": stubDocker, "iptables": stubIptables, "iptables-restore": stubIptablesRestore,
 		"systemctl": stubSystemctl, "install": stubInstall, "chown": stubChown, "getent": stubGetent,
-		"ss": stubSs, "timeout": stubTimeout,
+		"ss": stubSs, "timeout": stubTimeout, "logger": stubLogger,
 	}
 	for nome, conteudo := range bins {
 		escrever(t, filepath.Join(e.dir, "bin", nome), conteudo, 0o755)
 	}
 	escrever(t, filepath.Join(e.dir, "runner.sh"), runnerEnsaio, 0o755)
+	// BACKUP-01: copia byte a byte do deploy/backup-mariadb.sh num caminho do
+	// "root" (o checkout do repositorio e do usuario e o /home aparece com o
+	// overflow uid no namespace; o script exige dono root sem escrita g/o).
+	escrever(t, filepath.Join(e.dir, "bk", "backup-mariadb.sh"), lerRaiz(t, "deploy", "backup-mariadb.sh"), 0o755)
+	require.NoError(t, os.Chmod(filepath.Join(e.dir, "bk"), 0o755))
+	require.NoError(t, os.Chmod(filepath.Join(e.dir, "bk", "backup-mariadb.sh"), 0o755))
 	e.setState("chain_DOCKER-USER", "-A DOCKER-USER -j RETURN\n")
 	// DEPLOY-08: do próprio servidor a porta publicada responde com o erro
 	// 1130 (origem pelo DNAT sem conta), como no servidor real.
@@ -429,7 +435,8 @@ func (e *ensaio) rodar(args ...string) saidaEnsaio {
 	e.t.Helper()
 	_ = os.Remove(filepath.Join(e.dir, "log"))
 	base := []string{"-rm", "bash", filepath.Join(e.dir, "runner.sh"),
-		"--ssl-dir", filepath.Join(e.dir, "ssl"), "--dados", filepath.Join(e.dir, "dados"), "--host-nome", hostTeste}
+		"--ssl-dir", filepath.Join(e.dir, "ssl"), "--dados", filepath.Join(e.dir, "dados"), "--host-nome", hostTeste,
+		"--backup-script", filepath.Join(e.dir, "bk", "backup-mariadb.sh")}
 	cmd := exec.Command("unshare", append(base, args...)...)
 	cmd.Env = append(ambienteLimpo(), "FAKE="+e.dir, "SCRIPT="+mariadbDocker(e.t))
 	out, err := cmd.CombinedOutput()

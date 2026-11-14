@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import { refreshSessionUser, useSessionUser } from "@/lib/session";
 import { vlog } from "@/lib/vlog";
+import { validarDinheiro } from "@/lib/dinheiro";
 
 const F = "PedidoModal.tsx";
 
@@ -630,13 +631,12 @@ export function PedidoModal({
         setError("Quantidade deve ser maior que zero em todos os itens.");
         return;
       }
-      const precoPraticado = Number(row.preco_praticado);
-      if (!Number.isFinite(precoPraticado) || precoPraticado < 0) {
-        setError(
-          "Preco praticado deve ser um numero maior ou igual a zero em todos os itens."
-        );
+      const preco = validarDinheiro(row.preco_praticado, "Preco praticado", " em todos os itens");
+      if (!preco.ok) {
+        setError(preco.erro);
         return;
       }
+      const precoPraticado = preco.valor;
       const descontoPct = Number(row.desconto_pct || "0");
       if (!Number.isFinite(descontoPct) || descontoPct < 0 || descontoPct > 100) {
         setError("Desconto deve estar entre 0 e 100 em todos os itens.");

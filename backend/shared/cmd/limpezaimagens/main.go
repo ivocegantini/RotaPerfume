@@ -7,8 +7,11 @@
 //
 //	go run ./cmd/limpezaimagens -dry-run
 //	go run ./cmd/limpezaimagens
+//	go run ./cmd/limpezaimagens -reprocessar-webp -dry-run   # SEC-48
+//	go run ./cmd/limpezaimagens -reprocessar-webp
 //
-// Roda com a conta da API (só SELECT em produtos). O log tem só totais.
+// Roda com a conta da API (SELECT em produtos; o -reprocessar-webp também
+// faz UPDATE produtos.imagem). O log tem só totais.
 package main
 
 import (

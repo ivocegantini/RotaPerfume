@@ -507,6 +507,55 @@ etapa_govulncheck() {
 # ----------------------------------------------------------------------------
 versao_mariadb() { mariadb --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-MariaDB' | head -n1 | sed 's/-MariaDB//'; }
 
+# SEC-58: resumo_chaves ARQ: "<tipo>:<validade>:<fpr>" de cada chave do arquivo
+# (pub/sec/sub/ssb), lido com gpg --show-keys num GNUPGHOME vazio.
+resumo_chaves() {
+	local gh
+	gh="$(mktemp -d)" || return 1
+	GNUPGHOME="$gh" gpg --batch --no-tty --show-keys --with-colons "$1" 2>/dev/null |
+		awk -F: '$1 ~ /^(pub|sec|sub|ssb)$/ { t = $1; v = $2; next } t != "" && $1 == "fpr" { print t ":" v ":" $10; t = "" }'
+	rm -rf "$gh"
+}
+
+# SEC-58: conferir_chave_mariadb ARQ FINGERPRINT SAIDA. Exige UMA chave pública
+# primária com o fingerprint esperado, sem material secreto (sec/ssb), não
+# revogada nem expirada; grava em SAIDA só o export-minimal dessa chave
+# (nunca o arquivo baixado).
+conferir_chave_mariadb() {
+	local arq="$1" esperado saida="${3:-}" resumo pubs gh
+	esperado="$(printf '%s' "${2:-}" | tr -d ' ' | tr '[:lower:]' '[:upper:]')"
+	[[ "$esperado" =~ ^[0-9A-F]{40}$ ]] || { aviso "MARIADB_CHAVE_FINGERPRINT ausente ou inválido em versoes.conf (SEC-58): chave recusada"; return 1; }
+	[ -n "$saida" ] || { aviso "conferir_chave_mariadb sem arquivo de saída (SEC-58)"; return 1; }
+	tem gpg || { aviso "gpg não encontrado: não dá para conferir a chave do MariaDB (SEC-58): chave recusada"; return 1; }
+	resumo="$(resumo_chaves "$arq")"
+	if printf '%s\n' "$resumo" | grep -qE '^(sec|ssb):'; then
+		aviso "arquivo da chave do MariaDB traz chave secreta (sec/ssb) (SEC-58): chave recusada"; return 1
+	fi
+	pubs="$(printf '%s\n' "$resumo" | grep -cE '^pub:')"
+	if [ "$pubs" -ne 1 ]; then
+		aviso "arquivo da chave do MariaDB com $pubs chaves primárias, esperada 1 (SEC-58): chave recusada"; return 1
+	fi
+	case "$(printf '%s\n' "$resumo" | awk -F: '$1 == "pub" { print $2 }')" in
+	*r*) aviso "chave do MariaDB revogada (SEC-58): chave recusada"; return 1 ;;
+	*e*) aviso "chave do MariaDB expirada (SEC-58): chave recusada"; return 1 ;;
+	esac
+	if ! printf '%s\n' "$resumo" | grep -qx "pub:[^:]*:$esperado"; then
+		aviso "fingerprint da chave do MariaDB divergente (SEC-58): esperado $esperado, obtido $(printf '%s\n' "$resumo" | awk -F: '$1 == "pub" { print $3 }'). Chave recusada."
+		return 1
+	fi
+	gh="$(mktemp -d)" || return 1
+	if ! GNUPGHOME="$gh" gpg --batch --no-tty --quiet --import "$arq" 2>/dev/null ||
+		! GNUPGHOME="$gh" gpg --batch --no-tty --export --export-options export-minimal "$esperado" >"$saida" 2>/dev/null; then
+		rm -rf "$gh"; aviso "falha ao exportar a chave do MariaDB (SEC-58): chave recusada"; return 1
+	fi
+	rm -rf "$gh"
+	# A saída é conferida de novo: só a pública esperada.
+	if [ "$(resumo_chaves "$saida" | grep -cE '^(pub|sec):')" -ne 1 ] || ! resumo_chaves "$saida" | grep -qx "pub:[^:]*:$esperado"; then
+		aviso "export da chave do MariaDB inesperado (SEC-58): chave recusada"; return 1
+	fi
+	info "Chave do MariaDB conferida: $esperado"
+}
+
 configurar_repo_mariadb() {
 	local base suite
 	case " $DISTRO_ID $DISTRO_LIKE " in
@@ -516,11 +565,17 @@ configurar_repo_mariadb() {
 	# shellcheck disable=SC2015 # o "|| C" deve rodar se A OU B falhar (é o pretendido)
 	[ -n "${base:-}" ] && [ -n "${suite:-}" ] || { aviso "não identifiquei a versão da distro para o repositório do MariaDB"; return 1; }
 	info "Configurando o repositório oficial do MariaDB $MARIADB_SERIE ($base $suite)"
+	tem gpg || apt_instalar gpg || true
 	local tmp; tmp="$(mktemp)"
 	baixar "https://mariadb.org/mariadb_release_signing_key.pgp" "$tmp" || { rm -f "$tmp"; return 1; }
+	# SEC-58: só instala a chave se o fingerprint for o fixado em versoes.conf.
+	# Instala o export-minimal da chave conferida, nunca o arquivo baixado.
+	local chave; chave="$(mktemp)"
+	conferir_chave_mariadb "$tmp" "${MARIADB_CHAVE_FINGERPRINT:-}" "$chave" || { rm -f "$tmp" "$chave"; return 1; }
 	# shellcheck disable=SC2015 # o "|| C" deve rodar se A OU B falhar (é o pretendido)
 	como_root install -d -m 0755 /etc/apt/keyrings &&
-		como_root install -m 0644 "$tmp" /etc/apt/keyrings/mariadb-keyring.pgp || { rm -f "$tmp"; return 1; }
+		como_root install -m 0644 "$chave" /etc/apt/keyrings/mariadb-keyring.pgp || { rm -f "$tmp" "$chave"; return 1; }
+	rm -f "$chave"
 	printf 'X-Repolib-Name: MariaDB\nTypes: deb\nURIs: https://dlm.mariadb.com/repo/mariadb-server/%s/repo/%s\nSuites: %s\nComponents: main\nSigned-By: /etc/apt/keyrings/mariadb-keyring.pgp\n' \
 		"$MARIADB_SERIE" "$base" "$suite" >"$tmp"
 	como_root install -m 0644 "$tmp" /etc/apt/sources.list.d/mariadb.sources || { rm -f "$tmp"; return 1; }
@@ -702,4 +757,7 @@ main() {
 	resumo
 }
 
-main
+# SEC-58: carregado por "source" (testes), só define as funções.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+	main
+fi

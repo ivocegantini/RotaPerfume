@@ -59,7 +59,9 @@ func (c *sec12IT) token(expira time.Time, motivo string) int64 {
 	rt := &identidade.RefreshToken{UsuarioID: c.uid, HashToken: fmt.Sprintf("%s%d", c.prefix, c.seq), ExpiraEm: expira, IP: "127.0.0.1", UserAgent: "go-test"}
 	require.NoError(c.t, identidademysql.NovoRefreshTokens(c.db).Inserir(context.Background(), rt))
 	if motivo != "" {
-		_, err := c.db.Exec(`UPDATE refresh_tokens SET revoked_at = NOW() - INTERVAL 5 MINUTE, revoked_reason = ? WHERE id = ?`, motivo, rt.ID)
+		// TST-23: revoked_at pelo relógio do Go (o mesmo caminho da API), nunca
+		// NOW() do banco, que depende do time_zone do servidor.
+		_, err := c.db.Exec(`UPDATE refresh_tokens SET revoked_at = ?, revoked_reason = ? WHERE id = ?`, time.Now().Add(-5*time.Minute), motivo, rt.ID)
 		require.NoError(c.t, err)
 	}
 	return rt.ID

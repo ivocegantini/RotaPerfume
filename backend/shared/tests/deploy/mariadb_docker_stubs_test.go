@@ -87,8 +87,17 @@ case "$1" in
     exit 0 ;;
   exec)
     a="$*"
+    # BACKUP-01: mariadb-dump do deploy/backup-mariadb.sh (argv em $S/dump_args).
+    if [[ "$a" == *mariadb-dump* ]]; then
+      echo "$a" >>"$S/dump_args"
+      [[ -f "$S/dump_falha" ]] && { echo "mariadb-dump: Got error: 2002" >&2; exit 2; }
+      printf -- '-- MariaDB dump 10.19  Distrib 11.4.13-MariaDB\nCREATE TABLE t (id int);\n'
+      [[ -f "$S/dump_incompleto" ]] || echo "-- Dump completed on 2026-11-14 10:00:00"
+      exit 0
+    fi
     if [[ "$a" != *" -e "* ]]; then echo "-- stdin" >>"$S/sql"; cat >>"$S/sql"; exit 0; fi
     case "$a" in
+      *"information_schema.TABLES"*) cat "$S/tabelas" 2>/dev/null ;;
       *skip_networking*) echo 0 ;;
       *"FLUSH SSL"*) echo "FLUSH SSL" >>"$S/sql" ;;
       *"SELECT VERSION()"*) echo 11.4.13-MariaDB ;;
@@ -183,6 +192,9 @@ fi
 `
 
 const stubChown = "#!/bin/bash\nexit 0\n"
+
+// logger (BACKUP-01, --sem-backup): nunca escreve no journal real.
+const stubLogger = "#!/bin/bash\necho \"logger $*\" >>\"$FAKE/log\"\n"
 
 const stubGetent = `#!/bin/bash
 [[ "$1" == passwd ]] && exit 2

@@ -18,6 +18,7 @@ import { useAjustarAoMudar, useResetOnOpen } from "@/lib/useResetOnOpen";
 import { formatCnpj } from "@/lib/cnpj";
 import { formatarData } from "@/lib/formatarData";
 import { vlog } from "@/lib/vlog";
+import { validarDinheiro } from "@/lib/dinheiro";
 
 const F = "VendedorModal.tsx";
 
@@ -486,13 +487,14 @@ export function VendedorModal({
       return;
     }
     vlog(F, "VendedorModal.handleSubmit", "convertendo meta mensal");
-    const meta = Number(metaMensal);
-    vlog(F, "VendedorModal.handleSubmit", "validando meta mensal:", meta);
-    if (!Number.isFinite(meta) || meta < 0) {
+    const metaRes = validarDinheiro(metaMensal, "Meta mensal");
+    vlog(F, "VendedorModal.handleSubmit", "validando meta mensal:", metaRes.ok);
+    if (!metaRes.ok) {
       vlog(F, "VendedorModal.handleSubmit", "meta mensal inválida");
-      setError("Meta mensal deve ser um numero maior ou igual a zero.");
+      setError(metaRes.erro);
       return;
     }
+    const meta = metaRes.valor;
 
     vlog(F, "VendedorModal.handleSubmit", "marcando envio em andamento");
     setSubmitting(true);

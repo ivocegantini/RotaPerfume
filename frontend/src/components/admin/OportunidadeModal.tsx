@@ -11,6 +11,7 @@ import { useAjustarAoMudar, useResetOnOpen } from "@/lib/useResetOnOpen";
 import { useVendedorTravado, vendedorInicial } from "@/lib/useVendedorTravado";
 import { apiListVendedores, apiListClientesDoVendedor } from "@/lib/api";
 import { vlog } from "@/lib/vlog";
+import { validarDinheiro } from "@/lib/dinheiro";
 
 const F = "OportunidadeModal.tsx";
 
@@ -377,13 +378,14 @@ export function OportunidadeModal({
     }
 
     vlog(F, "OportunidadeModal.handleSubmit", "convertendo valor estimado para número");
-    const valor = Number(valorEstimado);
-    vlog(F, "OportunidadeModal.handleSubmit", "validando valor estimado:", valor);
-    if (!Number.isFinite(valor) || valor < 0) {
+    const valorRes = validarDinheiro(valorEstimado, "Valor estimado");
+    vlog(F, "OportunidadeModal.handleSubmit", "validando valor estimado:", valorRes.ok);
+    if (!valorRes.ok) {
       vlog(F, "OportunidadeModal.handleSubmit", "valor estimado inválido");
-      setError("Valor estimado deve ser um numero maior ou igual a zero.");
+      setError(valorRes.erro);
       return;
     }
+    const valor = valorRes.valor;
 
     vlog(F, "OportunidadeModal.handleSubmit", "declarando ciclo em dias");
     let ciclo: number | undefined;

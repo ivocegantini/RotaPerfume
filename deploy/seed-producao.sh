@@ -43,7 +43,7 @@
 set -euo pipefail
 umask 077
 
-DB_CLIENT_IMAGE="mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620"
+DB_CLIENT_IMAGE="mariadb:11.4.13@sha256:5e73baf8179b29f115101bb102763a47a017361f3e9792daccba6646c3ab1532"
 GO_IMAGE="golang:1.26.11-alpine@sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb"
 
 # Padroes da producao; as opcoes de isolamento (TST-17) so servem para o
