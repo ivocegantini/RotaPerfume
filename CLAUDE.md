@@ -80,6 +80,7 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 - **BUG-29** Rodar make ... MAKEFLAGS=-k agora para com erro. Antes, nesse caso o ENV_ARQUIVO não chegava aos sub-makes, que liam o .env padrão sem avisar. O make -k e o MAKEFLAGS=-k make ... continuam funcionando.
 - **SEC-56** Formas numéricas de IPv4 que não sejam o endereço padrão (3232278634, 0xc0a8a86a, 192.168.43114, octal) agora contam como produção, no Makefile e no Go.
 - **SEC-57** A porta com espaço passa a ser recusada nos dois lados, com a mensagem "porta inválida", inclusive com CONFIRMO_PRODUCAO. Antes, o Makefile dizia que era o banco de produção.
+- **TST-25** make test-integration recria e apaga o banco rotaperfumes_teste, nunca o DB_NAME.
 
 ## Instalação do ambiente
 
