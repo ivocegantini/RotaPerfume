@@ -5,6 +5,16 @@
 > **Primeira instalação da produção?** Siga a **[seção 11 (Instalação inicial da produção, DEPLOY-07)](#11-instalação-inicial-da-produção-deploy-07)** **antes** do primeiro deploy da `main`: MariaDB 11.4 novo com CA própria, seed com o admin e os 42 vendedores inativos, fingerprint da CA commitado e credenciais do Jenkins. Sem a rede `rotaperfumes-db` e o container `rotaperfumes-mariadb`, o estágio `CA do banco` para o job (e o `docker compose up` falharia).
 >
 > **Dev x produção:** o banco de **desenvolvimento** é o MariaDB 11.8 do CasaOS, no mesmo servidor, porta 3307 (`192.168.168.106:3307`), com a CA de dev em `deploy/ca-cert.pem` (`.env` padrão). A **produção** é o container `rotaperfumes-mariadb` (porta 3306, CA de produção, fingerprint em `deploy/db-ca.fingerprint`). As duas CAs nunca se misturam.
+>
+> **Mapa dos ambientes de banco** (servidor `192.168.168.106`):
+>
+> | Ambiente | Servidor | Banco | Conta | Configuração | Uso |
+> | --- | --- | --- | --- | --- | --- |
+> | Desenvolvimento | CasaOS, MariaDB 11.8, porta 3307 | `rotaperfumes` | `casaos`@`192.168.168.%` | `.env` padrão; CA `deploy/ca-cert.pem` | `make dev-api` e trabalho do dia a dia |
+> | Teste (descartável) | CasaOS, porta 3307 | `rotaperfumes_teste` | `casaos` (GRANT só nesse nome) | o próprio `make test-integration` (TST-25: `DB_TESTE`, servidor do `.env`) | testes de integração; recriado e apagado a cada execução. Roteiros com `make db-*`: env temporário com `DB_NAME=rotaperfumes_teste` |
+> | Produção | container `rotaperfumes-mariadb`, MariaDB 11.4, porta 3306 | `rotaperfumes` | contas do seed (§11) | `.env.producao` + `CONFIRMO_PRODUCAO` | API publicada; nunca testes, `db-down`/`db-seed`/`db-reset` |
+>
+> Permissão do banco de teste (uma vez, como root no MariaDB do CasaOS): ``GRANT ALL PRIVILEGES ON `rotaperfumes\_teste`.* TO 'casaos'@'192.168.168.%';`` (o `\_` evita o curinga do `_`).
 
 ## 0. Instalação automática (recomendado)
 

@@ -112,13 +112,21 @@ func TestSEC53_Makefile_ListaDeSegredos(t *testing.T) {
 
 // sec53Dir monta a cópia: Makefile, .env falso, backend/{shared,
 // rotaperfumes-api} e frontend vazios e go/npm falsos que gravam o ambiente
-// (env) de cada chamada em env.log.
+// (env) de cada chamada em env.log. TST-25: o test-integration recria o banco
+// descartável, então há também um sql/ordem-ddl.txt mínimo e um mariadb falso
+// (grava as chamadas em mariadb.log).
 func sec53Dir(t *testing.T) (dir, pathFalso, envLog string) {
 	t.Helper()
 	dir = copiaDoMakefile(t)
-	for _, d := range []string{"backend/shared", "backend/rotaperfumes-api", "frontend", "bin-falso"} {
+	for _, d := range []string{"backend/shared", "backend/rotaperfumes-api", "frontend", "bin-falso", "sql"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.FromSlash(d)), 0o755))
 	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "sql", "ordem-ddl.txt"), []byte("01_ddl_a.sql\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "sql", "01_ddl_a.sql"), []byte("-- DDL-A\n"), 0o644))
+	mariadbLog := filepath.Join(dir, "mariadb.log")
+	mariadb := "#!/bin/sh\n[ \"$1\" = --version ] && { echo 'mariadb from 11.4.5-MariaDB, client 15.2'; exit 0; }\n" +
+		"case \"$*\" in *' -e '*) echo \"mariadb $*\" >> '" + mariadbLog + "' ;; *) echo \"mariadb $* $(head -n 1)\" >> '" + mariadbLog + "' ;; esac\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "bin-falso", "mariadb"), []byte(mariadb), 0o755))
 	envFalso := strings.Join([]string{
 		"DB_HOST=127.0.0.1",
 		"DB_USUARIO=usuario-sec53",

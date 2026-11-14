@@ -159,7 +159,7 @@ func TestSEC54_ListaPermitidosIgualAoMakefile(t *testing.T) {
 	assert.Equal(t, []string{"localhost", "127.0.0.0/8", "::1", "192.168.168.106:3307"}, integracao.Permitidos)
 
 	assert.True(t, mk.phony["db-guard-integracao"], "db-guard-integracao no .PHONY")
-	assert.Equal(t, []string{"db-guard-producao", "db-guard-integracao"}, mk.regras["test-integration"].prereqs)
+	assert.Equal(t, []string{"db-guard-producao", "db-guard-integracao", "db-guard-banco-teste", "db-check-env"}, mk.regras["test-integration"].prereqs)
 	assert.Contains(t, mk.linhaDaVariavel(t, "GUARDA_INTEGRACAO"), "db-guard-producao db-guard-integracao")
 	// A mesma normalização nas três guardas e no db-check-env.
 	assert.Contains(t, mk.linhaDaVariavel(t, "PRODUCAO_DETECTA"), "$(NORMALIZA_HOST)")

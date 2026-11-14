@@ -29,7 +29,9 @@ import (
 	"github.com/rotaperfumes/shared/testkit/integracao"
 )
 
-const valorPedidoDB07 = 123.45
+// valorPedidoDB07 vai ao banco como texto (ARQ-09: DECIMAL gravado por "x.yy")
+// e volta como Dinheiro; as comparações são em centavos exatos.
+const valorPedidoDB07 = "123.45"
 
 // conexaoFullGroupBy devolve UMA conexão do pool com ONLY_FULL_GROUP_BY na
 // sessão (SET SESSION vale só para a conexão; o *sql.Conn a fixa).
@@ -110,7 +112,7 @@ func TestIntegracaoDB07_GroupByComOnlyFullGroupBy(t *testing.T) {
 			serie, err := d.SerieVendas(ctx, e.escopo, analytics.DiasDe(7))
 			require.NoError(t, err, "série de vendas (GROUP BY data)")
 			require.NotEmpty(t, serie)
-			assert.GreaterOrEqual(t, serie[len(serie)-1].TotalVendas, valorPedidoDB07, "o pedido de hoje entra no último ponto")
+			assert.GreaterOrEqual(t, serie[len(serie)-1].TotalVendas.Centavos(), reaisT(valorPedidoDB07).Centavos(), "o pedido de hoje entra no último ponto")
 			_, err = d.TopVendedores(ctx, e.escopo, 1000)
 			require.NoError(t, err, "top vendedores")
 
@@ -120,7 +122,7 @@ func TestIntegracaoDB07_GroupByComOnlyFullGroupBy(t *testing.T) {
 			for _, m := range metas {
 				if m.ID == vendedorID {
 					achou = true
-					assert.InDelta(t, valorPedidoDB07, m.Realizado, 0.001, "vendas do mês somadas (a falha seria silenciosa)")
+					assert.Equal(t, reaisT(valorPedidoDB07), m.Realizado, "vendas do mês somadas (a falha seria silenciosa)")
 					assert.Equal(t, 1, m.QuantidadeVendas)
 				}
 			}
@@ -132,7 +134,7 @@ func TestIntegracaoDB07_GroupByComOnlyFullGroupBy(t *testing.T) {
 			for _, l := range r.Itens {
 				if l.VendedorID == vendedorID {
 					achou = true
-					assert.InDelta(t, valorPedidoDB07, l.TotalVendas, 0.001)
+					assert.Equal(t, reaisT(valorPedidoDB07), l.TotalVendas)
 					assert.Equal(t, 1, l.TotalPedidos)
 				}
 			}

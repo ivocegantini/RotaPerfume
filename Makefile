@@ -1,4 +1,4 @@
-.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test test-all lint shellcheck \
+.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test test-all lint shellcheck \
 	build build-api run-api dev-api stop-api \
 	test-api cover-api test-shared cover-shared arch-check cover-combinada gen-hash fix-hash \
 	frontend-deps \
@@ -472,11 +472,31 @@ cover-combinada: $(GUARDA_INTEGRACAO) build-shared ## ARQ-01: cobertura combinad
 # SEC-50: os testes recusam a produção antes de conectar
 # (backend/shared/testkit/integracao), sem válvula. SEC-54: só loopback ou
 # o CasaOS :3307 (db-guard-integracao / integracao.Permitidos). Os pacotes usam o mesmo banco: GO_TEST_FLAGS="-p 1 -count=1"
-# (um pacote por vez, sem cache). Banco descartável fora do .env:
+# (um pacote por vez, sem cache).
+# TST-25: o alvo usa o PROPRIO banco descartavel, DB_TESTE (rotaperfumes_teste),
+# no servidor do .env (ou do ENV_ARQUIVO): apaga as sobras, cria o schema
+# (db-down + db-up), roda os testes e apaga o banco no fim, mesmo com falha.
+# O DB_NAME do arquivo (dev/producao) nunca e tocado. DB_TESTE so muda pela
+# linha de comando, precisa ter "_teste" no nome e ser diferente do DB_NAME.
+# No CasaOS a conta so tem GRANT no rotaperfumes_teste (docs/deploy-servidor.md,
+# mapa dos ambientes). Execucao interrompida (Ctrl+C) deixa o banco: a proxima
+# o apaga antes de comecar.
+#   make test-integration                          # .env padrao (CasaOS :3307)
 #   make test-integration ENV_ARQUIVO=integracao.env
 # (ver docs/arquitetura-ddd.md §10.9).
-test-integration: db-guard-producao db-guard-integracao ## Roda testes de integração com -p 1 (requer MariaDB descartável e DB_*; só loopback ou CasaOS :3307, SEC-54; ver docs/arquitetura-ddd.md §10.9)
-	$(MAKE) test INTEGRATION=1 GO_TEST_FLAGS="-p 1 -count=1"
+DB_TESTE := rotaperfumes_teste
+db-guard-banco-teste: ## TST-25: DB_TESTE so com minusculas/digitos/_, com "_teste" no nome e diferente do DB_NAME
+	@printf '%s' "$(DB_TESTE)" | grep -Eq '^[a-z0-9_]*_teste[a-z0-9_]*$$' || { echo "TST-25: DB_TESTE=$(DB_TESTE) invalido: use so minusculas, digitos e _, com _teste no nome (padrao: rotaperfumes_teste)"; exit 1; }
+	@[ "$$(printf '%s' "$(DB_NAME)" | tr 'A-Z' 'a-z')" != "$(DB_TESTE)" ] || { echo "TST-25: DB_TESTE=$(DB_TESTE) e o mesmo banco do DB_NAME: o test-integration apaga o DB_TESTE no fim; aponte o DB_NAME para o banco de trabalho"; exit 1; }
+
+test-integration: db-guard-producao db-guard-integracao db-guard-banco-teste db-check-env ## TST-25: integração com -p 1 no banco descartável DB_TESTE (rotaperfumes_teste; recriado e apagado no fim; só loopback ou CasaOS :3307, SEC-54)
+	@echo "=== TST-25: banco descartavel $(DB_TESTE) em $(DB_HOST):$(DB_PORT) (recriado agora, apagado no fim) ==="
+	@rc=0; \
+	$(MAKE) db-down DB_NAME=$(DB_TESTE) && $(MAKE) db-up DB_NAME=$(DB_TESTE) && \
+	$(MAKE) test INTEGRATION=1 GO_TEST_FLAGS="-p 1 -count=1" DB_NAME=$(DB_TESTE) || rc=$$?; \
+	echo "=== TST-25: apagando o banco descartavel $(DB_TESTE) ==="; \
+	$(MAKE) db-down DB_NAME=$(DB_TESTE) || { echo "TST-25: AVISO: nao consegui apagar o $(DB_TESTE); apague com make db-down DB_NAME=$(DB_TESTE)"; [ $$rc -ne 0 ] || rc=1; }; \
+	exit $$rc
 
 test-frontend:
 	cd frontend && $(SEM_SEGREDOS) npm test

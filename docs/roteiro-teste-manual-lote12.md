@@ -46,7 +46,7 @@ Marque cada checkbox depois de conferir. Se algo divergir, anote o caso e encami
 
 3. **Precedência:** com o `.env` correto, rode `DB_SENHA=errada make db-create`.
 
-   - [ ] 1.7 Funciona (o `.env` ganha da variável do shell). Já `make db-create DB_SENHA=errada` falha com `Access denied` (a linha de comando ganha de tudo).
+   - [x] 1.7 Funciona (o `.env` ganha da variável do shell). Já `make db-create DB_SENHA=errada` falha com `Access denied` (a linha de comando ganha de tudo).
 
 4. **API sem credenciais:** comente `DB_SENHA` no `.env` e rode `make dev-api`.
 
@@ -272,3 +272,15 @@ Use um usuário de teste (`<QA>`), por exemplo o do roteiro do Lote 11 (se fez `
 | 4.3 | aprovado (equivalente) | `23_alter_...sql` de novo, exit 0: a coluna voltou como `datetime`, `NULL`, default `NULL`. |
 
 **Pendentes:** 1.1, 1.2 e 1.7 só podem ser verificados rodando o `make` (pelo usuário ou com permissão para o agente). Os demais itens do TST-04 ficam fechados por execução equivalente.
+
+### Execução final do TST-04 (2026-11-14, 🔴 TestBrain, Lote 38)
+
+`make` real, `ENV_ARQUIVO` temporário igual ao `.env` com `DB_NAME=rotaperfumes_l12` (conferido com `make -n`), MariaDB do CasaOS :3307 com TLS (`deploy/ca-cert.pem`).
+
+| Item | Resultado | Evidência |
+| ---- | --------- | --------- |
+| 1.1 | aprovado | Sem credenciais, `db-create` para no `SEC-11: defina DB_USUARIO/DB_SENHA no .env`, sem chamar o `mariadb`. |
+| 1.2 | aprovado | O mesmo com `db-fix-reuso-detectado` e `db-down CONFIRMAR=rotaperfumes_l12`. |
+| 1.7 | aprovado | `DB_SENHA=errada make db-create` cria o banco (exit 0); `make db-create DB_SENHA=errada` dá `ERROR 1045` (exit 2). |
+
+O banco foi usado também no TST-24 (integração) e apagado no fim; o CasaOS ficou só com o `rotaperfumes`.
