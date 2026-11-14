@@ -115,7 +115,7 @@ func (r *Vendedores) Inserir(ctx context.Context, v *comercial.Vendedor) error {
 	const q = `
 		INSERT INTO vendedores (nome, regiao, uf, data_admissao, data_desligamento, meta_mensal)
 		VALUES (?, ?, ?, ?, ?, ?)`
-	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir vendedor", q, v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.DataDesligamento, v.MetaMensal)
+	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir vendedor", q, v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.DataDesligamento, v.MetaMensal.String())
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (r *Vendedores) Atualizar(ctx context.Context, id int64, v *comercial.Vende
 		SET nome = ?, regiao = ?, uf = ?, data_admissao = ?, meta_mensal = ?
 		WHERE id = ?`
 	return db.ExecPorID(ctx, r.q, arqVendedores, "Vendedores.Atualizar", "comercialmysql: atualizar vendedor", comercial.ErrVendedorNaoEncontrado,
-		q, v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.MetaMensal, id)
+		q, v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.MetaMensal.String(), id)
 }
 
 // DefinirDesligamento grava (ou limpa, com quando nil) data_desligamento.

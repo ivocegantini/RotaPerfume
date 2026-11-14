@@ -20,7 +20,7 @@ type Oportunidade struct {
 	DataAbertura     time.Time
 	Etapa            string
 	ProbabilidadePct float64
-	ValorEstimado    float64
+	ValorEstimado    kernel.Dinheiro
 	DataFechamento   *time.Time
 	CicloDias        *int
 	MotivoPerda      *string
@@ -37,7 +37,7 @@ type DadosOportunidade struct {
 	DataAbertura     string // AAAA-MM-DD; vazio = agora só na criação
 	Etapa            string
 	ProbabilidadePct float64
-	ValorEstimado    float64
+	ValorEstimado    kernel.Decimal
 	DataFechamento   string // AAAA-MM-DD, opcional
 	CicloDias        *int
 	MotivoPerda      string // obrigatório na etapa "Fechado perdido"
@@ -59,12 +59,19 @@ func (d DadosOportunidade) Validar() error {
 		return ErrEtapaObrigatoria
 	case d.ProbabilidadePct < 0 || d.ProbabilidadePct > 100:
 		return ErrProbabilidadeInvalida
-	case d.ValorEstimado < 0:
-		return ErrValorEstimadoInvalido
-	case etapa == EtapaFechadoPerdido && strings.TrimSpace(d.MotivoPerda) == "":
+	}
+	if _, err := d.valorEstimado(); err != nil {
+		return err
+	}
+	if etapa == EtapaFechadoPerdido && strings.TrimSpace(d.MotivoPerda) == "" {
 		return ErrMotivoPerdaObrigatorio
 	}
 	return nil
+}
+
+// valorEstimado converte valor_estimado em centavos (ARQ-09).
+func (d DadosOportunidade) valorEstimado() (kernel.Dinheiro, error) {
+	return d.ValorEstimado.Dinheiro(ErrValorEstimadoInvalido, ErrValorEstimadoCasas)
 }
 
 // Oportunidade converte os dados já validados na entidade. agora != nil (a
@@ -74,10 +81,14 @@ func (d DadosOportunidade) Oportunidade(agora *time.Time) (*Oportunidade, error)
 	if err != nil {
 		return nil, err
 	}
+	valor, err := d.valorEstimado()
+	if err != nil {
+		return nil, err
+	}
 	o := &Oportunidade{
 		ClienteID: d.ClienteID, VendedorID: d.VendedorID, Origem: strings.TrimSpace(d.Origem),
 		DataAbertura: abertura, Etapa: strings.TrimSpace(d.Etapa), ProbabilidadePct: d.ProbabilidadePct,
-		ValorEstimado: d.ValorEstimado, CicloDias: d.CicloDias,
+		ValorEstimado: valor, CicloDias: d.CicloDias,
 	}
 	if strings.TrimSpace(d.DataFechamento) != "" {
 		fechamento, err := kernel.ParseDataLocal(d.DataFechamento, ErrDataFechamentoInvalida)

@@ -31,7 +31,7 @@ func produtoRowsAtivoForHandler(ativo bool) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(produtoColunasHeaderForHandler()).
 		AddRow(int64(1), "SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico",
-			99.90, 45.00, "UN", nil, ativo, "", now, now)
+			"99.90", "45.00", "UN", nil, ativo, "", now, now)
 }
 
 func emptyProdutoRowsForHandler() *sqlmock.Rows {
@@ -450,7 +450,7 @@ func TestCreateProduto_Success(t *testing.T) {
 	adminToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`INSERT INTO produtos \(sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo\)`).
-		WithArgs("SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico", 99.90, 45.00, "UN", sqlmock.AnyArg(), true).
+		WithArgs("SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), true).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	req, _ := http.NewRequest("POST", server.URL+"/api/produtos", makeJSON(validProdutoPayload()))
@@ -626,7 +626,7 @@ func TestUpdateProduto_Success(t *testing.T) {
 	adminToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE produtos\s+SET descricao = \?, categoria = \?, marca = \?, nota_olfativa = \?, preco_tabela = \?, custo_unitario = \?, unidade = \?, data_lancamento = \?\s+WHERE id = \?`).
-		WithArgs("Perfume Teste", "Perfumaria", "Marca X", "Cítrico", 99.90, 45.00, "UN", sqlmock.AnyArg(), int64(1)).
+		WithArgs("Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + produtoColunasRegex + ` FROM produtos WHERE id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -740,7 +740,7 @@ func TestUpdateProduto_NaoEncontrado(t *testing.T) {
 	adminToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE produtos\s+SET descricao = \?, categoria = \?, marca = \?, nota_olfativa = \?, preco_tabela = \?, custo_unitario = \?, unidade = \?, data_lancamento = \?\s+WHERE id = \?`).
-		WithArgs("Perfume Teste", "Perfumaria", "Marca X", "Cítrico", 99.90, 45.00, "UN", sqlmock.AnyArg(), int64(999)).
+		WithArgs("Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/produtos/999", makeJSON(validProdutoPayload()))

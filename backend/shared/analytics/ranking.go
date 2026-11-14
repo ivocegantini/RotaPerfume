@@ -1,6 +1,10 @@
 package analytics
 
-import "math"
+import (
+	"math"
+
+	"github.com/rotaperfumes/shared/kernel"
+)
 
 // LinhaRanking é uma linha de GET /api/dashboard/vendedores: vendas do mês,
 // meta e atingimento de um vendedor ativo. A ordenação (meta desc,
@@ -10,10 +14,10 @@ type LinhaRanking struct {
 	VendedorNome    string
 	Regiao          string
 	UF              string
-	TotalVendas     float64
+	TotalVendas     kernel.Dinheiro
 	TotalPedidos    int
 	TicketMedio     float64
-	Meta            float64
+	Meta            kernel.Dinheiro
 	AtingimentoMeta float64
 }
 
@@ -23,8 +27,8 @@ type DadosRanking struct {
 	VendedorNome string
 	Regiao       string
 	UF           string
-	Meta         float64
-	TotalVendas  float64
+	Meta         kernel.Dinheiro
+	TotalVendas  kernel.Dinheiro
 	TotalPedidos int
 	Atingimento  float64
 }
@@ -34,7 +38,7 @@ type DadosRanking struct {
 func NovaLinhaRanking(d DadosRanking) LinhaRanking {
 	ticket := 0.0
 	if d.TotalPedidos > 0 {
-		ticket = d.TotalVendas / float64(d.TotalPedidos)
+		ticket = d.TotalVendas.Reais() / float64(d.TotalPedidos) // estatística
 	}
 	return LinhaRanking{
 		VendedorID:      d.VendedorID,

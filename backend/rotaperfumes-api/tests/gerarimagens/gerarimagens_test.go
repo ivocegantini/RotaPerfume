@@ -48,7 +48,7 @@ var colunasProduto = []string{"id", "sku", "descricao", "categoria", "marca", "n
 
 func linha(rows *sqlmock.Rows, id int64, sku, desc, imagem string) *sqlmock.Rows {
 	agora := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	return rows.AddRow(id, sku, desc, "EDP", "Marca", "", 10.0, 5.0, "UN", nil, true, imagem, agora, agora)
+	return rows.AddRow(id, sku, desc, "EDP", "Marca", "", "10.0", "5.0", "UN", nil, true, imagem, agora, agora)
 }
 
 type execucao struct {

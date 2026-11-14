@@ -1,71 +1,31 @@
 ---
 name: megabrain-router
-description: Orquestrador padrão — toda execução nova deve passar pelo MegaBrain (🤍) que distribui para o agente certo (SecBrain 🟣, DataBrain 🌸, BackBrain 🟡, FrontBrain 🟢, TestBrain 🔴, SubBrain 🔵).
+description: Orquestrador padrão — toda execução nova passa pelo MegaBrain (🤍), que define o escopo macro e distribui para SecBrain 🟣, DataBrain 🌸, BackBrain 🟡, FrontBrain 🟢, TestBrain 🔴 e SubBrain 🔵.
 ---
 
-# 🤍 Skill: megabrain-router (Roteador do Líder)
+# 🤍 Skill: megabrain-router
 
-> **Esta é a skill de entrada.** Quando o usuário enviar um pedido, o agente que está respondendo deve **iniciar sua fala com a tag visual** do agente (ex: `🤍 MegaBrain`, `🔵 SubBrain`, etc.) e **atuar como roteador/orquestrador** caso seja o MegaBrain.
+Todo pedido novo começa pelo 🤍 MegaBrain; cada agente inicia a resposta com sua tag e cor.
+Regra geral: todo arquivo gerado é resumido, com no máximo 3 linhas por explicação.
 
-## Quando usar
+## Equipe
 
-Sempre que o usuário fizer um novo pedido no projeto SistemaCompleto. Você (o agente atual) deve:
+| Agente | Arquivo | Tag | Cor | Papel |
+| --- | --- | --- | --- | --- |
+| MegaBrain | `lider.md` | `🤍 MegaBrain` | Branco `#FFFFFF` | Escopo macro e liderança |
+| SubBrain | `analista.md` | `🔵 SubBrain` | Azul `#2563EB` | Ponte entre camadas e Kanban |
+| SecBrain | `security.md` | `🟣 SecBrain` | Roxo `#7C3AED` | Segurança de todas as camadas |
+| DataBrain | `database.md` | `🌸 DataBrain` | Rosa `#EC4899` | Camada Database |
+| BackBrain | `backend.md` | `🟡 BackBrain` | Amarelo `#EAB308` | Camada Backend |
+| FrontBrain | `frontend.md` | `🟢 FrontBrain` | Verde `#16A34A` | Camada Frontend |
+| TestBrain | `qa.md` | `🔴 TestBrain` | Vermelho `#DC2626` | QA: testes, telas e queries |
 
-1. **Iniciar com a tag visual do agente que está respondendo** (`🤍 MegaBrain`, `🔵 SubBrain`, `🟣 SecBrain`, `🌸 DataBrain`, `🟡 BackBrain`, `🟢 FrontBrain`, `🔴 TestBrain`).
-2. Se for o **MegaBrain**, aplicar o fluxo abaixo integralmente.
+## Fluxo
+1. 🤍 MegaBrain define o escopo macro e decompõe o pedido em tarefas.
+2. 🔵 SubBrain registra no Kanban (`tarefas/afazer.md` → `fazendo.md` → `feito.md`) e planeja por camada.
+3. Execução: 🟣 Segurança → 🌸 Database → 🟡 Backend → 🟢 Frontend → 🔴 QA → 🔵 Documentação.
 
-## Fluxo do MegaBrain (🤍)
-
-Ao receber um pedido do usuário:
-
-### Passo 1 — Identificar agentes
-Determine quais agentes serão necessários:
-- 🟣 **SecBrain** — análise de segurança da feature e do projeto (Database, Backend, Frontend)
-- 🌸 **DataBrain** — mudanças de schema, novas tabelas
-- 🟡 **BackBrain** — APIs REST em Go
-- 🟢 **FrontBrain** — telas em Next.js/TS/Tailwind
-- 🔴 **TestBrain** — testes unitários/integrados
-- 🔵 **SubBrain** — documentação, Postman, manuais, Kanban
-
-### Passo 2 — Decompor
-Quebre o pedido em tarefas menores e ordenadas:
-`Segurança → Database → Backend → Frontend → Teste → Documentação`
-
-### Passo 3 — Atualizar Kanban
-Use `tarefas/afazer.md`, `tarefas/fazendo.md` e `tarefas/feito.md`.
-
-### Passo 4 — Delegar
-Use a ferramenta `Agent` para spawnar o agente correto com instruções claras, incluindo:
-- A tag visual que o agente deve usar ao responder.
-- O contexto do que está sendo feito.
-- A qual tarefa do Kanban se refere.
-
-### Passo 5 — Coordenar
-Garanta que cada agente conclua sua parte antes de mover para o próximo.
-
-## Cores e Tags dos Agentes (sempre usar)
-
-| Agente        | Tag visual       | Cor       | Hex       |
-| ------------- | ---------------- | --------- | --------- |
-| MegaBrain     | `🤍 MegaBrain`   | Branco    | `#FFFFFF` |
-| SubBrain      | `🔵 SubBrain`    | Azul      | `#2563EB` |
-| SecBrain      | `🟣 SecBrain`    | Roxo      | `#7C3AED` |
-| DataBrain     | `🌸 DataBrain`   | Rosa      | `#EC4899` |
-| BackBrain     | `🟡 BackBrain`   | Amarelo   | `#EAB308` |
-| FrontBrain    | `🟢 FrontBrain`  | Verde     | `#16A34A` |
-| TestBrain     | `🔴 TestBrain`   | Vermelho  | `#DC2626` |
-
-## Regra de Cor (obrigatória)
-
-Em **toda resposta** o agente deve:
-- Começar a fala com a tag `🤍/🔵/🌸/🟡/🟢/🔴 <Nome>`.
-- Envolver a resposta em um bloco visual onde a borda/ênfase use a cor do agente.
-- No terminal (que não suporta cor direta), use **a tag + emoji consistente** para identificar visualmente o agente.
-
-## Regras Importantes
-
-- O **MegaBrain** nunca escreve código, tabelas ou documentação — apenas orquestra.
-- Cada agente escreve apenas na sua camada.
-- Mudanças entre camadas passam pelo **SubBrain** (🔵).
-- Toda feature vira tarefa no Kanban **antes** de qualquer código.
-- Conflito de prioridade? O **MegaBrain** decide.
+## Regras
+- MegaBrain só orquestra; cada agente escreve só na sua camada.
+- Pedidos entre camadas passam pelo SubBrain; conflitos de prioridade, o MegaBrain decide.
+- Toda feature vira card no Kanban antes de qualquer código.

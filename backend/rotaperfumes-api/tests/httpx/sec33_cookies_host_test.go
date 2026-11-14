@@ -3,8 +3,8 @@ package httpx_test
 // SEC-33 (Lote 31): com COOKIE_SECURE=true os cookies se chamam
 // __Host-access_token e __Host-refresh_token (Secure, Path=/, sem Domain) e
 // o backend lê SÓ esses nomes; com false (dev em HTTP) ficam access_token e
-// refresh_token sem Secure. No modo seguro, definir e limpar também expiram
-// os nomes antigos (transição).
+// refresh_token sem Secure. CHORE-14: a transição (expirar os nomes antigos
+// no modo seguro) saiu.
 
 import (
 	"net/http"
@@ -57,7 +57,8 @@ func TestSEC33_CookieRefreshDe_PorPar(t *testing.T) {
 	assert.Equal(t, "novo", httpx.CookieRefreshDe(r, httpx.CookiesSeguros))
 }
 
-func TestSEC33_DefinirELimpar_ModoSeguroExpiraAntigos(t *testing.T) {
+// CHORE-14: o modo seguro só emite/expira __Host- (sem a transição do SEC-33).
+func TestSEC33_DefinirELimpar_ModoSeguroSoHost(t *testing.T) {
 	for nome, escrever := range map[string]func(w http.ResponseWriter){
 		"definir": func(w http.ResponseWriter) { httpx.DefinirCookiesSessao(w, "a", "r", time.Hour, true) },
 		"limpar":  func(w http.ResponseWriter) { httpx.LimparCookiesSessao(w, true) },
@@ -66,7 +67,7 @@ func TestSEC33_DefinirELimpar_ModoSeguroExpiraAntigos(t *testing.T) {
 			w := httptest.NewRecorder()
 			escrever(w)
 			scs := w.Result().Header.Values("Set-Cookie")
-			require.Len(t, scs, 4)
+			require.Len(t, scs, 2)
 			vistos := map[string]string{}
 			for _, sc := range scs {
 				n, _, _ := strings.Cut(sc, "=")
@@ -76,7 +77,7 @@ func TestSEC33_DefinirELimpar_ModoSeguroExpiraAntigos(t *testing.T) {
 				assert.NotContains(t, sc, "Domain=")
 			}
 			for _, antigo := range []string{"access_token", "refresh_token"} {
-				assert.Contains(t, vistos[antigo], "Max-Age=0", "antigo expirado")
+				assert.NotContains(t, vistos, antigo, "nome sem prefixo não sai no modo seguro")
 			}
 			assert.Contains(t, vistos["__Host-access_token"], "SameSite=Strict")
 			assert.Contains(t, vistos["__Host-refresh_token"], "SameSite=Lax")
@@ -84,5 +85,5 @@ func TestSEC33_DefinirELimpar_ModoSeguroExpiraAntigos(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	httpx.DefinirCookiesSessao(w, "a", "r", time.Hour, false)
-	assert.Len(t, w.Result().Header.Values("Set-Cookie"), 2, "dev não emite expiração de nomes antigos")
+	assert.Len(t, w.Result().Header.Values("Set-Cookie"), 2, "dev: só os 2 nomes sem prefixo")
 }

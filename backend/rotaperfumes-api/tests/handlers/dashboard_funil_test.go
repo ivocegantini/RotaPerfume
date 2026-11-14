@@ -26,10 +26,10 @@ var funilColunas = []string{"etapa", "quantidade", "valor"}
 // funilLinhas: 2 em prospecção, 1 ganha, 1 perdida e 1 etapa desconhecida.
 func funilLinhas() *sqlmock.Rows {
 	return sqlmock.NewRows(funilColunas).
-		AddRow("Prospecção", 2, 200.0).
-		AddRow("Fechado ganho", 1, 150.5).
-		AddRow("Fechado perdido", 1, 80.0).
-		AddRow("Arquivada", 3, 999.0)
+		AddRow("Prospecção", 2, "200.0").
+		AddRow("Fechado ganho", 1, "150.5").
+		AddRow("Fechado perdido", 1, "80.0").
+		AddRow("Arquivada", 3, "999.0")
 }
 
 // envelopeFunil decodifica o envelope guardando data cru (ordem dos campos).
@@ -224,7 +224,7 @@ func TestDASH01_Funil_Erro500Generico(t *testing.T) {
 			m.ExpectQuery(reFunil).WillReturnError(errDriver)
 		}},
 		{"erro de scan (admin)", 1, "admin", func(m sqlmock.Sqlmock) {
-			m.ExpectQuery(reFunil).WillReturnRows(sqlmock.NewRows(funilColunas).AddRow("Prospecção", "nao-numero", 1.0))
+			m.ExpectQuery(reFunil).WillReturnRows(sqlmock.NewRows(funilColunas).AddRow("Prospecção", "nao-numero", "1.0"))
 		}},
 		{"erro ao resolver o escopo (normal)", escopoUsuarioNormal, "normal", func(m sqlmock.Sqlmock) {
 			m.ExpectQuery(reUsuarioVendedor).WithArgs(escopoUsuarioNormal).WillReturnError(errDriver)

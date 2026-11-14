@@ -67,9 +67,9 @@ type Pagamento struct {
 	PedidoID        int64
 	FormaPagamento  string
 	Parcelas        uint8
-	Valor           float64
+	Valor           kernel.Dinheiro
 	TaxaPct         float64
-	ValorLiquido    float64
+	ValorLiquido    kernel.Dinheiro
 	DataVencimento  time.Time
 	DataPagamento   *time.Time
 	StatusPagamento string
@@ -100,9 +100,9 @@ func (p *Pagamento) PodeExcluir() error {
 type DadosPagamento struct {
 	FormaPagamento  string
 	Parcelas        uint8
-	Valor           float64
+	Valor           kernel.Decimal
 	TaxaPct         float64
-	ValorLiquido    float64
+	ValorLiquido    kernel.Decimal
 	DataVencimento  string // AAAA-MM-DD, obrigatória
 	DataPagamento   string // AAAA-MM-DD, opcional (vazio = NULL)
 	StatusPagamento string
@@ -126,34 +126,34 @@ func (d DadosPagamento) Pagamento(pedidoID int64) (*Pagamento, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = d.validarValores(); err != nil {
+	valor, liquido, err := d.validarValores()
+	if err != nil {
 		return nil, err
 	}
 	vencimento, pagamento, err := d.datas()
 	if err != nil {
 		return nil, err
 	}
-	return &Pagamento{PedidoID: pedidoID, FormaPagamento: string(forma), Parcelas: d.Parcelas, Valor: d.Valor,
-		TaxaPct: d.TaxaPct, ValorLiquido: d.ValorLiquido, DataVencimento: vencimento,
+	return &Pagamento{PedidoID: pedidoID, FormaPagamento: string(forma), Parcelas: d.Parcelas, Valor: valor,
+		TaxaPct: d.TaxaPct, ValorLiquido: liquido, DataVencimento: vencimento,
 		DataPagamento: pagamento, StatusPagamento: string(status)}, nil
 }
 
-func (d DadosPagamento) validarValores() error {
+// validarValores devolve valor e valor_liquido em centavos (ARQ-09).
+func (d DadosPagamento) validarValores() (valor, liquido kernel.Dinheiro, err error) {
 	if d.Parcelas < 1 {
-		return ErrParcelasInvalidas
+		return valor, liquido, ErrParcelasInvalidas
 	}
-	if _, err := kernel.NovoDinheiro(d.Valor); err != nil {
-		return ErrValorInvalido
+	if valor, err = d.Valor.Dinheiro(ErrValorInvalido, ErrValorCasas); err != nil {
+		return valor, liquido, err
 	}
 	// !(dentro do intervalo) recusa também NaN; ±Inf cai fora do intervalo
 	// (CHORE-08: a comparação direta era falsa para NaN).
 	if math.IsNaN(d.TaxaPct) || math.IsInf(d.TaxaPct, 0) || d.TaxaPct < 0 || d.TaxaPct > TaxaPctMaxima {
-		return ErrTaxaPctInvalida
+		return valor, liquido, ErrTaxaPctInvalida
 	}
-	if _, err := kernel.NovoDinheiro(d.ValorLiquido); err != nil {
-		return ErrValorLiquidoInvalido
-	}
-	return nil
+	liquido, err = d.ValorLiquido.Dinheiro(ErrValorLiquidoInvalido, ErrValorLiquidoCasas)
+	return valor, liquido, err
 }
 
 func (d DadosPagamento) datas() (vencimento time.Time, pagamento *time.Time, err error) {

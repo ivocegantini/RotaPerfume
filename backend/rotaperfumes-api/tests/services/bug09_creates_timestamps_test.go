@@ -52,13 +52,13 @@ func bug09Casos() []bug09Caso {
 			id:   5,
 			antesDoInsert: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)`).
-					WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, 5000.0).
+					WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, "5000.00").
 					WillReturnResult(sqlmock.NewResult(5, 1))
 			},
 			reGetByID: `SELECT ` + vendedorGetColunasRegex,
 			linhaGravada: func(id int64, criado, atualizado time.Time) *sqlmock.Rows {
 				return sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "data_admissao", "data_desligamento", "meta_mensal", "created_at", "updated_at"}).
-					AddRow(id, "Vendedor Do Banco", "Sudeste", "SP", criado, nil, 5000.0, criado, atualizado)
+					AddRow(id, "Vendedor Do Banco", "Sudeste", "SP", criado, nil, "5000.0", criado, atualizado)
 			},
 			criar: func(db *sql.DB, verbose bool) (*bug09Resultado, error) {
 				v, err := casosComercial(db, 0).
@@ -76,14 +76,14 @@ func bug09Casos() []bug09Caso {
 			id:   11,
 			antesDoInsert: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(`INSERT INTO produtos \(sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo\)`).
-					WithArgs("SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico", 99.90, 45.00, "UN", sqlmock.AnyArg(), true).
+					WithArgs("SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), true).
 					WillReturnResult(sqlmock.NewResult(11, 1))
 			},
 			reGetByID: `SELECT ` + produtoColunasRegex + ` FROM produtos WHERE id = \? LIMIT 1`,
 			linhaGravada: func(id int64, criado, atualizado time.Time) *sqlmock.Rows {
 				return sqlmock.NewRows(produtoColunasHeader()).
 					AddRow(id, "SKU-001", "Descricao Do Banco", "Perfumaria", "Marca X", "Cítrico",
-						99.90, 45.00, "UN", criado, true, "", criado, atualizado)
+						"99.90", "45.00", "UN", criado, true, "", criado, atualizado)
 			},
 			criar: func(db *sql.DB, verbose bool) (*bug09Resultado, error) {
 				// ARQ-02: catalogoapp.CriarProduto (verbose vira vlog, sem cfg).
@@ -102,14 +102,14 @@ func bug09Casos() []bug09Caso {
 			antesDoInsert: func(mock sqlmock.Sqlmock) {
 				esperarLockPedido(mock, 1, 1) // SEC-35: o INSERT roda na tx, com o pedido travado
 				mock.ExpectExec(`INSERT INTO pagamentos \(pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento\)`).
-					WithArgs(int64(1), "PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto").
+					WithArgs(int64(1), "PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto").
 					WillReturnResult(sqlmock.NewResult(21, 1))
 				mock.ExpectCommit()
 			},
 			reGetByID: `SELECT ` + pagamentoColunasRegex + pagamentoFromRegex + ` WHERE pagamento_id = \? LIMIT 1`,
 			linhaGravada: func(id int64, criado, atualizado time.Time) *sqlmock.Rows {
 				return sqlmock.NewRows(pagamentoColunasHeader()).
-					AddRow(id, int64(1), "Boleto", uint8(1), 100.0, 0.0, 100.0, criado, nil, "Em aberto", criado, atualizado)
+					AddRow(id, int64(1), "Boleto", uint8(1), "100.0", "0.0", "100.0", criado, nil, "Em aberto", criado, atualizado)
 			},
 			criar: func(db *sql.DB, verbose bool) (*bug09Resultado, error) {
 				p, err := casosVendas(db, 0).
@@ -133,7 +133,7 @@ func bug09Casos() []bug09Caso {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`INSERT INTO oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(31, 1))
 			},
 			reGetByID: `SELECT ` + oportunidadeColunasRegex + ` FROM oportunidades WHERE oportunidade_id = \? LIMIT 1`,
@@ -142,7 +142,7 @@ func bug09Casos() []bug09Caso {
 					"oportunidade_id", "cliente_id", "vendedor_id", "origem", "data_abertura", "etapa",
 					"probabilidade_pct", "valor_estimado", "data_fechamento", "ciclo_dias", "motivo_perda",
 					"created_at", "updated_at",
-				}).AddRow(id, int64(100), int64(1), "Origem Do Banco", criado, "Prospeccao", 10.0, 1000.0, nil, nil, nil, criado, atualizado)
+				}).AddRow(id, int64(100), int64(1), "Origem Do Banco", criado, "Prospeccao", "10.0", "1000.0", nil, nil, nil, criado, atualizado)
 			},
 			criar: func(db *sql.DB, verbose bool) (*bug09Resultado, error) {
 				o, err := casosComercial(db, 0).

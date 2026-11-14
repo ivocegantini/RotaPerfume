@@ -6,7 +6,8 @@
 // O pacote é puro (docs/arquitetura-ddd.md §4.1): importa só a stdlib, o
 // kernel e shared/cnpj. Não loga, não conhece SQL nem HTTP e não tem tags
 // JSON (o DTO HTTP é que serializa). As entidades têm campos exportados com
-// os mesmos nomes e tipos dos models legados (registro ARQ-02, divergência b).
+// os mesmos nomes dos models legados (registro ARQ-02, divergência b);
+// dinheiro é kernel.Dinheiro (ARQ-09).
 package comercial
 
 import "github.com/rotaperfumes/shared/kernel"
@@ -28,6 +29,7 @@ var (
 	ErrUFInvalida            = kernel.NovoErro(kernel.KindInvalido, "uf deve ter 2 letras")
 	ErrDataAdmissaoInvalida  = kernel.NovoErro(kernel.KindInvalido, "data_admissao inválida (use o formato AAAA-MM-DD)")
 	ErrMetaMensalInvalida    = kernel.NovoErro(kernel.KindInvalido, "meta_mensal deve ser maior ou igual a zero")
+	ErrMetaMensalCasas       = kernel.NovoErro(kernel.KindInvalido, "meta_mensal deve ter no máximo 2 casas decimais") // ARQ-09
 	ErrVinculoNaoEncontrado  = kernel.NovoErro(kernel.KindNaoEncontrado, "vínculo entre cliente e vendedor não encontrado")
 	ErrClienteIDObrigatorio  = kernel.NovoErro(kernel.KindInvalido, "cliente_id é obrigatório")
 	// ErrVinculoDuplicado: 1062 em carteiras (corrida no vínculo do dia).
@@ -70,6 +72,7 @@ var (
 	ErrEtapaObrigatoria          = kernel.NovoErro(kernel.KindInvalido, "etapa é obrigatória")
 	ErrProbabilidadeInvalida     = kernel.NovoErro(kernel.KindInvalido, "probabilidade_pct deve estar entre 0 e 100")
 	ErrValorEstimadoInvalido     = kernel.NovoErro(kernel.KindInvalido, "valor_estimado deve ser maior ou igual a zero")
+	ErrValorEstimadoCasas        = kernel.NovoErro(kernel.KindInvalido, "valor_estimado deve ter no máximo 2 casas decimais") // ARQ-09
 	ErrDataAberturaInvalida      = kernel.NovoErro(kernel.KindInvalido, "data_abertura inválida (use o formato AAAA-MM-DD)")
 	ErrDataFechamentoInvalida    = kernel.NovoErro(kernel.KindInvalido, "data_fechamento inválida (use o formato AAAA-MM-DD)")
 	ErrMotivoPerdaObrigatorio    = kernel.NovoErro(kernel.KindInvalido, "motivo_perda é obrigatório quando etapa = \"Fechado perdido\"")

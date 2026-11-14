@@ -92,11 +92,11 @@ func TestSEC27_HTTP_Taxa30_Aceita(t *testing.T) {
 				uid = 2
 				sec27PosseNormalH(mock, "Em aberto")
 				mock.ExpectExec(sec27UpdCondRe).
-					WithArgs("PIX", uint8(1), 100.0, 30.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1), "Pago", "Pago com atraso").
+					WithArgs("PIX", uint8(1), "100.00", 30.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1), "Pago", "Pago com atraso").
 					WillReturnResult(sqlmock.NewResult(0, 1))
 			} else {
 				mock.ExpectExec(updatePagamentoRegH+`\s*$`).
-					WithArgs("PIX", uint8(1), 100.0, 30.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
+					WithArgs("PIX", uint8(1), "100.00", 30.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 			}
 			mock.ExpectQuery(pagamentoByIDRegexH).WithArgs(int64(1)).WillReturnRows(pagamentoRowsForHandler(1, 1, 100.0))
@@ -119,7 +119,7 @@ func TestSEC27_HTTP_PUT_QuitadoNormal_409(t *testing.T) {
 				defer db.Close()
 				sec27PosseNormalH(mock, atual)
 				mock.ExpectExec(sec27UpdCondRe).
-					WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, destino, int64(1), "Pago", "Pago com atraso").
+					WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, destino, int64(1), "Pago", "Pago com atraso").
 					WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectQuery(pagamentoByIDRegexH).WithArgs(int64(1)).WillReturnRows(pagamentoRowsComStatusForHandler(1, 1, 100.0, atual))
 
@@ -140,7 +140,7 @@ func TestSEC27_HTTP_PUT_QuitadoAdmin_200(t *testing.T) {
 			defer server.Close()
 			defer db.Close()
 			mock.ExpectExec(updatePagamentoRegH+`\s*$`).
-				WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
+				WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			mock.ExpectQuery(pagamentoByIDRegexH).WithArgs(int64(1)).WillReturnRows(pagamentoRowsForHandler(1, 1, 100.0))
 
@@ -159,7 +159,7 @@ func TestSEC27_HTTP_PUT_EmAbertoParaPago_Normal_200(t *testing.T) {
 	defer db.Close()
 	sec27PosseNormalH(mock, "Em aberto")
 	mock.ExpectExec(sec27UpdCondRe).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), sqlmock.AnyArg(), "Pago", int64(1), "Pago", "Pago com atraso").
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), sqlmock.AnyArg(), "Pago", int64(1), "Pago", "Pago com atraso").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(pagamentoByIDRegexH).WithArgs(int64(1)).WillReturnRows(pagamentoRowsComStatusForHandler(1, 1, 100.0, "Pago"))
 

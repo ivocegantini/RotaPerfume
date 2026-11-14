@@ -95,7 +95,7 @@ func TestComercial_ClienteDefinirAtivo(t *testing.T) {
 
 func TestComercial_Vendedor(t *testing.T) {
 	agora := time.Now()
-	ok := comercial.DadosVendedor{Nome: " Ana ", Regiao: "Sul", UF: "pr", MetaMensal: 10}
+	ok := comercial.DadosVendedor{Nome: " Ana ", Regiao: "Sul", UF: "pr", MetaMensal: "10"}
 	v, err := comercial.NovoVendedor(ok, agora)
 	require.NoError(t, err)
 	assert.Equal(t, "Ana", v.Nome)
@@ -113,7 +113,8 @@ func TestComercial_Vendedor(t *testing.T) {
 		{"nome", func(d *comercial.DadosVendedor) { d.Nome = "" }, comercial.ErrNomeObrigatorio},
 		{"região", func(d *comercial.DadosVendedor) { d.Regiao = "" }, comercial.ErrRegiaoObrigatoria},
 		{"uf", func(d *comercial.DadosVendedor) { d.UF = "X" }, comercial.ErrUFInvalida},
-		{"meta", func(d *comercial.DadosVendedor) { d.MetaMensal = -1 }, comercial.ErrMetaMensalInvalida},
+		{"meta", func(d *comercial.DadosVendedor) { d.MetaMensal = "-1" }, comercial.ErrMetaMensalInvalida},
+		{"meta com 3 casas (ARQ-09)", func(d *comercial.DadosVendedor) { d.MetaMensal = "10.001" }, comercial.ErrMetaMensalCasas},
 		{"data", func(d *comercial.DadosVendedor) { d.DataAdmissao = "x" }, comercial.ErrDataAdmissaoInvalida},
 	}
 	for _, c := range casos {
@@ -152,6 +153,14 @@ func TestComercial_VisitaEOportunidade(t *testing.T) {
 	op.DataAbertura, op.DataFechamento = "2024-01-01", "x"
 	_, err = op.Oportunidade(nil)
 	assert.ErrorIs(t, err, comercial.ErrDataFechamentoInvalida)
+	// ARQ-09: valor_estimado exato em centavos; inválido também sem Validar.
+	op.DataFechamento, op.ValorEstimado = "", "1500.5"
+	o, err = op.Oportunidade(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "1500.50", o.ValorEstimado.String())
+	op.ValorEstimado = "-0.01"
+	_, err = op.Oportunidade(nil)
+	assert.ErrorIs(t, err, comercial.ErrValorEstimadoInvalido)
 
 	casosOp := []struct {
 		mut  func(*comercial.DadosOportunidade)
@@ -162,7 +171,8 @@ func TestComercial_VisitaEOportunidade(t *testing.T) {
 		{func(d *comercial.DadosOportunidade) { d.Origem = " " }, comercial.ErrOrigemObrigatoria},
 		{func(d *comercial.DadosOportunidade) { d.Etapa = "" }, comercial.ErrEtapaObrigatoria},
 		{func(d *comercial.DadosOportunidade) { d.ProbabilidadePct = 101 }, comercial.ErrProbabilidadeInvalida},
-		{func(d *comercial.DadosOportunidade) { d.ValorEstimado = -1 }, comercial.ErrValorEstimadoInvalido},
+		{func(d *comercial.DadosOportunidade) { d.ValorEstimado = "-1" }, comercial.ErrValorEstimadoInvalido},
+		{func(d *comercial.DadosOportunidade) { d.ValorEstimado = "1.005" }, comercial.ErrValorEstimadoCasas},
 		{func(d *comercial.DadosOportunidade) { d.MotivoPerda = "" }, comercial.ErrMotivoPerdaObrigatorio},
 	}
 	for i, c := range casosOp {

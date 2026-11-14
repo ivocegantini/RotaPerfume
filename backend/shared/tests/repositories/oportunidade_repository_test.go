@@ -22,7 +22,7 @@ var oportunidadeColumns = []string{
 }
 
 func oportunidadeRow(id, clienteID, vendedorID int64, origem string, dataAbertura time.Time, etapa string, prob, valor float64, dataFechamento any, cicloDias any, motivoPerda any, created, updated time.Time) []driver.Value {
-	return []driver.Value{id, clienteID, vendedorID, origem, dataAbertura, etapa, prob, valor, dataFechamento, cicloDias, motivoPerda, created, updated}
+	return []driver.Value{id, clienteID, vendedorID, origem, dataAbertura, etapa, prob, decT(valor), dataFechamento, cicloDias, motivoPerda, created, updated}
 }
 
 func TestOportunidadeList_SemFiltro(t *testing.T) {
@@ -282,11 +282,11 @@ func TestOportunidadeCreate_Success(t *testing.T) {
 		DataAbertura:     now,
 		Etapa:            "Prospeccao",
 		ProbabilidadePct: 10,
-		ValorEstimado:    1000,
+		ValorEstimado:    reaisT("1000"),
 	}
 
 	mock.ExpectExec("INSERT INTO oportunidades").
-		WithArgs(o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa, o.ProbabilidadePct, o.ValorEstimado, o.DataFechamento, o.CicloDias, o.MotivoPerda).
+		WithArgs(o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa, o.ProbabilidadePct, o.ValorEstimado.String(), o.DataFechamento, o.CicloDias, o.MotivoPerda).
 		WillReturnResult(sqlmock.NewResult(9, 1))
 
 	ctx := context.Background()
@@ -324,11 +324,11 @@ func TestOportunidadeUpdate_Success(t *testing.T) {
 		DataAbertura:     now,
 		Etapa:            "Negociacao",
 		ProbabilidadePct: 50,
-		ValorEstimado:    2000,
+		ValorEstimado:    reaisT("2000"),
 	}
 
 	mock.ExpectExec("UPDATE oportunidades").
-		WithArgs(o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa, o.ProbabilidadePct, o.ValorEstimado, o.DataFechamento, o.CicloDias, o.MotivoPerda, int64(1)).
+		WithArgs(o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa, o.ProbabilidadePct, o.ValorEstimado.String(), o.DataFechamento, o.CicloDias, o.MotivoPerda, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	ctx := context.Background()

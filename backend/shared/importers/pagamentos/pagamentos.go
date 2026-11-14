@@ -43,6 +43,7 @@ import (
 
 	"github.com/rotaperfumes/shared/cmdutil"
 	"github.com/rotaperfumes/shared/importers/importkit"
+	"github.com/rotaperfumes/shared/kernel"
 )
 
 // Tag prefixa os logs e as mensagens de erro do importador.
@@ -62,9 +63,9 @@ type Row struct {
 	PedidoIDOrigem  int64
 	FormaPagamento  string
 	Parcelas        int
-	Valor           float64
+	Valor           kernel.Dinheiro
 	TaxaPct         float64
-	ValorLiquido    float64
+	ValorLiquido    kernel.Dinheiro
 	DataVencimento  string
 	DataPagamento   sql.NullString
 	StatusPagamento string
@@ -172,7 +173,7 @@ func ParsePagamentoRow(record []string) (Row, error) {
 		return Row{}, fmt.Errorf("parcelas inválido (%q): %w", record[3], err)
 	}
 
-	valor, err := strconv.ParseFloat(record[4], 64)
+	valor, err := kernel.LerDinheiro(record[4]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return Row{}, fmt.Errorf("valor inválido (%q): %w", record[4], err)
 	}
@@ -182,7 +183,7 @@ func ParsePagamentoRow(record []string) (Row, error) {
 		return Row{}, fmt.Errorf("taxa_pct inválido (%q): %w", record[5], err)
 	}
 
-	valorLiquido, err := strconv.ParseFloat(record[6], 64)
+	valorLiquido, err := kernel.LerDinheiro(record[6]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return Row{}, fmt.Errorf("valor_liquido inválido (%q): %w", record[6], err)
 	}
@@ -304,7 +305,7 @@ func UpsertPagamentos(db cmdutil.DB, rows []Row, pedidoIDs map[int64]int64) (ins
 				dataPagamento = row.DataPagamento.String
 			}
 			return []any{row.PagamentoID, pedidoID, row.FormaPagamento, row.Parcelas,
-				row.Valor, row.TaxaPct, row.ValorLiquido,
+				row.Valor.String(), row.TaxaPct, row.ValorLiquido.String(),
 				row.DataVencimento, dataPagamento, row.StatusPagamento}, true
 		},
 		LogFalha: func(row Row, err error) {

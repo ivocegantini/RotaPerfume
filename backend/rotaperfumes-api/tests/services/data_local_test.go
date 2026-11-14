@@ -132,7 +132,7 @@ type dlParserCaso struct {
 
 func dlPagamentoInput(venc, pag string) vendas.DadosNovoPagamento {
 	return vendas.DadosNovoPagamento{PedidoID: 1, DadosPagamento: vendas.DadosPagamento{
-		FormaPagamento: "Dinheiro", Parcelas: 1, Valor: 100, ValorLiquido: 100,
+		FormaPagamento: "Dinheiro", Parcelas: 1, Valor: "100", ValorLiquido: "100",
 		DataVencimento: venc, DataPagamento: pag, StatusPagamento: "Pago",
 	}}
 }
@@ -161,7 +161,7 @@ func dlCriarOportunidade(t *testing.T, abertura, fechamento string) (time.Time, 
 	mock.ExpectExec(`INSERT INTO oportunidades`).WillReturnResult(sqlmock.NewResult(9, 1))
 	o, err := casosComercial(db, 0).CriarOportunidade(context.Background(), principalAdmin(), fixo(comercial.DadosOportunidade{
 		ClienteID: 1, VendedorID: 2, Origem: "Indicação", DataAbertura: abertura,
-		Etapa: "Prospecção", ProbabilidadePct: 10, ValorEstimado: 100, DataFechamento: fechamento,
+		Etapa: "Prospecção", ProbabilidadePct: 10, ValorEstimado: "100", DataFechamento: fechamento,
 	}))
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -221,7 +221,7 @@ func dlParsers() []dlParserCaso {
 			mock.ExpectRollback()
 			_, err := casosVendas(db, 0).CriarPedido(ctx, principalAdmin(), lerFixo(vendas.DadosPedido{
 				ClienteID: 1, VendedorID: 2, DataPedido: data, Canal: "App", Status: "Faturado",
-				Itens: []vendas.DadosItem{{ProdutoID: 3, Quantidade: 1, PrecoPraticado: 10}},
+				Itens: []vendas.DadosItem{{ProdutoID: 3, Quantidade: 1, PrecoPraticado: "10"}},
 			}))
 			require.ErrorIs(t, err, errDLParar)
 			require.NoError(t, mock.ExpectationsWereMet())

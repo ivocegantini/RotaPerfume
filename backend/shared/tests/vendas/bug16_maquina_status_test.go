@@ -27,7 +27,7 @@ const (
 var bug16Status = []string{bug16Cancelado, bug16Separacao, bug16Entregue, bug16Faturado}
 
 func bug16Itens() []vendas.ItemPedido {
-	return []vendas.ItemPedido{{ProdutoID: 2, Quantidade: 4, PrecoPraticado: 50, DescontoPct: 5}}
+	return []vendas.ItemPedido{{ProdutoID: 2, Quantidade: 4, PrecoPraticado: reaisT("50"), DescontoPct: 5}}
 }
 
 // bug16Esperado é a matriz completa do ADENDO: o erro (nil = permitida) e o
@@ -95,7 +95,7 @@ func TestBUG16_Erros_KindEMensagem(t *testing.T) {
 // A transição é checada ANTES dos itens: transição proibida com itens
 // diferentes dá o 400 da transição, não o 409 dos itens.
 func TestBUG16_PlanejarAtualizacao_TransicaoAntesDosItens(t *testing.T) {
-	outros := []vendas.ItemPedido{{ProdutoID: 3, Quantidade: 1, PrecoPraticado: 10}}
+	outros := []vendas.ItemPedido{{ProdutoID: 3, Quantidade: 1, PrecoPraticado: reaisT("10")}}
 	casos := []struct {
 		atual, destino string
 		want           error

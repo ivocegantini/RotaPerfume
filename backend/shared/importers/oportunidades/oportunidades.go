@@ -50,6 +50,7 @@ import (
 	"github.com/rotaperfumes/shared/cmdutil"
 	"github.com/rotaperfumes/shared/importers/clientesdedup"
 	"github.com/rotaperfumes/shared/importers/importkit"
+	"github.com/rotaperfumes/shared/kernel"
 )
 
 // Tag prefixa os logs e as mensagens de erro do importador.
@@ -70,7 +71,7 @@ type Row struct {
 	DataAbertura     time.Time
 	Etapa            string
 	ProbabilidadePct float64
-	ValorEstimado    float64
+	ValorEstimado    kernel.Dinheiro
 	DataFechamento   *time.Time
 	CicloDias        sql.NullInt64
 	MotivoPerda      sql.NullString
@@ -191,7 +192,7 @@ func ParseRow(record []string) (Row, error) {
 		return Row{}, fmt.Errorf("probabilidade_pct inválido (%q): %w", record[6], err)
 	}
 
-	valorEstimado, err := strconv.ParseFloat(record[7], 64)
+	valorEstimado, err := kernel.LerDinheiro(record[7]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return Row{}, fmt.Errorf("valor_estimado inválido (%q): %w", record[7], err)
 	}
@@ -318,6 +319,6 @@ func argsOportunidade(row Row, clienteID int64) []any {
 	return []any{
 		row.OportunidadeID, clienteID, row.VendedorID, row.Origem,
 		row.DataAbertura.Format("2006-01-02"), row.Etapa, row.ProbabilidadePct,
-		row.ValorEstimado, dataFechamento, cicloDias, motivoPerda,
+		row.ValorEstimado.String(), dataFechamento, cicloDias, motivoPerda,
 	}
 }

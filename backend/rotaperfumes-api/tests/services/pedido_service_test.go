@@ -46,7 +46,7 @@ func pedidoColunasHeader() []string {
 func pedidoRows(idOrigem int64, valorTotal float64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeader()).
-		AddRow(idOrigem, int64(1), int64(2), now, "App", "Faturado", valorTotal, now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), int64(2), now, "App", "Faturado", decT(valorTotal), now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 func emptyPedidoRows() *sqlmock.Rows {
@@ -63,8 +63,8 @@ func itemPedidoColunasHeader() []string {
 func itemPedidoRows(pedidoID int64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(itemPedidoColunasHeader()).
-		AddRow(int64(1), pedidoID, int64(10), 2, 100.0, 10.0, 180.0, now, now, "SKU-010", "Produto A").
-		AddRow(int64(2), pedidoID, int64(11), 1, 50.0, 0.0, 50.0, now, now, "SKU-011", "Produto B")
+		AddRow(int64(1), pedidoID, int64(10), 2, "100.0", "10.0", "180.0", now, now, "SKU-010", "Produto A").
+		AddRow(int64(2), pedidoID, int64(11), 1, "50.0", "0.0", "50.0", now, now, "SKU-011", "Produto B")
 }
 
 // validPedidoInput retorna um input válido com dois itens (usado para
@@ -80,8 +80,8 @@ func validPedidoInput() vendas.DadosPedido {
 		Canal:      "App",
 		Status:     "Faturado",
 		Itens: []vendas.DadosItem{
-			{ProdutoID: 10, Quantidade: 2, PrecoPraticado: 100.0, DescontoPct: 10},
-			{ProdutoID: 11, Quantidade: 1, PrecoPraticado: 50.0, DescontoPct: 0},
+			{ProdutoID: 10, Quantidade: 2, PrecoPraticado: "100.0", DescontoPct: 10},
+			{ProdutoID: 11, Quantidade: 1, PrecoPraticado: "50.0", DescontoPct: 0},
 		},
 	}
 }
@@ -188,7 +188,7 @@ func TestPedidoService_GetPedidoDetalhe(t *testing.T) {
 		p, err := casos.ObterPedido(context.Background(), principalAdmin(), 1)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), p.PedidoIDOrigem)
-		assert.Equal(t, 230.0, p.ValorTotal)
+		assert.Equal(t, reaisT("230.0"), p.ValorTotal)
 		assert.Len(t, p.Itens, 2)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -336,7 +336,7 @@ func pedidoValidacaoTestCases() []struct {
 			nome: "preco_praticado negativo em um item",
 			input: func() vendas.DadosPedido {
 				in := validPedidoInput()
-				in.Itens[0].PrecoPraticado = -0.01
+				in.Itens[0].PrecoPraticado = "-0.01"
 				return in
 			},
 			wantErr: vendas.ErrPrecoPraticadoInvalido,
@@ -387,13 +387,13 @@ func TestPedidoService_CreatePedido_Validacoes(t *testing.T) {
 func expectCreateComItensSuccess(mock sqlmock.Sqlmock) {
 	mock.ExpectBegin()
 	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").
 		WillReturnResult(sqlmock.NewResult(100, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
-		WithArgs(int64(100), int64(10), 2, 100.0, 10.0, 180.0).
+		WithArgs(int64(100), int64(10), 2, "100.00", 10.0, "180.00").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
-		WithArgs(int64(100), int64(11), 1, 50.0, 0.0, 50.0).
+		WithArgs(int64(100), int64(11), 1, "50.00", 0.0, "50.00").
 		WillReturnResult(sqlmock.NewResult(2, 1))
 	// BUG-20: validPedidoInput nasce Faturado; a baixa roda na mesma tx.
 	for _, it := range []struct {
@@ -427,7 +427,7 @@ func TestPedidoService_CreatePedido_Sucesso(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, p)
 	assert.Equal(t, int64(100), p.PedidoIDOrigem)
-	assert.Equal(t, 230.0, p.ValorTotal)
+	assert.Equal(t, reaisT("230.0"), p.ValorTotal)
 	assert.Len(t, p.Itens, 2)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -450,7 +450,7 @@ func TestPedidoService_CreatePedido_ErroLastInsertId(t *testing.T) {
 	db, mock := newPedidoTestDB(t)
 	mock.ExpectBegin()
 	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").
 		WillReturnResult(sqlmock.NewErrorResult(sql.ErrConnDone))
 	mock.ExpectRollback()
 
@@ -502,16 +502,16 @@ func TestPedidoService_UpdatePedido_Sucesso(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(itensAtuaisRowsVazio())
 	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0, int64(1)).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
-		WithArgs(int64(1), int64(10), 2, 100.0, 10.0, 180.0).
+		WithArgs(int64(1), int64(10), 2, "100.00", 10.0, "180.00").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
-		WithArgs(int64(1), int64(11), 1, 50.0, 0.0, 50.0).
+		WithArgs(int64(1), int64(11), 1, "50.00", 0.0, "50.00").
 		WillReturnResult(sqlmock.NewResult(2, 1))
 	// baixa de estoque por item (resolve sku pelo produto_id, ajusta saldo).
 	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).
@@ -542,7 +542,7 @@ func TestPedidoService_UpdatePedido_Sucesso(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, p)
 	assert.Equal(t, int64(1), p.PedidoIDOrigem)
-	assert.Equal(t, 230.0, p.ValorTotal)
+	assert.Equal(t, reaisT("230.0"), p.ValorTotal)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -617,7 +617,7 @@ func TestPedidoService_UpdatePedido_FaturadoTentaAlterarItens_Erro409(t *testing
 func pedidoRowsComStatus(idOrigem int64, valorTotal float64, status string) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeader()).
-		AddRow(idOrigem, int64(1), int64(2), now, "App", status, valorTotal, now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), int64(2), now, "App", status, decT(valorTotal), now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 const deleteItensPedidoRegex = `DELETE FROM itens_pedido WHERE pedido_id = \?`

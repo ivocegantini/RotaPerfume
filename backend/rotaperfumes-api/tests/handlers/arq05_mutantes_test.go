@@ -31,14 +31,14 @@ func arq05ExpectUpdatePedidoAdmin(mock sqlmock.Sqlmock) {
 		WillReturnRows(sqlmock.NewRows([]string{"status", "vendedor_id"}).AddRow("Em separação", int64(2)))
 	mock.ExpectQuery(selectItensAtuaisTxRegexH).WithArgs(int64(1)).WillReturnRows(itensAtuaisRowsVazioH())
 	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0, int64(1)).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
-		WithArgs(int64(1), int64(10), 2, 100.0, 10.0, 180.0).WillReturnResult(sqlmock.NewResult(1, 1))
+		WithArgs(int64(1), int64(10), 2, "100.00", 10.0, "180.00").WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
-		WithArgs(int64(1), int64(11), 1, 50.0, 0.0, 50.0).WillReturnResult(sqlmock.NewResult(2, 1))
+		WithArgs(int64(1), int64(11), 1, "50.00", 0.0, "50.00").WillReturnResult(sqlmock.NewResult(2, 1))
 	expectBaixaEstoquePorItemH(mock, 10, "SKU-010")
 	expectBaixaEstoquePorItemH(mock, 11, "SKU-011")
 	mock.ExpectCommit()

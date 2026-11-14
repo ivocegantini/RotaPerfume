@@ -28,7 +28,8 @@ type ComandoTrocarSenha struct {
 // == atual → força (não conta) → histórico, atual + 2 últimas, sem
 // short-circuit (conta) → hash (fora da tx) → numa tx (BUG-15): histórico,
 // senha (com corte de sessão) e revogação dos refresh tokens. Falha em
-// qualquer etapa desfaz tudo e é 500 (a senha não muda).
+// qualquer etapa desfaz tudo e é 500 (a senha não muda); conta apagada
+// durante a troca é 400 (BUG-25).
 func (c *Casos) TrocarSenha(ctx context.Context, p kernel.Principal, cmd ComandoTrocarSenha) (err error) {
 	defer vlog.Trace(arqSenha, "Identidade.TrocarSenha", "user_id=%d", p.UserID())(&err)
 	if !p.Valido() {
@@ -50,6 +51,10 @@ func (c *Casos) TrocarSenha(ctx context.Context, p kernel.Principal, cmd Comando
 		return bloqueio(retry)
 	}
 	u, err := c.d.Usuarios.PorID(ctx, uid)
+	if errors.Is(err, identidade.ErrUsuarioNaoEncontrado) {
+		log.Printf("[auth] reset-password: conta inexistente: user_id=%d", uid)
+		return identidade.ErrContaRemovidaNaTroca // BUG-25: 400
+	}
 	if err != nil {
 		return erroLeituraUsuario("[auth] reset-password: GetByID", err)
 	}
@@ -108,11 +113,23 @@ func (c *Casos) gravarNovaSenha(ctx context.Context, u *identidade.Usuario, cmd 
 			log.Printf("[auth] reset-password: senha alterada por outra operação (rollback): user_id=%d", u.ID)
 			return identidade.ErrSenhaAlteradaConcorrentemente
 		}
+		if c.contaRemovida(ctx, u.ID) {
+			log.Printf("[auth] reset-password: conta removida durante a troca (rollback): user_id=%d", u.ID)
+			return identidade.ErrContaRemovidaNaTroca // BUG-25: 400
+		}
 		log.Printf("[auth] reset-password: gravar senha: %v", err)
-		return fmt.Errorf("identidadeapp: trocar senha: gravar: %v", err) // sem %w: inexistente aqui é 500
+		return fmt.Errorf("identidadeapp: trocar senha: gravar: %v", err) // sem %w: o resto é 500
 	}
 	log.Printf("[auth] reset-password: user_id=%d", u.ID)
 	return nil
+}
+
+// contaRemovida (BUG-25) relê o usuário depois de uma gravação que falhou:
+// a FK do histórico ou o UPDATE sem linha apontam a conta apagada no meio da
+// troca. Erro de infra na releitura não conta como removida (segue 500).
+func (c *Casos) contaRemovida(ctx context.Context, id int64) bool {
+	_, err := c.d.Usuarios.PorID(ctx, id)
+	return errors.Is(err, identidade.ErrUsuarioNaoEncontrado)
 }
 
 // gravacaoSenha é a escrita atômica de uma troca/reset de senha: usuario

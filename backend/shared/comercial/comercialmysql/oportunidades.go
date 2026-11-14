@@ -92,7 +92,7 @@ func (r *Oportunidades) Inserir(ctx context.Context, o *comercial.Oportunidade) 
 		INSERT INTO oportunidades (cliente_id, vendedor_id, origem, data_abertura, etapa, probabilidade_pct, valor_estimado, data_fechamento, ciclo_dias, motivo_perda)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir oportunidade", q, o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa,
-		o.ProbabilidadePct, o.ValorEstimado, o.DataFechamento, o.CicloDias, o.MotivoPerda)
+		o.ProbabilidadePct, o.ValorEstimado.String(), o.DataFechamento, o.CicloDias, o.MotivoPerda)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (r *Oportunidades) Atualizar(ctx context.Context, id int64, o *comercial.Op
 		SET cliente_id = ?, vendedor_id = ?, origem = ?, data_abertura = ?, etapa = ?, probabilidade_pct = ?, valor_estimado = ?, data_fechamento = ?, ciclo_dias = ?, motivo_perda = ?
 		WHERE oportunidade_id = ?`
 	return db.ExecPorID(ctx, r.q, arqOportunidades, "Oportunidades.Atualizar", "comercialmysql: atualizar oportunidade", comercial.ErrOportunidadeNaoEncontrada,
-		q, o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa, o.ProbabilidadePct, o.ValorEstimado,
+		q, o.ClienteID, o.VendedorID, o.Origem, o.DataAbertura, o.Etapa, o.ProbabilidadePct, o.ValorEstimado.String(),
 		o.DataFechamento, o.CicloDias, o.MotivoPerda, id)
 }
 

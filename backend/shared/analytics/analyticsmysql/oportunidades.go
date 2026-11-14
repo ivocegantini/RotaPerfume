@@ -2,7 +2,6 @@ package analyticsmysql
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/rotaperfumes/shared/analytics"
@@ -55,11 +54,9 @@ func (r *Oportunidades) Funil(ctx context.Context, e kernel.Escopo, j analytics.
 	contagens := make([]analytics.ContagemEtapa, 0, 6)
 	for rows.Next() {
 		var c analytics.ContagemEtapa
-		var valor sql.NullFloat64
-		if err := rows.Scan(&c.Etapa, &c.Quantidade, &valor); err != nil {
+		if err := rows.Scan(&c.Etapa, &c.Quantidade, &c.Valor); err != nil { // DECIMAL exato (ARQ-09)
 			return nil, fmt.Errorf("analyticsmysql: funil scan: %w", err)
 		}
-		c.Valor = valor.Float64
 		contagens = append(contagens, c)
 	}
 	if err := rows.Err(); err != nil {

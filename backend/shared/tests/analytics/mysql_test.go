@@ -86,32 +86,32 @@ func TestAnalyticsmysql_FalhasSilenciosasDoLegado(t *testing.T) {
 
 	t.Run("enriquecimento: erro de query mantém as metas sem vendas", func(t *testing.T) {
 		db, mock := novoMock(t)
-		mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).AddRow(int64(1), "A", "S", "PR", 100.0))
+		mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).AddRow(int64(1), "A", "S", "PR", "100.0"))
 		mock.ExpectQuery(`WHERE vendedor_id IN \(\?\)`).WithArgs(int64(1)).WillReturnError(errors.New("x"))
 		metas, err := analyticsmysql.NovoDashboard(db, time.Now).MetasVendedores(ctx, e)
 		require.NoError(t, err)
-		assert.Equal(t, []analytics.MetaVendedor{{ID: 1, Nome: "A", Regiao: "S", UF: "PR", Meta: 100}}, metas)
+		assert.Equal(t, []analytics.MetaVendedor{{ID: 1, Nome: "A", Regiao: "S", UF: "PR", Meta: reaisT("100")}}, metas)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("enriquecimento: linha que não escaneia é ignorada (IN com 2 ids)", func(t *testing.T) {
 		db, mock := novoMock(t)
 		mock.ExpectQuery(`FROM vendedores v`).WithArgs(5).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).
-			AddRow(int64(1), "A", 100.0).AddRow(int64(2), "B", 0.0))
+			AddRow(int64(1), "A", "100.0").AddRow(int64(2), "B", "0.0"))
 		mock.ExpectQuery(`WHERE vendedor_id IN \(\?,\?\)`).WithArgs(int64(1), int64(2)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).
-			AddRow("nao-numero", 1.0, 1).AddRow(int64(2), 30.0, 3))
+			AddRow("nao-numero", "1.0", 1).AddRow(int64(2), "30.0", 3))
 		top, err := analyticsmysql.NovoDashboard(db, time.Now).TopVendedores(ctx, e, 5)
 		require.NoError(t, err)
-		assert.Equal(t, []analytics.VendedorRanking{{ID: 1, Nome: "A", Meta: 100}, {ID: 2, Nome: "B", TotalVendas: 30, QuantidadeVendas: 3}}, top)
+		assert.Equal(t, []analytics.VendedorRanking{{ID: 1, Nome: "A", Meta: reaisT("100")}, {ID: 2, Nome: "B", TotalVendas: reaisT("30"), QuantidadeVendas: 3}}, top)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("top e metas: erro de scan é erro", func(t *testing.T) {
 		db, mock := novoMock(t)
-		mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).AddRow("x", "A", 1.0))
+		mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).AddRow("x", "A", "1.0"))
 		_, err := analyticsmysql.NovoDashboard(db, time.Now).TopVendedores(ctx, e, 10)
 		assert.ErrorContains(t, err, "analyticsmysql: top vendedores scan")
-		mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).AddRow("x", "A", "S", "PR", 1.0))
+		mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).AddRow("x", "A", "S", "PR", "1.0"))
 		_, err = analyticsmysql.NovoDashboard(db, time.Now).MetasVendedores(ctx, e)
 		assert.ErrorContains(t, err, "analyticsmysql: metas vendedores scan")
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -120,17 +120,17 @@ func TestAnalyticsmysql_FalhasSilenciosasDoLegado(t *testing.T) {
 	t.Run("série: linha de venda e dia que não escaneiam são ignorados", func(t *testing.T) {
 		db, mock := novoMock(t)
 		mock.ExpectQuery(`AS data`).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).
-			AddRow("2026-10-14", "nao-numero", 1).AddRow("2026-10-15", 5.0, 1))
+			AddRow("2026-10-14", "nao-numero", 1).AddRow("2026-10-15", "5.0", 1))
 		mock.ExpectQuery(`AS dia`).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"dia"}).AddRow(nil).AddRow("2026-10-15"))
 		pontos, err := analyticsmysql.NovoDashboard(db, time.Now).SerieVendas(ctx, e, analytics.DiasDe(2))
 		require.NoError(t, err)
-		assert.Equal(t, []analytics.PontoVenda{{Dia: "2026-10-15", TotalVendas: 5, TotalPedidos: 1}}, pontos)
+		assert.Equal(t, []analytics.PontoVenda{{Dia: "2026-10-15", TotalVendas: reaisT("5"), TotalPedidos: 1}}, pontos)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("série: só linhas inválidas = série zerada de hoje", func(t *testing.T) {
 		db, mock := novoMock(t)
-		mock.ExpectQuery(`AS data`).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).AddRow(nil, 1.0, 1))
+		mock.ExpectQuery(`AS data`).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).AddRow(nil, "1.0", 1))
 		pontos, err := analyticsmysql.NovoDashboard(db, time.Now).SerieVendas(ctx, e, analytics.DiasDe(1))
 		require.NoError(t, err)
 		assert.Equal(t, analytics.SerieZerada(1, time.Now()), pontos)
@@ -146,13 +146,13 @@ func TestAnalyticsmysql_ErrosDeInfra(t *testing.T) {
 	t.Run("ranking: scan e iteração", func(t *testing.T) {
 		db, mock := novoMock(t)
 		mock.ExpectQuery(`SELECT COUNT`).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
-		mock.ExpectQuery(`LIMIT \? OFFSET \?`).WithArgs(int64(7), 20, 0).WillReturnRows(sqlmock.NewRows(cols).AddRow("x", "A", "S", "PR", 1.0, 1.0, 1, 1.0))
+		mock.ExpectQuery(`LIMIT \? OFFSET \?`).WithArgs(int64(7), 20, 0).WillReturnRows(sqlmock.NewRows(cols).AddRow("x", "A", "S", "PR", "1.0", "1.0", 1, "1.0"))
 		_, err := analyticsmysql.NovoDashboard(db, time.Now).Ranking(ctx, doVendedor, kernel.NovaPagina(1, 20))
 		assert.ErrorContains(t, err, "analyticsmysql: ranking scan")
 
 		mock.ExpectQuery(`SELECT COUNT`).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
 		mock.ExpectQuery(`LIMIT \? OFFSET \?`).WithArgs(int64(7), 20, 0).WillReturnRows(sqlmock.NewRows(cols).
-			AddRow(int64(7), "A", "S", "PR", 1.0, 1.0, 1, 1.0).RowError(0, errInfra))
+			AddRow(int64(7), "A", "S", "PR", "1.0", "1.0", 1, "1.0").RowError(0, errInfra))
 		_, err = analyticsmysql.NovoDashboard(db, time.Now).Ranking(ctx, doVendedor, kernel.NovaPagina(1, 20))
 		assert.ErrorIs(t, err, errInfra)
 		assert.ErrorContains(t, err, "analyticsmysql: ranking rows")
@@ -208,7 +208,7 @@ func TestAnalyticsmysql_SerieZeradaUsaORelogioInjetado(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, analytics.SerieZerada(2, hojeFixo), pontos, "sem vendas")
 
-	mock.ExpectQuery(`AS data`).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).AddRow("2026-10-15", 1.0, 1))
+	mock.ExpectQuery(`AS data`).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).AddRow("2026-10-15", "1.0", 1))
 	mock.ExpectQuery(`AS dia`).WithArgs(2).WillReturnError(errInfra)
 	pontos, err = d.SerieVendas(ctx, e, analytics.DiasDe(2))
 	require.NoError(t, err)

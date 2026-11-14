@@ -3,8 +3,8 @@
 // ficam na tabela do bootstrap; o escopo de carteira (herdado do pedido no
 // caso do pagamento) é decidido pelos casos de uso (vendasapp), nunca aqui.
 //
-// Os DTOs têm as mesmas chaves, ordem e tipos dos models legados (contrato
-// JSON inalterado). valor_bruto e valor_total não existem no payload: o
+// Os DTOs têm as mesmas chaves e ordem dos models legados (contrato JSON
+// inalterado: dinheiro em reais decimais, ARQ-09). valor_bruto e valor_total não existem no payload: o
 // backend calcula (V-03); pedido_id não existe no payload de edição de
 // pagamento (V-02).
 package vendashttp
@@ -26,17 +26,17 @@ import (
 
 // pedidoJSON é o pedido da listagem (sem a chave "itens").
 type pedidoJSON struct {
-	PedidoIDOrigem int64     `json:"pedido_id_origem"`
-	ClienteID      int64     `json:"cliente_id"`
-	VendedorID     int64     `json:"vendedor_id"`
-	DataPedido     time.Time `json:"data_pedido"`
-	Canal          string    `json:"canal"`
-	Status         string    `json:"status"`
-	ValorTotal     float64   `json:"valor_total"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	ClienteNome    string    `json:"cliente_nome"`
-	VendedorNome   string    `json:"vendedor_nome"`
+	PedidoIDOrigem int64           `json:"pedido_id_origem"`
+	ClienteID      int64           `json:"cliente_id"`
+	VendedorID     int64           `json:"vendedor_id"`
+	DataPedido     time.Time       `json:"data_pedido"`
+	Canal          string          `json:"canal"`
+	Status         string          `json:"status"`
+	ValorTotal     kernel.Dinheiro `json:"valor_total"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+	ClienteNome    string          `json:"cliente_nome"`
+	VendedorNome   string          `json:"vendedor_nome"`
 }
 
 func novoPedidoJSON(p vendas.Pedido) pedidoJSON {
@@ -57,34 +57,34 @@ func novoPedidoDetalheJSON(p vendas.Pedido) pedidoDetalheJSON {
 }
 
 type itemPedidoJSON struct {
-	ItemIDOrigem     int64     `json:"item_id_origem"`
-	PedidoID         int64     `json:"pedido_id"`
-	ProdutoID        int64     `json:"produto_id"`
-	Quantidade       int       `json:"quantidade"`
-	PrecoPraticado   float64   `json:"preco_praticado"`
-	DescontoPct      float64   `json:"desconto_pct"`
-	ValorBruto       float64   `json:"valor_bruto"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	ProdutoSKU       string    `json:"produto_sku"`
-	ProdutoDescricao string    `json:"produto_descricao"`
+	ItemIDOrigem     int64           `json:"item_id_origem"`
+	PedidoID         int64           `json:"pedido_id"`
+	ProdutoID        int64           `json:"produto_id"`
+	Quantidade       int             `json:"quantidade"`
+	PrecoPraticado   kernel.Dinheiro `json:"preco_praticado"`
+	DescontoPct      float64         `json:"desconto_pct"`
+	ValorBruto       kernel.Dinheiro `json:"valor_bruto"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
+	ProdutoSKU       string          `json:"produto_sku"`
+	ProdutoDescricao string          `json:"produto_descricao"`
 }
 
 func novoItemPedidoJSON(it vendas.ItemPedido) itemPedidoJSON { return itemPedidoJSON(it) }
 
 type pagamentoJSON struct {
-	PagamentoID     int64      `json:"pagamento_id"`
-	PedidoID        int64      `json:"pedido_id"`
-	FormaPagamento  string     `json:"forma_pagamento"`
-	Parcelas        uint8      `json:"parcelas"`
-	Valor           float64    `json:"valor"`
-	TaxaPct         float64    `json:"taxa_pct"`
-	ValorLiquido    float64    `json:"valor_liquido"`
-	DataVencimento  time.Time  `json:"data_vencimento"`
-	DataPagamento   *time.Time `json:"data_pagamento"`
-	StatusPagamento string     `json:"status_pagamento"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	PagamentoID     int64           `json:"pagamento_id"`
+	PedidoID        int64           `json:"pedido_id"`
+	FormaPagamento  string          `json:"forma_pagamento"`
+	Parcelas        uint8           `json:"parcelas"`
+	Valor           kernel.Dinheiro `json:"valor"`
+	TaxaPct         float64         `json:"taxa_pct"`
+	ValorLiquido    kernel.Dinheiro `json:"valor_liquido"`
+	DataVencimento  time.Time       `json:"data_vencimento"`
+	DataPagamento   *time.Time      `json:"data_pagamento"`
+	StatusPagamento string          `json:"status_pagamento"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
 func novoPagamentoJSON(p vendas.Pagamento) pagamentoJSON { return pagamentoJSON(p) }
@@ -95,10 +95,10 @@ func novoPagamentoJSON(p vendas.Pagamento) pagamentoJSON { return pagamentoJSON(
 // ---------------------------------------------------------------------------
 
 type itemPedidoRequest struct {
-	ProdutoID      int64   `json:"produto_id"`
-	Quantidade     int     `json:"quantidade"`
-	PrecoPraticado float64 `json:"preco_praticado"`
-	DescontoPct    float64 `json:"desconto_pct"`
+	ProdutoID      int64          `json:"produto_id"`
+	Quantidade     int            `json:"quantidade"`
+	PrecoPraticado kernel.Decimal `json:"preco_praticado"`
+	DescontoPct    float64        `json:"desconto_pct"`
 }
 
 // pedidoRequest é o body de POST e PUT /api/pedidos (os dois legados eram
@@ -124,14 +124,14 @@ func dadosPedido(q pedidoRequest) vendas.DadosPedido {
 // pagamentoRequest é o body do PUT /api/pagamentos/{id}: SEM pedido_id (um
 // pedido_id enviado é ignorado pelo decoder).
 type pagamentoRequest struct {
-	FormaPagamento  string  `json:"forma_pagamento"`
-	Parcelas        uint8   `json:"parcelas"`
-	Valor           float64 `json:"valor"`
-	TaxaPct         float64 `json:"taxa_pct"`
-	ValorLiquido    float64 `json:"valor_liquido"`
-	DataVencimento  string  `json:"data_vencimento"`
-	DataPagamento   string  `json:"data_pagamento"`
-	StatusPagamento string  `json:"status_pagamento"`
+	FormaPagamento  string         `json:"forma_pagamento"`
+	Parcelas        uint8          `json:"parcelas"`
+	Valor           kernel.Decimal `json:"valor"`
+	TaxaPct         float64        `json:"taxa_pct"`
+	ValorLiquido    kernel.Decimal `json:"valor_liquido"`
+	DataVencimento  string         `json:"data_vencimento"`
+	DataPagamento   string         `json:"data_pagamento"`
+	StatusPagamento string         `json:"status_pagamento"`
 }
 
 func dadosPagamento(q pagamentoRequest) vendas.DadosPagamento { return vendas.DadosPagamento(q) }

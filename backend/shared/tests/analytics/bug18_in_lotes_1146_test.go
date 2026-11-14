@@ -31,20 +31,20 @@ func TestBUG18_MetasVendedores_INEmLotes(t *testing.T) {
 	db, mock := novoMock(t)
 	linhas := sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"})
 	for i := 1; i <= total; i++ {
-		linhas.AddRow(int64(i), "V", "S", "PR", 100.0)
+		linhas.AddRow(int64(i), "V", "S", "PR", "100.0")
 	}
 	mock.ExpectQuery(`FROM vendedores v`).WillReturnRows(linhas)
 	in := func(n int) string {
 		return `WHERE vendedor_id IN \(` + strings.TrimSuffix(strings.Repeat(`\?,`, n), ",") + `\)`
 	}
-	mock.ExpectQuery(in(analyticsmysql.LoteVendasDoMes)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(1), 10.0, 1))
-	mock.ExpectQuery(in(50)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(total), 20.0, 2))
+	mock.ExpectQuery(in(analyticsmysql.LoteVendasDoMes)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(1), "10.0", 1))
+	mock.ExpectQuery(in(50)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(total), "20.0", 2))
 
 	metas, err := analyticsmysql.NovoDashboard(db, time.Now).MetasVendedores(ctx, e)
 	require.NoError(t, err)
 	require.Len(t, metas, total)
-	assert.Equal(t, 10.0, metas[0].Realizado)
-	assert.Equal(t, 20.0, metas[total-1].Realizado)
+	assert.Equal(t, reaisT("10.0"), metas[0].Realizado)
+	assert.Equal(t, reaisT("20.0"), metas[total-1].Realizado)
 	assert.NoError(t, mock.ExpectationsWereMet(), "dois SELECTs: 100 + 50 placeholders")
 }
 

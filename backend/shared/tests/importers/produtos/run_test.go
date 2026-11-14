@@ -85,21 +85,21 @@ func TestUpsertAll(t *testing.T) {
 	db, mock := novoMock(t)
 	lanc := time.Date(2024, 1, 2, 0, 0, 0, 0, time.Local)
 	rows := []produtos.Row{
-		{SKU: "SKU-1", Descricao: "A", Categoria: "Perfume", Marca: "M", NotaOlfativa: "Floral", PrecoTabela: 100, CustoUnitario: 40, Unidade: "UN", Ativo: true, DataLancamento: &lanc},
-		{SKU: "SKU-2", Descricao: "B", Categoria: "Perfume", Marca: "M", PrecoTabela: 50, CustoUnitario: 20, Unidade: "UN", Ativo: false},
-		{SKU: "SKU-3", Descricao: "C", Categoria: "Perfume", Marca: "M", PrecoTabela: 1, CustoUnitario: 1, Unidade: "UN", Ativo: true},
-		{SKU: "SKU-4", Descricao: "D", Categoria: "Perfume", Marca: "M", PrecoTabela: 1, CustoUnitario: 1, Unidade: "UN", Ativo: true},
+		{SKU: "SKU-1", Descricao: "A", Categoria: "Perfume", Marca: "M", NotaOlfativa: "Floral", PrecoTabela: reaisT("100"), CustoUnitario: reaisT("40"), Unidade: "UN", Ativo: true, DataLancamento: &lanc},
+		{SKU: "SKU-2", Descricao: "B", Categoria: "Perfume", Marca: "M", PrecoTabela: reaisT("50"), CustoUnitario: reaisT("20"), Unidade: "UN", Ativo: false},
+		{SKU: "SKU-3", Descricao: "C", Categoria: "Perfume", Marca: "M", PrecoTabela: reaisT("1"), CustoUnitario: reaisT("1"), Unidade: "UN", Ativo: true},
+		{SKU: "SKU-4", Descricao: "D", Categoria: "Perfume", Marca: "M", PrecoTabela: reaisT("1"), CustoUnitario: reaisT("1"), Unidade: "UN", Ativo: true},
 	}
 	mock.ExpectPrepare("INSERT INTO produtos")
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs("SKU-1", "A", "Perfume", "M", "Floral", 100.0, 40.0, "UN", "2024-01-02", true).
+		WithArgs("SKU-1", "A", "Perfume", "M", "Floral", "100.00", "40.00", "UN", "2024-01-02", true).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// nota olfativa vazia e data_lancamento ausente vão como NULL.
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs("SKU-2", "B", "Perfume", "M", nil, 50.0, 20.0, "UN", nil, false).
+		WithArgs("SKU-2", "B", "Perfume", "M", nil, "50.00", "20.00", "UN", nil, false).
 		WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectExec("INSERT INTO produtos").WithArgs("SKU-3", "C", "Perfume", "M", nil, 1.0, 1.0, "UN", nil, true).WillReturnError(errBanco)
-	mock.ExpectExec("INSERT INTO produtos").WithArgs("SKU-4", "D", "Perfume", "M", nil, 1.0, 1.0, "UN", nil, true).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("INSERT INTO produtos").WithArgs("SKU-3", "C", "Perfume", "M", nil, "1.00", "1.00", "UN", nil, true).WillReturnError(errBanco)
+	mock.ExpectExec("INSERT INTO produtos").WithArgs("SKU-4", "D", "Perfume", "M", nil, "1.00", "1.00", "UN", nil, true).WillReturnResult(sqlmock.NewResult(0, 0))
 
 	ins, upd, fail, err := produtos.UpsertAll(db, rows)
 	require.NoError(t, err)
@@ -137,10 +137,10 @@ func TestRun_Importa(t *testing.T) {
 	mock.ExpectPing()
 	mock.ExpectPrepare("INSERT INTO produtos")
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs("SKU-1", "Perfume A", "Perfume", "Marca", "Floral", 100.0, 40.0, "UN", "2024-01-02", false).
+		WithArgs("SKU-1", "Perfume A", "Perfume", "Marca", "Floral", "100.00", "40.00", "UN", "2024-01-02", false).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs("SKU-2", "Perfume B", "Perfume", "Marca", nil, 50.0, 20.0, "UN", nil, true).
+		WithArgs("SKU-2", "Perfume B", "Perfume", "Marca", nil, "50.00", "20.00", "UN", nil, true).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectClose()
 

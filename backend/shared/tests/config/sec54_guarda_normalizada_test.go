@@ -92,7 +92,11 @@ func TestSEC54_Paridade_MakefileEGo(t *testing.T) {
 			assert.Equal(t, c.producao, goProd != nil, "Go ValidarNaoProducao: %v", goProd)
 			assert.Equal(t, c.integracao, errInt == nil, "Makefile db-guard-integracao: %s", outInt)
 			assert.Equal(t, c.integracao, goProd == nil && goInt == nil, "Go integração: %v / %v", goProd, goInt)
-			if errInt != nil {
+			switch {
+			case errInt != nil && !portaNumericaSEC57(c.porta):
+				// SEC-57 (Lote 37): porta inválida tem mensagem própria.
+				assert.Contains(t, outInt, "SEC-57: DB_PORT=")
+			case errInt != nil:
 				assert.Contains(t, outInt, "SEC-54: DB_HOST=")
 				assert.Contains(t, outInt, "fora da allowlist da integracao")
 			}

@@ -1,6 +1,10 @@
 package analytics
 
-import "time"
+import (
+	"time"
+
+	"github.com/rotaperfumes/shared/kernel"
+)
 
 // layoutDia é o formato YYYY-MM-DD do contrato (o mesmo do DATE_FORMAT).
 const layoutDia = "2006-01-02"
@@ -14,7 +18,7 @@ type SerieVendas struct {
 // PontoVenda é um dia da série.
 type PontoVenda struct {
 	Dia          string
-	TotalVendas  float64
+	TotalVendas  kernel.Dinheiro
 	TotalPedidos int
 }
 

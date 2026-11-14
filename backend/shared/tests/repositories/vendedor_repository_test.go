@@ -242,7 +242,7 @@ func TestVendedorGetByID_Success(t *testing.T) {
 
 	now := time.Now()
 	rows := sqlmock.NewRows(vendedorGetColumns).
-		AddRow(1, "João Vendedor", "Sudeste", "SP", now, nil, 5000.0, now, now)
+		AddRow(1, "João Vendedor", "Sudeste", "SP", now, nil, "5000.0", now, now)
 
 	mock.ExpectQuery(`SELECT id, nome, regiao, uf, data_admissao, data_desligamento, meta_mensal, created_at, updated_at FROM vendedores WHERE id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -299,10 +299,10 @@ func TestVendedorCreate_Success(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	v := &comercial.Vendedor{Nome: "Novo Vendedor", Regiao: "Sul", UF: "RS", DataAdmissao: now, MetaMensal: 3000.0}
+	v := &comercial.Vendedor{Nome: "Novo Vendedor", Regiao: "Sul", UF: "RS", DataAdmissao: now, MetaMensal: reaisT("3000.0")}
 
 	mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)\s+VALUES \(\?, \?, \?, \?, \?, \?\)`).
-		WithArgs(v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.DataDesligamento, v.MetaMensal).
+		WithArgs(v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.DataDesligamento, v.MetaMensal.String()).
 		WillReturnResult(sqlmock.NewResult(9, 1))
 
 	ctx := context.Background()
@@ -317,7 +317,7 @@ func TestVendedorCreate_ExecError(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	v := &comercial.Vendedor{Nome: "Novo Vendedor", Regiao: "Sul", UF: "RS", DataAdmissao: time.Now(), MetaMensal: 3000.0}
+	v := &comercial.Vendedor{Nome: "Novo Vendedor", Regiao: "Sul", UF: "RS", DataAdmissao: time.Now(), MetaMensal: reaisT("3000.0")}
 
 	mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)\s+VALUES \(\?, \?, \?, \?, \?, \?\)`).
 		WillReturnError(sql.ErrConnDone)
@@ -333,7 +333,7 @@ func TestVendedorCreate_LastInsertIdError(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	v := &comercial.Vendedor{Nome: "Novo Vendedor", Regiao: "Sul", UF: "RS", DataAdmissao: time.Now(), MetaMensal: 3000.0}
+	v := &comercial.Vendedor{Nome: "Novo Vendedor", Regiao: "Sul", UF: "RS", DataAdmissao: time.Now(), MetaMensal: reaisT("3000.0")}
 
 	mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)\s+VALUES \(\?, \?, \?, \?, \?, \?\)`).
 		WillReturnResult(sqlmock.NewErrorResult(sql.ErrConnDone))
@@ -354,10 +354,10 @@ func TestVendedorUpdate_Success(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	v := &comercial.Vendedor{Nome: "Vendedor Atualizado", Regiao: "Nordeste", UF: "BA", DataAdmissao: now, MetaMensal: 4000.0}
+	v := &comercial.Vendedor{Nome: "Vendedor Atualizado", Regiao: "Nordeste", UF: "BA", DataAdmissao: now, MetaMensal: reaisT("4000.0")}
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs(v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.MetaMensal, int64(1)).
+		WithArgs(v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.MetaMensal.String(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	ctx := context.Background()
@@ -371,10 +371,10 @@ func TestVendedorUpdate_NotFound(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	v := &comercial.Vendedor{Nome: "Vendedor X", Regiao: "Nordeste", UF: "BA", DataAdmissao: time.Now(), MetaMensal: 4000.0}
+	v := &comercial.Vendedor{Nome: "Vendedor X", Regiao: "Nordeste", UF: "BA", DataAdmissao: time.Now(), MetaMensal: reaisT("4000.0")}
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs(v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.MetaMensal, int64(999)).
+		WithArgs(v.Nome, v.Regiao, v.UF, v.DataAdmissao, v.MetaMensal.String(), int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	ctx := context.Background()
@@ -388,7 +388,7 @@ func TestVendedorUpdate_ExecError(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	v := &comercial.Vendedor{Nome: "Vendedor X", Regiao: "Nordeste", UF: "BA", DataAdmissao: time.Now(), MetaMensal: 4000.0}
+	v := &comercial.Vendedor{Nome: "Vendedor X", Regiao: "Nordeste", UF: "BA", DataAdmissao: time.Now(), MetaMensal: reaisT("4000.0")}
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
 		WillReturnError(sql.ErrConnDone)
@@ -404,7 +404,7 @@ func TestVendedorUpdate_RowsAffectedError(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	v := &comercial.Vendedor{Nome: "Vendedor X", Regiao: "Nordeste", UF: "BA", DataAdmissao: time.Now(), MetaMensal: 4000.0}
+	v := &comercial.Vendedor{Nome: "Vendedor X", Regiao: "Nordeste", UF: "BA", DataAdmissao: time.Now(), MetaMensal: reaisT("4000.0")}
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
 		WillReturnResult(sqlmock.NewErrorResult(sql.ErrConnDone))

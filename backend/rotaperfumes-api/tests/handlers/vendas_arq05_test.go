@@ -74,7 +74,7 @@ func TestARQ05_ContratoJSON_ByteAByte(t *testing.T) {
 	quando := time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)
 	rowsPedido := func() *sqlmock.Rows {
 		return sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-			AddRow(int64(7), int64(1), int64(2), quando, "App", "Entregue", 230.5, quando, quando, "ACME", "Ana")
+			AddRow(int64(7), int64(1), int64(2), quando, "App", "Entregue", "230.5", quando, quando, "ACME", "Ana")
 	}
 	cabecalho := legadoPedidoListagem{legadoPedido: legadoPedido{PedidoIDOrigem: 7, ClienteID: 1, VendedorID: 2, DataPedido: quando,
 		Canal: "App", Status: "Entregue", ValorTotal: 230.5, CreatedAt: quando, UpdatedAt: quando}, ClienteNome: "ACME", VendedorNome: "Ana"}
@@ -88,7 +88,7 @@ func TestARQ05_ContratoJSON_ByteAByte(t *testing.T) {
 		defer db.Close()
 		mock.ExpectQuery(`FROM pedidos p .+ WHERE p\.pedido_id_origem = \? LIMIT 1`).WithArgs(int64(7)).WillReturnRows(rowsPedido())
 		mock.ExpectQuery(`FROM itens_pedido i`).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows(itemPedidoColunasHeaderForHandler()).
-			AddRow(int64(1), int64(7), int64(10), 2, 100.0, 10.0, 180.0, quando, quando, "SKU-10", "Perfume"))
+			AddRow(int64(1), int64(7), int64(10), 2, "100.0", "10.0", "180.0", quando, quando, "SKU-10", "Perfume"))
 		status, body := getComToken(t, server.URL+"/api/pedidos/7", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
 		assert.Equal(t, envelopeComercialLegado(t, map[string]any{"success": true, "data": legadoPedidoDetalhe{
@@ -149,7 +149,7 @@ func TestARQ05_ContratoJSON_ByteAByte(t *testing.T) {
 		defer db.Close()
 		mock.ExpectQuery(`FROM pagamentos WHERE pagamento_id = \? LIMIT 1`).WithArgs(int64(3)).WillReturnRows(
 			sqlmock.NewRows(pagamentoColunasHeaderForHandler()).
-				AddRow(int64(3), int64(7), "PIX", uint8(2), 100.0, 1.5, 98.5, quando, nil, "Em aberto", quando, quando))
+				AddRow(int64(3), int64(7), "PIX", uint8(2), "100.0", "1.5", "98.5", quando, nil, "Em aberto", quando, quando))
 		status, body := getComToken(t, server.URL+"/api/pagamentos/3", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
 		assert.Equal(t, envelopeComercialLegado(t, map[string]any{"success": true, "data": legadoPagamento{

@@ -21,7 +21,7 @@ const clienteResumoFromRegex = ` FROM carteiras ca JOIN clientes c ON c\.cliente
 func vendedorGetRows(id int64, nome string, dataDesligamento any) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "data_admissao", "data_desligamento", "meta_mensal", "created_at", "updated_at"}).
-		AddRow(id, nome, "Sudeste", "SP", now, dataDesligamento, 5000.0, now, now)
+		AddRow(id, nome, "Sudeste", "SP", now, dataDesligamento, "5000.0", now, now)
 }
 
 func clienteResumoRows() *sqlmock.Rows {
@@ -37,7 +37,7 @@ func validVendedorInput() comercial.DadosVendedor {
 		Regiao:       "Sudeste",
 		UF:           "SP",
 		DataAdmissao: "2024-01-15",
-		MetaMensal:   5000.0,
+		MetaMensal:   "5000.0",
 	}
 }
 
@@ -292,7 +292,7 @@ func vendedorValidacaoTestCases() []struct {
 			nome: "meta_mensal negativa",
 			input: func() comercial.DadosVendedor {
 				in := validVendedorInput()
-				in.MetaMensal = -1
+				in.MetaMensal = "-1"
 				return in
 			},
 			wantErr: comercial.ErrMetaMensalInvalida,
@@ -333,7 +333,7 @@ func TestVendedorService_CreateVendedor_DataAdmissaoVaziaUsaHoje(t *testing.T) {
 	in.DataAdmissao = ""
 
 	mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, 5000.0).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, "5000.00").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	casos := casosComercial(db, 0)
@@ -349,7 +349,7 @@ func TestVendedorService_CreateVendedor_Sucesso(t *testing.T) {
 	db, mock := newVendedorTestDB(t)
 
 	mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, 5000.0).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, "5000.00").
 		WillReturnResult(sqlmock.NewResult(5, 1))
 
 	casos := casosComercial(db, 0)
@@ -411,7 +411,7 @@ func TestVendedorService_UpdateVendedor_Sucesso(t *testing.T) {
 	db, mock := newVendedorTestDB(t)
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), 5000.0, int64(1)).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), "5000.00", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(vendedorGetColunasRegex).
 		WithArgs(int64(1)).
@@ -430,7 +430,7 @@ func TestVendedorService_UpdateVendedor_NaoEncontrado(t *testing.T) {
 	db, mock := newVendedorTestDB(t)
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), 5000.0, int64(999)).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), "5000.00", int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	casos := casosComercial(db, 0)
@@ -460,7 +460,7 @@ func TestVendedorService_UpdateVendedor_ErroNoGetByIDApósUpdate(t *testing.T) {
 	db, mock := newVendedorTestDB(t)
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), 5000.0, int64(1)).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), "5000.00", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(vendedorGetColunasRegex).
 		WithArgs(int64(1)).

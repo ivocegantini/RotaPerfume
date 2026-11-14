@@ -7,7 +7,7 @@ package deploy_test
 //   - cliente do banco no padrão do mariadb_cli do Jenkinsfile (rede, IP do
 //     admin, cap-drop, MYSQL_PWD pelo ambiente, TLS verificado);
 //   - DDL de sql/ordem-ddl.txt, vendedores inativos, sem -all-users, senha do
-//     admin por -password-out/-password-prompt, env-file com shred;
+//     admin só por -password-out (aleatória, SEC-52), env-file com shred;
 //   - opções e falhas antes da 1ª etapa.
 // O ensaio com docker falso fica para o 🔴 TestBrain.
 
@@ -79,8 +79,12 @@ func TestDEPLOY07_SeedProducao_Contrato(t *testing.T) {
 	} {
 		assert.Contains(t, codigo, s)
 	}
-	for _, s := range []string{`readonly IP_ADMIN="172.30.42.20"`, `readonly REDE_NOME="rotaperfumes-db"`,
-		`readonly CONTAINER="rotaperfumes-mariadb"`, `readonly CA_HOST="/etc/mysql/ssl/ca.pem"`,
+	// Padrões da produção (TST-17: viraram opções, travadas com readonly
+	// depois da validação).
+	for _, s := range []string{`IP_ADMIN="172.30.42.20"`, `REDE_NOME="rotaperfumes-db"`,
+		`CONTAINER="rotaperfumes-mariadb"`, `SSL_DIR="/etc/mysql/ssl"`, `SEGREDOS_DIR="/root/rotaperfumes-mariadb"`,
+		`TRABALHO_DIR="/root"`, `readonly CONTAINER REDE_NOME IP_ADMIN SEGREDOS_DIR SSL_DIR TRABALHO_DIR`,
+		`readonly CA_HOST="$SSL_DIR/ca.pem"`,
 		`readonly SENHA_DB_ARQ="$SEGREDOS_DIR/$DB_ADMIN.senha"`, `readonly DB_ADMIN="rotaperfumes_admin"`} {
 		assert.Contains(t, codigo, s)
 	}
@@ -92,16 +96,20 @@ func TestDEPLOY07_SeedProducao_Contrato(t *testing.T) {
 	assert.Contains(t, codigo, `UPDATE usuarios SET ativo = 0 WHERE role <> 'admin'`)
 	// O resetpassword só roda com -create-admin (o -all-users só aparece no --help, como "NAO roda").
 	chamadas := regexp.MustCompile(`"\$GO_IMAGE" -[a-z-]+`).FindAllString(codigo, -1)
-	require.Len(t, chamadas, 2, "prompt e -password-out")
+	require.Len(t, chamadas, 1, "só -password-out (SEC-52: sem prompt)")
 	for _, c := range chamadas {
 		assert.Equal(t, `"$GO_IMAGE" -create-admin`, c)
 	}
 	assert.Equal(t, 1, strings.Count(codigo, "-all-users"), "só no texto do --help")
 	assert.Contains(t, codigo, "NAO roda -all-users")
 	assert.NotContains(t, codigo, "make db-seed\n")
-	// Admin: senha gerada em arquivo ou digitada; nunca -password=.
+	// Admin (SEC-52): senha sempre gerada em arquivo; nunca digitada nem -password=.
 	assert.Contains(t, codigo, "-create-admin -password-out /saida/admin.senha")
-	assert.Contains(t, codigo, "-create-admin -password-prompt")
+	assert.NotContains(t, codigo, "-password-prompt")
+	assert.NotContains(t, codigo, "run -it")
+	// SEC-52: build do resetpassword sem capabilities e tar sem chown.
+	assert.Contains(t, codigo, "docker run --rm -i --cap-drop ALL --security-opt no-new-privileges:true \\\n      -e CGO_ENABLED=0")
+	assert.Contains(t, codigo, "tar -xof - -C /src")
 	assert.NotRegexp(t, `-password[= ]['"]?[A-Za-z0-9]`, strings.ReplaceAll(codigo, "-password-", ""))
 	// env-file temporário 600 com shred; pepper sem eco.
 	assert.Contains(t, codigo, `--env-file "$ENV_ARQ"`)
@@ -135,7 +143,8 @@ func TestDEPLOY07_SeedProducao_Opcoes(t *testing.T) {
 
 	out, rc := rodar("--help")
 	require.Equal(t, 0, rc, out)
-	for _, s := range []string{"--pepper-file", "--admin-senha-prompt", "--admin-senha-arquivo", "--forcar",
+	for _, s := range []string{"--pepper-file", "--admin-senha-arquivo", "--forcar",
+		"--container", "--rede-nome", "--ip-admin", "--segredos-dir", "--ssl-dir", "--trabalho-dir",
 		"sql/ordem-ddl.txt", "ativo = 0 WHERE role <> 'admin'", "NAO roda -all-users", "make db-seed"} {
 		assert.Contains(t, out, s)
 	}
@@ -149,6 +158,16 @@ func TestDEPLOY07_SeedProducao_Opcoes(t *testing.T) {
 		{"opcao desconhecida", []string{"--all-users"}, 2, "Opcao desconhecida: --all-users"},
 		{"--pepper-file sem valor", []string{"--pepper-file"}, 1, "a opcao --pepper-file exige um valor"},
 		{"--admin-senha-arquivo vazio", []string{"--admin-senha-arquivo", ""}, 1, "a opcao --admin-senha-arquivo exige um valor"},
+		// SEC-52: sem senha digitada; TST-17: opções de isolamento validadas.
+		{"--admin-senha-prompt saiu", []string{"--admin-senha-prompt"}, 1, "a opcao --admin-senha-prompt saiu (SEC-52)"},
+		{"--container inválido", []string{"--container", "a;b"}, 1, "--container invalido: a;b"},
+		{"--rede-nome inválido", []string{"--rede-nome", "-x"}, 1, "--rede-nome invalido: -x"},
+		{"--ip-admin octeto > 255", []string{"--ip-admin", "172.30.42.256"}, 1, "--ip-admin invalido"},
+		{"--ip-admin com zero à esquerda", []string{"--ip-admin", "172.30.042.20"}, 1, "--ip-admin invalido"},
+		{"--segredos-dir relativo", []string{"--segredos-dir", "seg"}, 1, "precisam de caminho absoluto: seg"},
+		{"--ssl-dir relativo", []string{"--ssl-dir", "ssl"}, 1, "precisam de caminho absoluto: ssl"},
+		{"--trabalho-dir relativo", []string{"--trabalho-dir", "t"}, 1, "precisam de caminho absoluto: t"},
+		{"--ip-admin sem valor", []string{"--ip-admin"}, 1, "a opcao --ip-admin exige um valor"},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {

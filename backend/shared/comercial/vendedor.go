@@ -3,6 +3,8 @@ package comercial
 import (
 	"strings"
 	"time"
+
+	"github.com/rotaperfumes/shared/kernel"
 )
 
 // Vendedor é o agregado do vendedor. DataDesligamento nil = ativo; o
@@ -16,7 +18,7 @@ type Vendedor struct {
 	UF               string
 	DataAdmissao     time.Time
 	DataDesligamento *time.Time
-	MetaMensal       float64
+	MetaMensal       kernel.Dinheiro
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -43,7 +45,7 @@ type DadosVendedor struct {
 	Regiao       string
 	UF           string
 	DataAdmissao string // AAAA-MM-DD; vazio = hoje só na criação
-	MetaMensal   float64
+	MetaMensal   kernel.Decimal
 }
 
 // NovoVendedor valida a criação: data_admissao vazia vira agora.
@@ -59,7 +61,7 @@ func VendedorEditado(d DadosVendedor) (*Vendedor, error) {
 
 // validarVendedor segue a ordem do legado: nome, região, UF, meta e data.
 func validarVendedor(d DadosVendedor, agora *time.Time) (*Vendedor, error) {
-	v := &Vendedor{Nome: strings.TrimSpace(d.Nome), Regiao: strings.TrimSpace(d.Regiao), MetaMensal: d.MetaMensal}
+	v := &Vendedor{Nome: strings.TrimSpace(d.Nome), Regiao: strings.TrimSpace(d.Regiao)}
 	var err error
 	switch {
 	case v.Nome == "":
@@ -70,8 +72,8 @@ func validarVendedor(d DadosVendedor, agora *time.Time) (*Vendedor, error) {
 	if v.UF, err = normalizarUF(d.UF); err != nil {
 		return nil, err
 	}
-	if v.MetaMensal < 0 {
-		return nil, ErrMetaMensalInvalida
+	if v.MetaMensal, err = d.MetaMensal.Dinheiro(ErrMetaMensalInvalida, ErrMetaMensalCasas); err != nil {
+		return nil, err
 	}
 	if v.DataAdmissao, err = dataOuAgora(d.DataAdmissao, agora, ErrDataAdmissaoInvalida); err != nil {
 		return nil, err

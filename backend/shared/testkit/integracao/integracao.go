@@ -76,6 +76,10 @@ func ValidarNaoProducao(host, porta string) error {
 		vlog.Printf("integracao.go", "ValidarNaoProducao", "decisão literal_ipv6_nao_loopback_recusado")
 		return erroProducao(host, porta)
 	}
+	if reHostNumerico.MatchString(h) && !reIPv4Canonico.MatchString(h) {
+		vlog.Printf("integracao.go", "ValidarNaoProducao", "decisão ipv4_nao_canonico_recusado")
+		return erroProducao(host, porta)
+	}
 	if contem(ProducaoHostsRede, h) {
 		vlog.Printf("integracao.go", "ValidarNaoProducao", "decisão host_da_rede_docker_de_producao_recusado")
 		return erroProducao(host, porta)
@@ -223,6 +227,11 @@ var (
 	reLoopbackV4  = regexp.MustCompile(`^127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$`)
 	reIPv4Mapeado = regexp.MustCompile(`^(?:::ffff:|0:0:0:0:0:ffff:)([0-9]{1,3}(?:\.[0-9]{1,3}){3})$`)
 	rePorta       = regexp.MustCompile(`^\+?[0-9]+$`)
+	// SEC-56: host "numérico" (dígitos, a-f, x e pontos, começando por
+	// dígito) que não é IPv4 canônico (decimal/hex/curto/octal, aceitos pelo
+	// getaddrinfo) conta como produção; mesma regra do PRODUCAO_DETECTA.
+	reHostNumerico = regexp.MustCompile(`^[0-9][0-9a-fx.]*$`)
+	reIPv4Canonico = regexp.MustCompile(`^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$`)
 )
 
 // normalizarHost (SEC-54) é a mesma normalização textual do NORMALIZA_HOST
@@ -246,9 +255,10 @@ func normalizarHost(host string) (h string, eraLocal bool) {
 
 // normalizarPorta (SEC-54): vazia fica vazia; senão exige "+"? e dígitos e
 // tira o "+" e os zeros à esquerda (03306 e +3306 viram 3306), igual ao
-// PRODUCAO_DETECTA do Makefile. ok=false para porta não numérica.
+// PRODUCAO_DETECTA do Makefile. ok=false para porta não numérica; SEC-57:
+// espaço (nas pontas ou no meio) também é porta inválida, como no Makefile.
 func normalizarPorta(porta string) (p string, ok bool) {
-	p = strings.TrimSpace(porta)
+	p = porta
 	if p == "" {
 		return "", true
 	}

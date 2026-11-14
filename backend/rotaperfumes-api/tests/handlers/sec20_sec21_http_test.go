@@ -192,10 +192,9 @@ func TestSEC21_HTTP_SecureIndependeDoHost(t *testing.T) {
 					n := httpx.NomesCookiesPara(seguro) // SEC-33: __Host- no modo seguro
 					require.Contains(t, crus, n.Acesso)
 					require.Contains(t, crus, n.Refresh)
-					if seguro { // transição: os nomes antigos são expirados
+					if seguro { // CHORE-14: sem a transição, nomes sem prefixo não saem
 						for _, antigo := range []string{"access_token", "refresh_token"} {
-							a := sec21Attrs(crus[antigo])
-							assert.True(t, a["Max-Age=0"] && a["Secure"] && a["Path=/"], "antigo expirado: %s", crus[antigo])
+							assert.NotContains(t, crus, antigo)
 						}
 					}
 					for nome, sameSite := range map[string]string{n.Acesso: "SameSite=Strict", n.Refresh: "SameSite=Lax"} {

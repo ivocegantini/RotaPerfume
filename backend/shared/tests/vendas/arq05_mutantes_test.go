@@ -41,14 +41,14 @@ func arq05LinhaPagamento(id, pedidoID int64) *sqlmock.Rows {
 	agora := time.Now()
 	return sqlmock.NewRows([]string{"pagamento_id", "pedido_id", "forma_pagamento", "parcelas", "valor", "taxa_pct",
 		"valor_liquido", "data_vencimento", "data_pagamento", "status_pagamento", "created_at", "updated_at"}).
-		AddRow(id, pedidoID, "PIX", uint8(1), 100.0, 0.0, 100.0, agora, nil, "Em aberto", agora, agora)
+		AddRow(id, pedidoID, "PIX", uint8(1), "100.0", "0.0", "100.0", agora, nil, "Em aberto", agora, agora)
 }
 
 func arq05LinhaPedido(id, vendedorID int64) *sqlmock.Rows {
 	agora := time.Now()
 	return sqlmock.NewRows([]string{"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido", "canal", "status",
 		"valor_total", "created_at", "updated_at", "c", "v"}).
-		AddRow(id, int64(1), vendedorID, agora, "App", "Em separação", 1.0, agora, agora, "C", "V")
+		AddRow(id, int64(1), vendedorID, agora, "App", "Em separação", "1.0", agora, agora, "C", "V")
 }
 
 // leitorVigiado devolve v e registra se o body foi lido.

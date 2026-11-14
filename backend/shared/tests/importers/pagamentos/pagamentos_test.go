@@ -32,13 +32,13 @@ func TestParsePagamentoRow(t *testing.T) {
 		{
 			nome: "pago, com data de pagamento",
 			rec:  linha("1", "10", "PIX", "1", "100", "0", "100", "2024-01-10", "2024-01-09", "Pago"),
-			want: pagamentos.Row{PagamentoID: 1, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: 100, TaxaPct: 0, ValorLiquido: 100,
+			want: pagamentos.Row{PagamentoID: 1, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: reaisT("100"), TaxaPct: 0, ValorLiquido: reaisT("100"),
 				DataVencimento: "2024-01-10", DataPagamento: sql.NullString{String: "2024-01-09", Valid: true}, StatusPagamento: "Pago"},
 		},
 		{
 			nome: "em aberto: data_pagamento vazia vira NULL",
 			rec:  linha(" 2 ", " 11 ", " Boleto 28 dias ", " 3 ", " 300.5 ", " 2.5 ", " 293 ", " 2024-02-28 ", "  ", " Em aberto "),
-			want: pagamentos.Row{PagamentoID: 2, PedidoIDOrigem: 11, FormaPagamento: "Boleto 28 dias", Parcelas: 3, Valor: 300.5, TaxaPct: 2.5, ValorLiquido: 293,
+			want: pagamentos.Row{PagamentoID: 2, PedidoIDOrigem: 11, FormaPagamento: "Boleto 28 dias", Parcelas: 3, Valor: reaisT("300.5"), TaxaPct: 2.5, ValorLiquido: reaisT("293"),
 				DataVencimento: "2024-02-28", StatusPagamento: "Em aberto"},
 		},
 		{nome: "pagamento_id inválido", rec: linha("", "10", "PIX", "1", "1", "0", "1", "2024-01-10", "", "Pago"), errSub: "pagamento_id inválido"},
@@ -198,20 +198,20 @@ func TestUpsertPagamentos(t *testing.T) {
 	capturarLog(t)
 	db, mock := novoMock(t)
 	rows := []pagamentos.Row{
-		{PagamentoID: 1, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: 100, ValorLiquido: 100, DataVencimento: "2024-01-10",
+		{PagamentoID: 1, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: reaisT("100"), ValorLiquido: reaisT("100"), DataVencimento: "2024-01-10",
 			DataPagamento: sql.NullString{String: "2024-01-09", Valid: true}, StatusPagamento: "Pago"},
-		{PagamentoID: 2, PedidoIDOrigem: 99, FormaPagamento: "PIX", Parcelas: 1, Valor: 1, ValorLiquido: 1, DataVencimento: "2024-01-10", StatusPagamento: "Pago"},
-		{PagamentoID: 3, PedidoIDOrigem: 10, FormaPagamento: "Dinheiro", Parcelas: 1, Valor: 5, ValorLiquido: 5, DataVencimento: "2024-01-11", StatusPagamento: "Em aberto"},
-		{PagamentoID: 4, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: 5, ValorLiquido: 5, DataVencimento: "2024-01-11", StatusPagamento: "Em aberto"},
-		{PagamentoID: 5, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: 5, ValorLiquido: 5, DataVencimento: "2024-01-11", StatusPagamento: "Em aberto"},
+		{PagamentoID: 2, PedidoIDOrigem: 99, FormaPagamento: "PIX", Parcelas: 1, Valor: reaisT("1"), ValorLiquido: reaisT("1"), DataVencimento: "2024-01-10", StatusPagamento: "Pago"},
+		{PagamentoID: 3, PedidoIDOrigem: 10, FormaPagamento: "Dinheiro", Parcelas: 1, Valor: reaisT("5"), ValorLiquido: reaisT("5"), DataVencimento: "2024-01-11", StatusPagamento: "Em aberto"},
+		{PagamentoID: 4, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: reaisT("5"), ValorLiquido: reaisT("5"), DataVencimento: "2024-01-11", StatusPagamento: "Em aberto"},
+		{PagamentoID: 5, PedidoIDOrigem: 10, FormaPagamento: "PIX", Parcelas: 1, Valor: reaisT("5"), ValorLiquido: reaisT("5"), DataVencimento: "2024-01-11", StatusPagamento: "Em aberto"},
 	}
 	mock.ExpectPrepare("INSERT INTO pagamentos")
 	mock.ExpectExec("INSERT INTO pagamentos").
-		WithArgs(int64(1), int64(10), "PIX", 1, 100.0, 0.0, 100.0, "2024-01-10", "2024-01-09", "Pago").
+		WithArgs(int64(1), int64(10), "PIX", 1, "100.00", 0.0, "100.00", "2024-01-10", "2024-01-09", "Pago").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// pagamento 2: pedido 99 fora do lookup -> sem Exec. pagamento 3: data_pagamento NULL.
 	mock.ExpectExec("INSERT INTO pagamentos").
-		WithArgs(int64(3), int64(10), "Dinheiro", 1, 5.0, 0.0, 5.0, "2024-01-11", nil, "Em aberto").
+		WithArgs(int64(3), int64(10), "Dinheiro", 1, "5.00", 0.0, "5.00", "2024-01-11", nil, "Em aberto").
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec("INSERT INTO pagamentos").WithArgs(int64(4), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnError(errBanco)
@@ -255,7 +255,7 @@ func TestRun_Importa(t *testing.T) {
 	mock.ExpectQuery("SELECT pedido_id_origem FROM pedidos").WillReturnRows(sqlmock.NewRows([]string{"p"}).AddRow(10))
 	mock.ExpectPrepare("INSERT INTO pagamentos")
 	mock.ExpectExec("INSERT INTO pagamentos").
-		WithArgs(int64(1), int64(10), "PIX", 1, 100.0, 0.0, 100.0, "2024-01-10", "2024-01-09", "Pago").
+		WithArgs(int64(1), int64(10), "PIX", 1, "100.00", 0.0, "100.00", "2024-01-10", "2024-01-09", "Pago").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 

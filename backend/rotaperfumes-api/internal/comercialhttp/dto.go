@@ -3,8 +3,8 @@
 // políticas ficam na tabela do bootstrap; o escopo de carteira é decidido
 // pelos casos de uso (comercialapp), nunca aqui.
 //
-// Os DTOs têm as mesmas chaves, ordem e tipos dos models legados (contrato
-// JSON inalterado). Como as entidades do domínio têm os mesmos campos, a
+// Os DTOs têm as mesmas chaves e ordem dos models legados (contrato JSON
+// inalterado: dinheiro em reais decimais, ARQ-09). Como as entidades do domínio têm os mesmos campos, a
 // conversão é a conversão de tipo do Go (as tags não contam).
 package comercialhttp
 
@@ -24,15 +24,15 @@ import (
 // ---------------------------------------------------------------------------
 
 type vendedorJSON struct {
-	ID               int64      `json:"id"`
-	Nome             string     `json:"nome"`
-	Regiao           string     `json:"regiao"`
-	UF               string     `json:"uf"`
-	DataAdmissao     time.Time  `json:"data_admissao"`
-	DataDesligamento *time.Time `json:"data_desligamento"`
-	MetaMensal       float64    `json:"meta_mensal"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID               int64           `json:"id"`
+	Nome             string          `json:"nome"`
+	Regiao           string          `json:"regiao"`
+	UF               string          `json:"uf"`
+	DataAdmissao     time.Time       `json:"data_admissao"`
+	DataDesligamento *time.Time      `json:"data_desligamento"`
+	MetaMensal       kernel.Dinheiro `json:"meta_mensal"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 func novoVendedorJSON(v comercial.Vendedor) vendedorJSON { return vendedorJSON(v) }
@@ -103,19 +103,19 @@ type visitaJSON struct {
 func novoVisitaJSON(v comercial.Visita) visitaJSON { return visitaJSON(v) }
 
 type oportunidadeJSON struct {
-	OportunidadeID   int64      `json:"oportunidade_id"`
-	ClienteID        int64      `json:"cliente_id"`
-	VendedorID       int64      `json:"vendedor_id"`
-	Origem           string     `json:"origem"`
-	DataAbertura     time.Time  `json:"data_abertura"`
-	Etapa            string     `json:"etapa"`
-	ProbabilidadePct float64    `json:"probabilidade_pct"`
-	ValorEstimado    float64    `json:"valor_estimado"`
-	DataFechamento   *time.Time `json:"data_fechamento"`
-	CicloDias        *int       `json:"ciclo_dias"`
-	MotivoPerda      *string    `json:"motivo_perda"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	OportunidadeID   int64           `json:"oportunidade_id"`
+	ClienteID        int64           `json:"cliente_id"`
+	VendedorID       int64           `json:"vendedor_id"`
+	Origem           string          `json:"origem"`
+	DataAbertura     time.Time       `json:"data_abertura"`
+	Etapa            string          `json:"etapa"`
+	ProbabilidadePct float64         `json:"probabilidade_pct"`
+	ValorEstimado    kernel.Dinheiro `json:"valor_estimado"`
+	DataFechamento   *time.Time      `json:"data_fechamento"`
+	CicloDias        *int            `json:"ciclo_dias"`
+	MotivoPerda      *string         `json:"motivo_perda"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 func novoOportunidadeJSON(o comercial.Oportunidade) oportunidadeJSON { return oportunidadeJSON(o) }
@@ -126,11 +126,11 @@ func novoOportunidadeJSON(o comercial.Oportunidade) oportunidadeJSON { return op
 // ---------------------------------------------------------------------------
 
 type vendedorRequest struct {
-	Nome         string  `json:"nome"`
-	Regiao       string  `json:"regiao"`
-	UF           string  `json:"uf"`
-	DataAdmissao string  `json:"data_admissao"` // AAAA-MM-DD (opcional na criação)
-	MetaMensal   float64 `json:"meta_mensal"`
+	Nome         string         `json:"nome"`
+	Regiao       string         `json:"regiao"`
+	UF           string         `json:"uf"`
+	DataAdmissao string         `json:"data_admissao"` // AAAA-MM-DD (opcional na criação)
+	MetaMensal   kernel.Decimal `json:"meta_mensal"`
 }
 
 type vincularClienteRequest struct {
@@ -156,16 +156,16 @@ type visitaRequest struct {
 }
 
 type oportunidadeRequest struct {
-	ClienteID        int64   `json:"cliente_id"`
-	VendedorID       int64   `json:"vendedor_id"` // ignorado para usuário restrito (E-05)
-	Origem           string  `json:"origem"`
-	DataAbertura     string  `json:"data_abertura"`
-	Etapa            string  `json:"etapa"`
-	ProbabilidadePct float64 `json:"probabilidade_pct"`
-	ValorEstimado    float64 `json:"valor_estimado"`
-	DataFechamento   string  `json:"data_fechamento"`
-	CicloDias        *int    `json:"ciclo_dias"`
-	MotivoPerda      string  `json:"motivo_perda"`
+	ClienteID        int64          `json:"cliente_id"`
+	VendedorID       int64          `json:"vendedor_id"` // ignorado para usuário restrito (E-05)
+	Origem           string         `json:"origem"`
+	DataAbertura     string         `json:"data_abertura"`
+	Etapa            string         `json:"etapa"`
+	ProbabilidadePct float64        `json:"probabilidade_pct"`
+	ValorEstimado    kernel.Decimal `json:"valor_estimado"`
+	DataFechamento   string         `json:"data_fechamento"`
+	CicloDias        *int           `json:"ciclo_dias"`
+	MotivoPerda      string         `json:"motivo_perda"`
 }
 
 // leitor adia o decode do body para depois da autorização do caso de uso

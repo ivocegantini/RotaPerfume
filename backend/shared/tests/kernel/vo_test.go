@@ -1,7 +1,6 @@
 package kernel_test
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -137,35 +136,6 @@ func TestEmail_Mascarado_IgualAoVlog(t *testing.T) {
 	}
 	var zero kernel.Email
 	assert.Equal(t, "***", zero.Mascarado())
-}
-
-func TestNovoDinheiro(t *testing.T) {
-	casos := []struct {
-		nome string
-		v    float64
-		ok   bool
-	}{
-		{"zero", 0, true},
-		{"positivo", 199.9, true},
-		{"negativo", -0.01, false},
-		{"NaN", math.NaN(), false},
-		{"+Inf", math.Inf(1), false},
-		{"-Inf", math.Inf(-1), false},
-	}
-	for _, c := range casos {
-		t.Run(c.nome, func(t *testing.T) {
-			d, err := kernel.NovoDinheiro(c.v)
-			if !c.ok {
-				assert.ErrorIs(t, err, kernel.ErrDinheiroInvalido)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, c.v, d.Float64())
-		})
-	}
-	a, _ := kernel.NovoDinheiro(10.5)
-	b, _ := kernel.NovoDinheiro(0.25)
-	assert.Equal(t, 10.75, a.Somar(b).Float64())
 }
 
 // N-2: errCampo nil engoliria a data inválida; é erro de programação.

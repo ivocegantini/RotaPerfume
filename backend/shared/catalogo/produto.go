@@ -29,8 +29,8 @@ type CamposProduto struct {
 	Categoria     string
 	Marca         string
 	NotaOlfativa  string // "" grava NULL
-	PrecoTabela   float64
-	CustoUnitario float64
+	PrecoTabela   kernel.Dinheiro
+	CustoUnitario kernel.Dinheiro
 	Unidade       string
 	// DataLancamento é a meia-noite em time.Local (BUG-01); nil = sem data.
 	DataLancamento *time.Time
@@ -43,8 +43,8 @@ type DadosProduto struct {
 	Categoria      string
 	Marca          string
 	NotaOlfativa   string
-	PrecoTabela    float64
-	CustoUnitario  float64
+	PrecoTabela    kernel.Decimal
+	CustoUnitario  kernel.Decimal
 	Unidade        string
 	DataLancamento string // AAAA-MM-DD, opcional
 }
@@ -68,22 +68,21 @@ func NovoProduto(d DadosProduto) (*Produto, error) {
 // categoria, marca, unidade, preço, custo e data de lançamento (opcional).
 func NovosCamposProduto(d DadosProduto) (CamposProduto, error) {
 	c := CamposProduto{
-		Descricao:     strings.TrimSpace(d.Descricao),
-		Categoria:     strings.TrimSpace(d.Categoria),
-		Marca:         strings.TrimSpace(d.Marca),
-		NotaOlfativa:  strings.TrimSpace(d.NotaOlfativa),
-		PrecoTabela:   d.PrecoTabela,
-		CustoUnitario: d.CustoUnitario,
-		Unidade:       strings.TrimSpace(d.Unidade),
+		Descricao:    strings.TrimSpace(d.Descricao),
+		Categoria:    strings.TrimSpace(d.Categoria),
+		Marca:        strings.TrimSpace(d.Marca),
+		NotaOlfativa: strings.TrimSpace(d.NotaOlfativa),
+		Unidade:      strings.TrimSpace(d.Unidade),
 	}
 	if err := c.validarObrigatorios(); err != nil {
 		return CamposProduto{}, err
 	}
-	if _, err := kernel.NovoDinheiro(c.PrecoTabela); err != nil {
-		return CamposProduto{}, ErrPrecoTabelaInvalido
+	var err error
+	if c.PrecoTabela, err = d.PrecoTabela.Dinheiro(ErrPrecoTabelaInvalido, ErrPrecoTabelaCasas); err != nil {
+		return CamposProduto{}, err
 	}
-	if _, err := kernel.NovoDinheiro(c.CustoUnitario); err != nil {
-		return CamposProduto{}, ErrCustoUnitarioInvalido
+	if c.CustoUnitario, err = d.CustoUnitario.Dinheiro(ErrCustoUnitarioInvalido, ErrCustoUnitarioCasas); err != nil {
+		return CamposProduto{}, err
 	}
 	if strings.TrimSpace(d.DataLancamento) != "" {
 		data, err := kernel.ParseDataLocal(d.DataLancamento, ErrDataLancamentoInvalida)

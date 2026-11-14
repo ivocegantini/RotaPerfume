@@ -50,7 +50,7 @@ func expectCarteiraInexistenteH(mock sqlmock.Sqlmock, vendedorID, clienteID int6
 func pedidoRowsVendedorH(idOrigem, vendedorID int64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-		AddRow(idOrigem, int64(1), vendedorID, now, "App", "Faturado", 230.0, now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), vendedorID, now, "App", "Faturado", "230.0", now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 // expectPedidoAtualH registra a leitura do pedido atual (GetPedidoDetalhe:
@@ -93,11 +93,11 @@ func TestCreatePedido_Normal_ForcaVendedorDoUsuario(t *testing.T) {
 	expectEscopoCarteiraPedidoH(mock, 2, 7, 1)
 	mock.ExpectBegin()
 	mock.ExpectExec(insertPedidoRegexH).
-		WithArgs(int64(1), int64(7), sqlmock.AnyArg(), "App", "Faturado", 230.0).
+		WithArgs(int64(1), int64(7), sqlmock.AnyArg(), "App", "Faturado", "230.00").
 		WillReturnResult(sqlmock.NewResult(100, 1))
-	mock.ExpectExec(insertItemRegexH).WithArgs(int64(100), int64(10), 2, 100.0, 10.0, 180.0).
+	mock.ExpectExec(insertItemRegexH).WithArgs(int64(100), int64(10), 2, "100.00", 10.0, "180.00").
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(insertItemRegexH).WithArgs(int64(100), int64(11), 1, 50.0, 0.0, 50.0).
+	mock.ExpectExec(insertItemRegexH).WithArgs(int64(100), int64(11), 1, "50.00", 0.0, "50.00").
 		WillReturnResult(sqlmock.NewResult(2, 1))
 	expectBaixaEstoquePorItemH(mock, 10, "SKU-010") // BUG-20: nasce Faturado
 	expectBaixaEstoquePorItemH(mock, 11, "SKU-011")
@@ -332,13 +332,13 @@ func TestUpdatePedido_Normal_NaoTrocaVendedor(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"status", "vendedor_id"}).AddRow("Pendente", int64(2)))
 	mock.ExpectQuery(selectItensAtuaisTxRegexH).WithArgs(int64(1)).WillReturnRows(itensAtuaisRowsVazioH())
 	mock.ExpectExec(updatePedidoRegexH).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0, int64(1)).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectExec(insertItemRegexH).WithArgs(int64(1), int64(10), 2, 100.0, 10.0, 180.0).
+	mock.ExpectExec(insertItemRegexH).WithArgs(int64(1), int64(10), 2, "100.00", 10.0, "180.00").
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(insertItemRegexH).WithArgs(int64(1), int64(11), 1, 50.0, 0.0, 50.0).
+	mock.ExpectExec(insertItemRegexH).WithArgs(int64(1), int64(11), 1, "50.00", 0.0, "50.00").
 		WillReturnResult(sqlmock.NewResult(2, 1))
 	expectBaixaEstoquePorItemH(mock, 10, "SKU-010")
 	expectBaixaEstoquePorItemH(mock, 11, "SKU-011")
@@ -468,7 +468,7 @@ func TestCreatePagamento_Normal_ProprioEscopo(t *testing.T) {
 	expectEscopoUsuarioH(mock, 2, 2)
 	expectLockPedidoRestritoH(mock, 1, 2) // SEC-35/38: posse e INSERT na tx, com o pedido travado
 	mock.ExpectExec(insertPagamentoRegH).
-		WithArgs(int64(1), "PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto").
+		WithArgs(int64(1), "PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegexH + pagamentoFromRegexH + ` WHERE pagamento_id = \? LIMIT 1`).
@@ -600,7 +600,7 @@ func TestUpdatePagamento_Normal_ProprioEscopo(t *testing.T) {
 	mock.ExpectQuery(pedidoByIDRegexH).WithArgs(int64(1)).WillReturnRows(pedidoRowsVendedorH(1, 2))
 	// SEC-27: o perfil normal grava com o UPDATE condicionado a "não quitado".
 	mock.ExpectExec(updatePagamentoRegH+`.*AND status_pagamento NOT IN \(\?, \?\)`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1), "Pago", "Pago com atraso").
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1), "Pago", "Pago com atraso").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(pagamentoByIDRegexH).WithArgs(int64(1)).WillReturnRows(pagamentoRowsForHandler(1, 1, 100.0))
 

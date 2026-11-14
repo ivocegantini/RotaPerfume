@@ -4,6 +4,7 @@ package analytics_test
 // fora do funil, taxa de ganho e conversões arredondadas).
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,12 +68,13 @@ func TestDASH01_JanelaString(t *testing.T) {
 }
 
 // etapas monta as 5 etapas esperadas na ordem do funil a partir de
-// (quantidade, valor, conv. anterior, conv. topo).
+// (quantidade, valor, conv. anterior, conv. topo); o valor esperado vira
+// Dinheiro exato (ARQ-09).
 func etapas(v [5][4]float64) []analytics.EtapaFunil {
 	nomes := []string{analytics.EtapaProspeccao, analytics.EtapaQualificacao, analytics.EtapaProposta, analytics.EtapaNegociacao, analytics.EtapaGanho}
 	out := make([]analytics.EtapaFunil, 5)
 	for i, n := range nomes {
-		out[i] = analytics.EtapaFunil{Etapa: n, Quantidade: int(v[i][0]), ValorEstimado: v[i][1], ConversaoAnteriorPct: v[i][2], ConversaoTopoPct: v[i][3]}
+		out[i] = analytics.EtapaFunil{Etapa: n, Quantidade: int(v[i][0]), ValorEstimado: reaisT(strconv.FormatFloat(v[i][1], 'f', 2, 64)), ConversaoAnteriorPct: v[i][2], ConversaoTopoPct: v[i][3]}
 	}
 	return out
 }
@@ -96,13 +98,13 @@ func TestDASH01_NovoFunil(t *testing.T) {
 		{
 			nome: "cumulativo completo com perdidas e etapa desconhecida", janela: analytics.Janela90d,
 			contagens: []analytics.ContagemEtapa{
-				{Etapa: analytics.EtapaGanho, Quantidade: 4, Valor: 40},
-				{Etapa: analytics.EtapaProspeccao, Quantidade: 10, Valor: 100},
-				{Etapa: "Desconhecida", Quantidade: 7, Valor: 70},
-				{Etapa: analytics.EtapaQualificacao, Quantidade: 5, Valor: 50},
-				{Etapa: analytics.EtapaPerdido, Quantidade: 6, Valor: 60},
-				{Etapa: analytics.EtapaProposta, Quantidade: 3, Valor: 30},
-				{Etapa: analytics.EtapaNegociacao, Quantidade: 2, Valor: 20},
+				{Etapa: analytics.EtapaGanho, Quantidade: 4, Valor: reaisT("40")},
+				{Etapa: analytics.EtapaProspeccao, Quantidade: 10, Valor: reaisT("100")},
+				{Etapa: "Desconhecida", Quantidade: 7, Valor: reaisT("70")},
+				{Etapa: analytics.EtapaQualificacao, Quantidade: 5, Valor: reaisT("50")},
+				{Etapa: analytics.EtapaPerdido, Quantidade: 6, Valor: reaisT("60")},
+				{Etapa: analytics.EtapaProposta, Quantidade: 3, Valor: reaisT("30")},
+				{Etapa: analytics.EtapaNegociacao, Quantidade: 2, Valor: reaisT("20")},
 			},
 			want: analytics.Funil{
 				Janela: analytics.Janela90d, TotalOportunidades: 37,
@@ -113,35 +115,35 @@ func TestDASH01_NovoFunil(t *testing.T) {
 					{6, 60, 66.67, 25},      // 6/9, 6/24
 					{4, 40, 66.67, 16.67},   // 4/6, 4/24
 				}),
-				Perdidas:     analytics.TotalEtapa{Quantidade: 6, ValorEstimado: 60},
+				Perdidas:     analytics.TotalEtapa{Quantidade: 6, ValorEstimado: reaisT("60")},
 				TaxaGanhoPct: 40, // 4/(4+6)
 			},
 		},
 		{
 			nome: "perdidas e desconhecidas só no total; anterior 0 → conversão 0", janela: analytics.Janela365d,
 			contagens: []analytics.ContagemEtapa{
-				{Etapa: analytics.EtapaPerdido, Quantidade: 3, Valor: 30.556},
-				{Etapa: "prospecção", Quantidade: 2, Valor: 1}, // caixa diferente: comparação exata
-				{Etapa: "", Quantidade: 1, Valor: 1},
+				{Etapa: analytics.EtapaPerdido, Quantidade: 3, Valor: reaisT("30.56")},
+				{Etapa: "prospecção", Quantidade: 2, Valor: reaisT("1")}, // caixa diferente: comparação exata
+				{Etapa: "", Quantidade: 1, Valor: reaisT("1")},
 			},
 			want: analytics.Funil{
 				Janela: analytics.Janela365d, TotalOportunidades: 6, Etapas: zeros,
-				Perdidas:     analytics.TotalEtapa{Quantidade: 3, ValorEstimado: 30.56},
+				Perdidas:     analytics.TotalEtapa{Quantidade: 3, ValorEstimado: reaisT("30.56")},
 				TaxaGanhoPct: 0, // 0/(0+3)
 			},
 		},
 		{
-			nome: "etapas duplicadas somadas e valores arredondados",
+			nome: "etapas duplicadas somadas, valores exatos em centavos (ARQ-09)",
 			contagens: []analytics.ContagemEtapa{
-				{Etapa: analytics.EtapaProspeccao, Quantidade: 1, Valor: 1.111},
-				{Etapa: analytics.EtapaProspeccao, Quantidade: 2, Valor: 2.222},
-				{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: 10.004},
-				{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: 0.002},
+				{Etapa: analytics.EtapaProspeccao, Quantidade: 1, Valor: reaisT("1.11")},
+				{Etapa: analytics.EtapaProspeccao, Quantidade: 2, Valor: reaisT("2.22")},
+				{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: reaisT("10.00")},
+				{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: reaisT("0.01")},
 			},
 			want: analytics.Funil{
 				TotalOportunidades: 5,
 				Etapas: etapas([5][4]float64{
-					{5, 13.34, 100, 100}, // 3.333 + 10.006 = 13.339
+					{5, 13.34, 100, 100}, // 3.33 + 10.01
 					{2, 10.01, 40, 40},
 					{2, 10.01, 100, 40},
 					{2, 10.01, 100, 40},
@@ -152,10 +154,10 @@ func TestDASH01_NovoFunil(t *testing.T) {
 		},
 		{
 			nome:      "só topo: conversões seguintes 0 e taxa de ganho com denominador 0",
-			contagens: []analytics.ContagemEtapa{{Etapa: analytics.EtapaProspeccao, Quantidade: 5, Valor: 9.999}},
+			contagens: []analytics.ContagemEtapa{{Etapa: analytics.EtapaProspeccao, Quantidade: 5, Valor: reaisT("9.99")}},
 			want: analytics.Funil{
 				TotalOportunidades: 5,
-				Etapas:             etapas([5][4]float64{{5, 10, 100, 100}}),
+				Etapas:             etapas([5][4]float64{{5, 9.99, 100, 100}}),
 			},
 		},
 		{
@@ -182,7 +184,8 @@ func TestDASH01_NovoFunil(t *testing.T) {
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
-			f := analytics.NovoFunil(c.janela, c.contagens)
+			f, err := analytics.NovoFunil(c.janela, c.contagens)
+			require.NoError(t, err)
 			assert.Equal(t, c.want, f)
 			assert.NotNil(t, f.Etapas)
 			assert.False(t, f.VendedorDesligado, "quem tem dados nunca está desligado")
@@ -192,13 +195,29 @@ func TestDASH01_NovoFunil(t *testing.T) {
 
 // O funil é monotônico: cada etapa ≤ a anterior (cumulativo do fundo).
 func TestDASH01_NovoFunil_Monotonico(t *testing.T) {
-	f := analytics.NovoFunil(analytics.JanelaTudo, []analytics.ContagemEtapa{
+	f, err := analytics.NovoFunil(analytics.JanelaTudo, []analytics.ContagemEtapa{
 		{Etapa: analytics.EtapaNegociacao, Quantidade: 50}, {Etapa: analytics.EtapaProspeccao, Quantidade: 1},
 		{Etapa: analytics.EtapaGanho, Quantidade: 7}, {Etapa: analytics.EtapaQualificacao, Quantidade: 3},
 	})
+	require.NoError(t, err)
 	for i := 1; i < len(f.Etapas); i++ {
 		assert.LessOrEqual(t, f.Etapas[i].Quantidade, f.Etapas[i-1].Quantidade)
 		assert.LessOrEqual(t, f.Etapas[i].ConversaoAnteriorPct, 100.0)
+	}
+}
+
+// ARQ-09: soma de valor estimado acima de DECIMAL(15,2) é 500, nunca wrap.
+func TestARQ09_NovoFunil_SomaForaDoLimite(t *testing.T) {
+	max := reaisT("9999999999999.99")
+	for _, c := range [][]analytics.ContagemEtapa{
+		{{Etapa: analytics.EtapaGanho, Valor: max}, {Etapa: analytics.EtapaGanho, Valor: reaisT("0.01")}},
+		{{Etapa: analytics.EtapaGanho, Valor: max}, {Etapa: analytics.EtapaProspeccao, Valor: max}},
+	} {
+		_, err := analytics.NovoFunil(analytics.JanelaTudo, c)
+		require.ErrorIs(t, err, analytics.ErrValorForaDoLimite)
+		var ke *kernel.Erro
+		require.ErrorAs(t, err, &ke)
+		assert.Equal(t, kernel.KindInterno, ke.Kind())
 	}
 }
 

@@ -38,14 +38,14 @@ func (r *Dashboard) VendasTotais(ctx context.Context, e kernel.Escopo, p analyti
 	if err != nil {
 		return analytics.TotaisVendas{}, err
 	}
-	var valor sql.NullFloat64
+	var valor kernel.Dinheiro // DECIMAL exato; NULL vira zero (ARQ-09)
 	var qtd sql.NullInt64
 	err = r.q.QueryRowContext(ctx, fmt.Sprintf(fmtVendasTotais, clausulaPeriodoPedido(p))+filtro, args...).Scan(&valor, &qtd)
 	if err != nil {
 		return analytics.TotaisVendas{}, semTabela(err, "vendas totais")
 	}
 	vlog.Printf(arqDashboard, "Dashboard.VendasTotais", "SELECT pedidos totais linhas=1")
-	return analytics.TotaisVendas{Valor: valor.Float64, Quantidade: int(qtd.Int64)}, nil
+	return analytics.TotaisVendas{Valor: valor, Quantidade: int(qtd.Int64)}, nil
 }
 
 // TotalPedidos: quantidade de pedidos do período. Sem a tabela, zero.
@@ -65,17 +65,17 @@ func (r *Dashboard) TotalPedidos(ctx context.Context, e kernel.Escopo, p analyti
 
 // MetaMensalTotal: soma das metas dos vendedores ativos do escopo. Sem a
 // tabela vendedores, zero.
-func (r *Dashboard) MetaMensalTotal(ctx context.Context, e kernel.Escopo) (float64, error) {
+func (r *Dashboard) MetaMensalTotal(ctx context.Context, e kernel.Escopo) (kernel.Dinheiro, error) {
 	filtro, args, err := filtroVendedor(e, filtroVendedorPorID)
 	if err != nil {
-		return 0, err
+		return kernel.Dinheiro{}, err
 	}
-	var meta sql.NullFloat64
+	var meta kernel.Dinheiro
 	if err = r.q.QueryRowContext(ctx, sqlMetaMensalTotal+filtro, args...).Scan(&meta); err != nil {
-		return 0, semTabela(err, "meta mensal total")
+		return kernel.Dinheiro{}, semTabela(err, "meta mensal total")
 	}
 	vlog.Printf(arqDashboard, "Dashboard.MetaMensalTotal", "SELECT vendedores meta linhas=1")
-	return meta.Float64, nil
+	return meta, nil
 }
 
 // semTabela: "tabela não existe" vira nil (o chamador devolve zero, como o
@@ -183,12 +183,12 @@ func (r *Dashboard) somarVendasDoLote(ctx context.Context, ids []any, vendas map
 	defer rows.Close()
 	for rows.Next() {
 		var vendedorID int64
-		var total sql.NullFloat64
+		var total kernel.Dinheiro
 		var qtd sql.NullInt64
 		if err := rows.Scan(&vendedorID, &total, &qtd); err != nil {
 			continue
 		}
-		vendas[vendedorID] = analytics.VendasDoMes{Total: total.Float64, Quantidade: int(qtd.Int64)}
+		vendas[vendedorID] = analytics.VendasDoMes{Total: total, Quantidade: int(qtd.Int64)}
 	}
 }
 
@@ -233,12 +233,12 @@ func lerVendasPorDia(rows *sql.Rows) map[string]analytics.PontoVenda {
 	vendas := make(map[string]analytics.PontoVenda)
 	for rows.Next() {
 		var dia string
-		var valor sql.NullFloat64
+		var valor kernel.Dinheiro
 		var qtd sql.NullInt64
 		if err := rows.Scan(&dia, &valor, &qtd); err != nil {
 			continue
 		}
-		vendas[dia] = analytics.PontoVenda{Dia: dia, TotalVendas: valor.Float64, TotalPedidos: int(qtd.Int64)}
+		vendas[dia] = analytics.PontoVenda{Dia: dia, TotalVendas: valor, TotalPedidos: int(qtd.Int64)}
 	}
 	return vendas
 }

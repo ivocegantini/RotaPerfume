@@ -138,7 +138,7 @@ func TestTrocarSenha_RamosDeFalha(t *testing.T) {
 		{"senha atual vazia", p, cmd("", "Nova#12345"), nil, identidade.ErrSenhaAtualObrigatoria},
 		{"nova vazia", p, cmd("Atual#123", ""), nil, identidade.ErrNovaSenhaObrigatoria},
 		{"rate limit", p, cmd("Atual#123", "Nova#12345"), func(a *ambiente) { a.limite = limitadorFake{bloquear: "reset:"} }, identidade.ErrMuitasTentativas},
-		{"usuário sumiu → 404", p, cmd("Atual#123", "Nova#12345"), func(a *ambiente) { a.usuarios.errPorID = []error{identidade.ErrUsuarioNaoEncontrado} }, identidade.ErrUsuarioNaoEncontrado},
+		{"usuário sumiu → 400 (BUG-25)", p, cmd("Atual#123", "Nova#12345"), func(a *ambiente) { a.usuarios.errPorID = []error{identidade.ErrUsuarioNaoEncontrado} }, identidade.ErrContaRemovidaNaTroca},
 		{"infra na leitura → 500", p, cmd("Atual#123", "Nova#12345"), func(a *ambiente) { a.usuarios.errPorID = []error{errInfra} }, errInfra},
 		{"infra no histórico → 500", p, cmd("Atual#123", "Nova#12345"), func(a *ambiente) { a.historico.errListar = errInfra }, errInfra},
 		{"hash da nova falha → 500", p, cmd("Atual#123", "Nova#12345"), func(a *ambiente) { a.hasher.errGerar = errInfra }, errInfra},
@@ -152,7 +152,32 @@ func TestTrocarSenha_RamosDeFalha(t *testing.T) {
 			assert.ErrorIs(t, a.casos().TrocarSenha(ctx, c.p, c.cmd), c.want)
 		})
 	}
-	t.Run("falha ao gravar é 500 mesmo para inexistente (sem %w)", func(t *testing.T) {
+	// BUG-25: conta apagada no meio da troca (FK do histórico ou UPDATE sem
+	// linha) é 400; a releitura com infra fora continua 500.
+	t.Run("conta apagada durante a gravação → 400 (BUG-25)", func(t *testing.T) {
+		for nome, falhar := range map[string]func(a *ambiente){
+			"FK do histórico":  func(a *ambiente) { a.historico.errRegistro = errInfra },
+			"UPDATE sem linha": func(a *ambiente) { a.usuarios.errSenha = identidade.ErrUsuarioNaoEncontrado },
+		} {
+			t.Run(nome, func(t *testing.T) {
+				a := novoAmbiente(u)
+				falhar(a)
+				a.usuarios.errPorID = []error{nil, identidade.ErrUsuarioNaoEncontrado}
+				err := a.casos().TrocarSenha(ctx, p, cmd("Atual#123", "Nova#12345"))
+				assert.ErrorIs(t, err, identidade.ErrContaRemovidaNaTroca)
+				assert.Empty(t, a.usuarios.senhas)
+			})
+		}
+		t.Run("releitura com infra fora segue 500", func(t *testing.T) {
+			a := novoAmbiente(u)
+			a.historico.errRegistro = errInfra
+			a.usuarios.errPorID = []error{nil, errInfra}
+			err := a.casos().TrocarSenha(ctx, p, cmd("Atual#123", "Nova#12345"))
+			require.Error(t, err)
+			assert.NotErrorIs(t, err, identidade.ErrContaRemovidaNaTroca)
+		})
+	})
+	t.Run("falha ao gravar com a conta presente é 500 (sem %w)", func(t *testing.T) {
 		a := novoAmbiente(u)
 		a.usuarios.errSenha = identidade.ErrUsuarioNaoEncontrado
 		err := a.casos().TrocarSenha(ctx, p, cmd("Atual#123", "Nova#12345"))

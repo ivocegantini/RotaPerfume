@@ -11,22 +11,23 @@ import (
 	"github.com/rotaperfumes/rotaperfumes-api/internal/httpx"
 	"github.com/rotaperfumes/shared/catalogo"
 	"github.com/rotaperfumes/shared/catalogo/catalogoapp"
+	"github.com/rotaperfumes/shared/kernel"
 )
 
 // produtoResposta tem as mesmas chaves, ordem e tipos do models.Produto
 // legado (contrato JSON inalterado).
 type produtoResposta struct {
-	ID             int64      `json:"id"`
-	SKU            string     `json:"sku"`
-	Descricao      string     `json:"descricao"`
-	Categoria      string     `json:"categoria"`
-	Marca          string     `json:"marca"`
-	NotaOlfativa   string     `json:"nota_olfativa"`
-	PrecoTabela    float64    `json:"preco_tabela"`
-	CustoUnitario  float64    `json:"custo_unitario"`
-	Unidade        string     `json:"unidade"`
-	DataLancamento *time.Time `json:"data_lancamento"`
-	Ativo          bool       `json:"ativo"`
+	ID             int64           `json:"id"`
+	SKU            string          `json:"sku"`
+	Descricao      string          `json:"descricao"`
+	Categoria      string          `json:"categoria"`
+	Marca          string          `json:"marca"`
+	NotaOlfativa   string          `json:"nota_olfativa"`
+	PrecoTabela    kernel.Dinheiro `json:"preco_tabela"`
+	CustoUnitario  kernel.Dinheiro `json:"custo_unitario"`
+	Unidade        string          `json:"unidade"`
+	DataLancamento *time.Time      `json:"data_lancamento"`
+	Ativo          bool            `json:"ativo"`
 	// ImagemURL (IMG-01) é o caminho público da imagem, ou null sem imagem.
 	ImagemURL *string   `json:"imagem_url"`
 	CreatedAt time.Time `json:"created_at"`
@@ -61,14 +62,14 @@ type criarProdutoRequest struct {
 // atualizarProdutoRequest é o body do PUT de produto. Não tem sku: como no
 // legado, um "sku" no PUT é ignorado (e não vira 400 por tipo errado).
 type atualizarProdutoRequest struct {
-	Descricao      string  `json:"descricao"`
-	Categoria      string  `json:"categoria"`
-	Marca          string  `json:"marca"`
-	NotaOlfativa   string  `json:"nota_olfativa"`
-	PrecoTabela    float64 `json:"preco_tabela"`
-	CustoUnitario  float64 `json:"custo_unitario"`
-	Unidade        string  `json:"unidade"`
-	DataLancamento string  `json:"data_lancamento"` // opcional, AAAA-MM-DD
+	Descricao      string         `json:"descricao"`
+	Categoria      string         `json:"categoria"`
+	Marca          string         `json:"marca"`
+	NotaOlfativa   string         `json:"nota_olfativa"`
+	PrecoTabela    kernel.Decimal `json:"preco_tabela"`
+	CustoUnitario  kernel.Decimal `json:"custo_unitario"`
+	Unidade        string         `json:"unidade"`
+	DataLancamento string         `json:"data_lancamento"` // opcional, AAAA-MM-DD
 }
 
 func (r criarProdutoRequest) paraDados() catalogo.DadosProduto {

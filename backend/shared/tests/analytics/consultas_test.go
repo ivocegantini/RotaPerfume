@@ -31,7 +31,7 @@ func (f *vendasFake) passo() error {
 }
 
 func (f *vendasFake) VendasTotais(context.Context, kernel.Escopo, analytics.Periodo) (analytics.TotaisVendas, error) {
-	return analytics.TotaisVendas{Valor: 90, Quantidade: 3}, f.passo()
+	return analytics.TotaisVendas{Valor: reaisT("90"), Quantidade: 3}, f.passo()
 }
 func (f *vendasFake) TotalPedidos(context.Context, kernel.Escopo, analytics.Periodo) (int, error) {
 	return 3, f.passo()
@@ -42,8 +42,8 @@ func (f *vendasFake) TopVendedores(_ context.Context, _ kernel.Escopo, limite in
 func (f *vendasFake) MetasVendedores(context.Context, kernel.Escopo) ([]analytics.MetaVendedor, error) {
 	return nil, f.passo()
 }
-func (f *vendasFake) MetaMensalTotal(context.Context, kernel.Escopo) (float64, error) {
-	return 1000, f.passo()
+func (f *vendasFake) MetaMensalTotal(context.Context, kernel.Escopo) (kernel.Dinheiro, error) {
+	return reaisT("1000"), f.passo()
 }
 func (f *vendasFake) SerieVendas(_ context.Context, _ kernel.Escopo, d analytics.Dias) ([]analytics.PontoVenda, error) {
 	return []analytics.PontoVenda{{Dia: "x", TotalPedidos: d.Int()}}, f.passo()

@@ -39,10 +39,10 @@ func TestDashboardVendedorFilter(t *testing.T) {
 				} else {
 					exp.WithArgs()
 				}
-				exp.WillReturnRows(sqlmock.NewRows([]string{"v", "q"}).AddRow(10.5, 2))
+				exp.WillReturnRows(sqlmock.NewRows([]string{"v", "q"}).AddRow("10.5", 2))
 				v, q, err := valorEQtd(analyticsmysql.NovoDashboard(db, time.Now).VendasTotais(ctx, escopoDe(vendedorID), periodoDe("month")))
 				require.NoError(t, err)
-				assert.Equal(t, 10.5, v)
+				assert.Equal(t, reaisT("10.5"), v)
 				assert.Equal(t, 2, q)
 			},
 		},
@@ -56,10 +56,10 @@ func TestDashboardVendedorFilter(t *testing.T) {
 				} else {
 					exp.WithArgs()
 				}
-				exp.WillReturnRows(sqlmock.NewRows([]string{"m"}).AddRow(1000.0))
+				exp.WillReturnRows(sqlmock.NewRows([]string{"m"}).AddRow("1000.0"))
 				m, err := analyticsmysql.NovoDashboard(db, time.Now).MetaMensalTotal(ctx, escopoDe(vendedorID))
 				require.NoError(t, err)
-				assert.Equal(t, 1000.0, m)
+				assert.Equal(t, reaisT("1000.0"), m)
 			},
 		},
 		{

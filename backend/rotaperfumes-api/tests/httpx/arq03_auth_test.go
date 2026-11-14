@@ -88,7 +88,7 @@ func TestCookiesDeSessao(t *testing.T) {
 	w := httptest.NewRecorder()
 	httpx.DefinirCookiesSessao(w, "acesso", "refresh", time.Hour, true)
 	cs := w.Result().Cookies()
-	if assert.Len(t, cs, 4, "SEC-33: 2 cookies __Host- + expiração dos 2 antigos") {
+	if assert.Len(t, cs, 2, "CHORE-14: só os 2 cookies __Host-") {
 		assert.Equal(t, httpx.CookiesSeguros.Acesso, cs[0].Name)
 		assert.True(t, cs[0].HttpOnly && cs[0].Secure)
 		assert.Equal(t, http.SameSiteStrictMode, cs[0].SameSite)

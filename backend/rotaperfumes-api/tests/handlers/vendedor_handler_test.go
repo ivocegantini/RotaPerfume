@@ -23,7 +23,7 @@ const clienteResumoFromRegexH = ` FROM carteiras ca JOIN clientes c ON c\.client
 func vendedorGetRowsH(id int64, nome string, dataDesligamento any) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "data_admissao", "data_desligamento", "meta_mensal", "created_at", "updated_at"}).
-		AddRow(id, nome, "Sudeste", "SP", now, dataDesligamento, 5000.0, now, now)
+		AddRow(id, nome, "Sudeste", "SP", now, dataDesligamento, "5000.0", now, now)
 }
 
 func clienteResumoRowsH() *sqlmock.Rows {
@@ -641,7 +641,7 @@ func TestCreateVendedor_Success(t *testing.T) {
 	adminToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`INSERT INTO vendedores \(nome, regiao, uf, data_admissao, data_desligamento, meta_mensal\)`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, 5000.0).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), nil, "5000.00").
 		WillReturnResult(sqlmock.NewResult(5, 1))
 
 	req, _ := http.NewRequest("POST", server.URL+"/api/vendedores", makeJSON(validVendedorPayload()))
@@ -770,7 +770,7 @@ func TestUpdateVendedor_Success(t *testing.T) {
 	adminToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), 5000.0, int64(1)).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), "5000.00", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(vendedorGetColunasRegexH).
 		WithArgs(int64(1)).
@@ -864,7 +864,7 @@ func TestUpdateVendedor_NaoEncontrado(t *testing.T) {
 	adminToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE vendedores\s+SET nome = \?, regiao = \?, uf = \?, data_admissao = \?, meta_mensal = \?\s+WHERE id = \?`).
-		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), 5000.0, int64(999)).
+		WithArgs("Novo Vendedor", "Sudeste", "SP", sqlmock.AnyArg(), "5000.00", int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/vendedores/999", makeJSON(validVendedorPayload()))

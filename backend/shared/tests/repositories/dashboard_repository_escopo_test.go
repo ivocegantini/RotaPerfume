@@ -84,11 +84,11 @@ func TestDashboardEscopo_GetVendasTotais(t *testing.T) {
 				} else {
 					exp.WithoutArgs()
 				}
-				exp.WillReturnRows(sqlmock.NewRows([]string{"v", "q"}).AddRow(50.0, 1))
+				exp.WillReturnRows(sqlmock.NewRows([]string{"v", "q"}).AddRow("50.0", 1))
 
 				valor, qtd, err := valorEQtd(analyticsmysql.NovoDashboard(db, time.Now).VendasTotais(context.Background(), escopoDe(tt.vendedorID), periodoDe(periodo)))
 				require.NoError(t, err)
-				assert.Equal(t, 50.0, valor)
+				assert.Equal(t, reaisT("50.0"), valor)
 				assert.Equal(t, 1, qtd)
 				require.NotEmpty(t, *captured)
 				assertFiltro(t, (*captured)[0], "AND status NOT IN ('cancelado', 'devolvido') AND vendedor_id = ?", tt.filtra, "")
@@ -129,11 +129,11 @@ func TestDashboardEscopo_GetMetaMensalTotal(t *testing.T) {
 			} else {
 				exp.WithoutArgs()
 			}
-			exp.WillReturnRows(sqlmock.NewRows([]string{"m"}).AddRow(1000.0))
+			exp.WillReturnRows(sqlmock.NewRows([]string{"m"}).AddRow("1000.0"))
 
 			meta, err := analyticsmysql.NovoDashboard(db, time.Now).MetaMensalTotal(context.Background(), escopoDe(tt.vendedorID))
 			require.NoError(t, err)
-			assert.Equal(t, 1000.0, meta)
+			assert.Equal(t, reaisT("1000.0"), meta)
 			assertFiltro(t, (*captured)[0], "WHERE data_desligamento IS NULL AND id = ?", tt.filtra, "")
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -233,7 +233,7 @@ func TestDashboardEscopo_GetVendedoresRanking(t *testing.T) {
 				// Filtro antes de LIMIT/OFFSET.
 				lista.WithArgs(tt.vendedorID, tt.limit, tt.offset)
 				total = 1
-				rows.AddRow(tt.vendedorID, "B", "Sul", "PR", 100.0, 50.0, 1, 50.0)
+				rows.AddRow(tt.vendedorID, "B", "Sul", "PR", "100.0", "50.0", 1, "50.0")
 			} else {
 				count.WithoutArgs()
 				lista.WithArgs(tt.limit, tt.offset)
@@ -290,7 +290,7 @@ func TestDashboardEmptySeries(t *testing.T) {
 			for i, p := range serie {
 				assert.Equal(t, 3, reflect.TypeOf(p).NumField(), "três campos: dia, total_vendas, total_pedidos")
 				assert.Regexp(t, isoDate, p.Dia)
-				assert.Equal(t, 0.0, p.TotalVendas)
+				assert.Equal(t, reaisT("0.0"), p.TotalVendas)
 				assert.Equal(t, 0, p.TotalPedidos)
 				if i > 0 {
 					assert.Less(t, serie[i-1].Dia, p.Dia, "ordem crescente")

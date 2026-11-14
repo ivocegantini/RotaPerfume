@@ -63,31 +63,31 @@ func TestBUG19_Ranking_AtingimentoArredondado(t *testing.T) {
 	}
 }
 
-// Ticket médio = total/pedidos, também arredondado (1 pedido → o próprio valor).
+// Ticket médio = total/pedidos (estatística float64), arredondado. ARQ-09:
+// o total é Dinheiro exato e sai sem arredondar.
 func TestBUG19_Ranking_TicketArredondado(t *testing.T) {
-	for _, c := range bug19Casos {
-		if math.IsNaN(c.entrada) || math.IsInf(c.entrada, 0) {
-			continue
-		}
-		t.Run(fmt.Sprintf("%v", c.entrada), func(t *testing.T) {
-			l := analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: c.entrada, TotalPedidos: 1})
+	casos := []struct {
+		total   string
+		pedidos int
+		want    float64
+	}{
+		{"10.00", 3, 3.33}, {"20.00", 3, 6.67}, {"0.05", 2, 0.03}, {"-0.05", 2, -0.03},
+		{"1.25", 1, 1.25}, {"99.99", 1, 99.99}, {"0.01", 3, 0}, {"-0.01", 3, 0},
+	}
+	for _, c := range casos {
+		t.Run(c.total, func(t *testing.T) {
+			l := analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: reaisT(c.total), TotalPedidos: c.pedidos})
 			assert.Equal(t, c.want, l.TicketMedio)
-			assert.Equal(t, c.entrada, l.TotalVendas, "o total não é arredondado")
+			assert.Equal(t, reaisT(c.total), l.TotalVendas, "o total não é arredondado")
 			bug19SemMenosZero(t, l.TicketMedio)
 		})
 	}
-	// Divisão que gera dízima: 10/3 = 3.333… → 3.33; 20/3 = 6.666… → 6.67.
-	assert.Equal(t, 3.33, analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: 10, TotalPedidos: 3}).TicketMedio)
-	assert.Equal(t, 6.67, analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: 20, TotalPedidos: 3}).TicketMedio)
-	// Overflow do total (Inf) dividido por pedidos: 0, não Inf no JSON.
-	l := analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: math.Inf(1), TotalPedidos: 2})
-	assert.Zero(t, l.TicketMedio)
 }
 
 // A linha inteira serializa sem erro e sem "-0" mesmo com entradas ruins.
 func TestBUG19_Ranking_JSONSemMenosZeroNemNaN(t *testing.T) {
 	for _, at := range []float64{-0.004, math.NaN(), math.Inf(-1)} {
-		l := analytics.NovaLinhaRanking(analytics.DadosRanking{Atingimento: at, TotalVendas: -0.001, TotalPedidos: 1})
+		l := analytics.NovaLinhaRanking(analytics.DadosRanking{Atingimento: at, TotalVendas: reaisT("-0.01"), TotalPedidos: 3})
 		b, err := json.Marshal(struct{ T, A float64 }{l.TicketMedio, l.AtingimentoMeta})
 		require.NoError(t, err)
 		assert.JSONEq(t, `{"T":0,"A":0}`, string(b))
@@ -95,25 +95,26 @@ func TestBUG19_Ranking_JSONSemMenosZeroNemNaN(t *testing.T) {
 	}
 }
 
-// Funil: valor estimado e percentuais passam pelo mesmo arredondamento.
+// Funil: percentuais com arredondar2; valores exatos em centavos (ARQ-09).
 func TestBUG19_Funil_ValoresEPercentuais(t *testing.T) {
-	f := analytics.NovoFunil(analytics.Janela(0), []analytics.ContagemEtapa{
-		{Etapa: analytics.EtapaProspeccao, Quantidade: 3, Valor: 2.675},
-		{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: 1.005},
-		{Etapa: analytics.EtapaPerdido, Quantidade: 2, Valor: -0.004},
+	f, err := analytics.NovoFunil(analytics.Janela(0), []analytics.ContagemEtapa{
+		{Etapa: analytics.EtapaProspeccao, Quantidade: 3, Valor: reaisT("2.67")},
+		{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: reaisT("1.01")},
+		{Etapa: analytics.EtapaPerdido, Quantidade: 2},
 	})
+	require.NoError(t, err)
 	require.Len(t, f.Etapas, 5)
-	assert.Equal(t, 3.68, f.Etapas[0].ValorEstimado, "2.675 + 1.005 = 3.68")
-	assert.Equal(t, 1.0, f.Etapas[4].ValorEstimado)
+	assert.Equal(t, "3.68", f.Etapas[0].ValorEstimado.String(), "2.67 + 1.01 = 3.68")
+	assert.Equal(t, "1.01", f.Etapas[4].ValorEstimado.String())
 	assert.Equal(t, 25.0, f.Etapas[1].ConversaoTopoPct, "1/4")
 	assert.Equal(t, 33.33, f.TaxaGanhoPct, "1/3 = 33.333…")
-	assert.Equal(t, 0.0, f.Perdidas.ValorEstimado)
-	bug19SemMenosZero(t, f.Perdidas.ValorEstimado)
+	assert.Equal(t, int64(0), f.Perdidas.ValorEstimado.Centavos())
 
 	// 2/3 = 66.666… → 66.67 (metade para cima, nunca truncado).
-	f = analytics.NovoFunil(analytics.Janela(0), []analytics.ContagemEtapa{
+	f, err = analytics.NovoFunil(analytics.Janela(0), []analytics.ContagemEtapa{
 		{Etapa: analytics.EtapaGanho, Quantidade: 2}, {Etapa: analytics.EtapaPerdido, Quantidade: 1},
 	})
+	require.NoError(t, err)
 	assert.Equal(t, 66.67, f.TaxaGanhoPct)
 
 	b, err := json.Marshal(f)

@@ -90,13 +90,13 @@ func TestARQ06_ContratoJSON_ByteAByte(t *testing.T) {
 		server, db, mock := setupTestServer(t)
 		defer server.Close()
 		defer db.Close()
-		mock.ExpectQuery(reVendasTotais).WillReturnRows(sqlmock.NewRows([]string{"v", "q"}).AddRow(1234.5, 3))
+		mock.ExpectQuery(reVendasTotais).WillReturnRows(sqlmock.NewRows([]string{"v", "q"}).AddRow("1234.5", 3))
 		mock.ExpectQuery(reTotalPedidos).WillReturnRows(sqlmock.NewRows([]string{"t"}).AddRow(3))
-		mock.ExpectQuery(reTopVendedores).WithArgs(10).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).AddRow(int64(7), "Ana", 1000.0))
-		mock.ExpectQuery(reEnrichVendas).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(7), 250.25, 2))
-		mock.ExpectQuery(reMetasVendedores).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).AddRow(int64(7), "Ana", "Sul", "PR", 1000.0))
-		mock.ExpectQuery(reEnrichVendas).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(7), 250.25, 2))
-		mock.ExpectQuery(reMetaMensalTotal).WillReturnRows(sqlmock.NewRows([]string{"m"}).AddRow(1000.0))
+		mock.ExpectQuery(reTopVendedores).WithArgs(10).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).AddRow(int64(7), "Ana", "1000.0"))
+		mock.ExpectQuery(reEnrichVendas).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(7), "250.25", 2))
+		mock.ExpectQuery(reMetasVendedores).WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).AddRow(int64(7), "Ana", "Sul", "PR", "1000.0"))
+		mock.ExpectQuery(reEnrichVendas).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"v", "t", "q"}).AddRow(int64(7), "250.25", 2))
+		mock.ExpectQuery(reMetaMensalTotal).WillReturnRows(sqlmock.NewRows([]string{"m"}).AddRow("1000.0"))
 
 		status, body := getComToken(t, server.URL+"/api/dashboard/metrics?periodo=week", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
@@ -111,7 +111,7 @@ func TestARQ06_ContratoJSON_ByteAByte(t *testing.T) {
 		server, db, mock := setupTestServer(t)
 		defer server.Close()
 		defer db.Close()
-		mock.ExpectQuery(reSerieVendas).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).AddRow("2026-10-14", 10.5, 1))
+		mock.ExpectQuery(reSerieVendas).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"d", "v", "q"}).AddRow("2026-10-14", "10.5", 1))
 		mock.ExpectQuery(reSerieDias).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"dia"}).AddRow("2026-10-14").AddRow("2026-10-15"))
 
 		status, body := getComToken(t, server.URL+"/api/dashboard/vendas?dias=2", 1, "admin")
@@ -127,12 +127,12 @@ func TestARQ06_ContratoJSON_ByteAByte(t *testing.T) {
 		defer db.Close()
 		mock.ExpectQuery(reRankingCount).WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(3))
 		mock.ExpectQuery(reRankingLista).WithArgs(2, 0).WillReturnRows(sqlmock.NewRows(rankingCols).
-			AddRow(int64(7), "Ana", "Sul", "PR", 1000.0, 333.333, 3, 33.3333))
+			AddRow(int64(7), "Ana", "Sul", "PR", "1000.0", "333.33", 3, "33.3333"))
 
 		status, body := getComToken(t, server.URL+"/api/dashboard/vendedores?page=1&limit=2", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
 		assert.Equal(t, envelopeComercialLegado(t, legadoPaginado([]map[string]any{{
-			"vendedor_id": int64(7), "vendedor_nome": "Ana", "regiao": "Sul", "uf": "PR", "total_vendas": 333.333,
+			"vendedor_id": int64(7), "vendedor_nome": "Ana", "regiao": "Sul", "uf": "PR", "total_vendas": 333.33,
 			"total_pedidos": 3, "ticket_medio": 111.11, "meta": 1000.0, "atingimento_meta": 33.33,
 		}}, 1, 2, 3, 2)), body)
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -338,7 +338,7 @@ func TestARQ06_Vlog_NiveisSemValores(t *testing.T) {
 	expectEscopoVendedor(mock, escopoVendedorB)
 	mock.ExpectQuery(reRankingCount).WithArgs(escopoVendedorB).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
 	mock.ExpectQuery(reRankingLista).WithArgs(escopoVendedorB, 20, 0).WillReturnRows(sqlmock.NewRows(rankingCols).
-		AddRow(escopoVendedorB, "NomeSecreto", "Sul", "PR", 100.0, 50.0, 1, 50.0))
+		AddRow(escopoVendedorB, "NomeSecreto", "Sul", "PR", "100.0", "50.0", 1, "50.0"))
 	status, _ := getComToken2(t, server.URL+"/api/dashboard/vendedores", generateToken(t, testCfg(), escopoUsuarioNormal, "normal"))
 	require.Equal(t, http.StatusOK, status)
 

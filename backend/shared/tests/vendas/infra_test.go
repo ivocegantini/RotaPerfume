@@ -175,7 +175,7 @@ func TestARQ05_ErrosDeInfraNaTxDoPedido(t *testing.T) {
 
 	db, mock = novoMock(t)
 	mock.ExpectQuery(`SELECT produto_id, quantidade`).
-		WillReturnRows(sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).AddRow("x", 1, 1.0, 0.0))
+		WillReturnRows(sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).AddRow("x", 1, "1.0", "0.0"))
 	_, err = vendasmysql.NovoPedidos(db).ItensAtuais(ctx, 1)
 	assert.ErrorContains(t, err, "vendasmysql: scan itens_pedido (tx)")
 

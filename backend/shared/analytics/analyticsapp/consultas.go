@@ -202,7 +202,7 @@ func (c *Consultas) Funil(ctx context.Context, q ConsultaFunil) (f analytics.Fun
 	if err != nil {
 		return f, err
 	}
-	return analytics.NovoFunil(q.Janela, contagens), nil
+	return analytics.NovoFunil(q.Janela, contagens)
 }
 
 // acesso é o escopo resolvido de uma consulta. liberado=false responde

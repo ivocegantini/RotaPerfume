@@ -17,7 +17,7 @@ import (
 func sec14Itens(n int) []vendas.DadosItem {
 	itens := make([]vendas.DadosItem, n)
 	for i := range itens {
-		itens[i] = vendas.DadosItem{ProdutoID: int64(i + 1), Quantidade: 1, PrecoPraticado: 1}
+		itens[i] = vendas.DadosItem{ProdutoID: int64(i + 1), Quantidade: 1, PrecoPraticado: "1"}
 	}
 	return itens
 }
@@ -30,7 +30,7 @@ func TestSEC14_NovoPedido_MaxItens(t *testing.T) {
 	p, err := vendas.NovoPedido(d)
 	require.NoError(t, err, "200 itens é o teto aceito")
 	assert.Len(t, p.Itens, 200)
-	assert.Equal(t, 200.0, p.ValorTotal)
+	assert.Equal(t, reaisT("200.0"), p.ValorTotal)
 
 	d.Itens = sec14Itens(vendas.MaxItensPedido + 1)
 	p, err = vendas.NovoPedido(d)

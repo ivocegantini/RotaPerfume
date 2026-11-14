@@ -19,6 +19,8 @@ var (
 	ErrUnidadeObrigatoria     = kernel.NovoErro(kernel.KindInvalido, "unidade é obrigatória")
 	ErrPrecoTabelaInvalido    = kernel.NovoErro(kernel.KindInvalido, "preco_tabela deve ser maior ou igual a zero")
 	ErrCustoUnitarioInvalido  = kernel.NovoErro(kernel.KindInvalido, "custo_unitario deve ser maior ou igual a zero")
+	ErrPrecoTabelaCasas       = kernel.NovoErro(kernel.KindInvalido, "preco_tabela deve ter no máximo 2 casas decimais")   // ARQ-09
+	ErrCustoUnitarioCasas     = kernel.NovoErro(kernel.KindInvalido, "custo_unitario deve ter no máximo 2 casas decimais") // ARQ-09
 	ErrDataLancamentoInvalida = kernel.NovoErro(kernel.KindInvalido, "data_lancamento inválida (use o formato AAAA-MM-DD)")
 	// ErrSKUDuplicado (CHORE-06): 1062 em uk_produtos_sku no INSERT, 409.
 	ErrSKUDuplicado = kernel.NovoErro(kernel.KindConflito, "sku já cadastrado")

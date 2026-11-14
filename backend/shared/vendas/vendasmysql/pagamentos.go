@@ -147,7 +147,7 @@ func (r *Pagamentos) Inserir(ctx context.Context, p *vendas.Pagamento) error {
 		INSERT INTO pagamentos (pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	id, err := db.Inserir(ctx, r.q, "vendasmysql: create pagamento", q, p.PedidoID, p.FormaPagamento, p.Parcelas,
-		p.Valor, p.TaxaPct, p.ValorLiquido, p.DataVencimento, nullTime(p.DataPagamento), p.StatusPagamento)
+		p.Valor.String(), p.TaxaPct, p.ValorLiquido.String(), p.DataVencimento, nullTime(p.DataPagamento), p.StatusPagamento)
 	if db.ViolacaoFK(err, fkPagamentosPedido) {
 		vlog.Printf(arqPagamentos, "Pagamentos.Inserir", "decisão pedido_inexistente_fk")
 		return vendas.ErrPedidoNaoEncontrado
@@ -168,7 +168,7 @@ func (r *Pagamentos) Atualizar(ctx context.Context, id int64, p *vendas.Pagament
 		SET forma_pagamento = ?, parcelas = ?, valor = ?, taxa_pct = ?, valor_liquido = ?, data_vencimento = ?, data_pagamento = ?, status_pagamento = ?
 		WHERE pagamento_id = ?`
 	return db.ExecPorID(ctx, r.q, arqPagamentos, "Pagamentos.Atualizar", "vendasmysql: update pagamento", vendas.ErrPagamentoNaoEncontrado,
-		q, p.FormaPagamento, p.Parcelas, p.Valor, p.TaxaPct, p.ValorLiquido, p.DataVencimento,
+		q, p.FormaPagamento, p.Parcelas, p.Valor.String(), p.TaxaPct, p.ValorLiquido.String(), p.DataVencimento,
 		nullTime(p.DataPagamento), p.StatusPagamento, id)
 }
 
@@ -183,7 +183,7 @@ func (r *Pagamentos) AtualizarSeNaoQuitado(ctx context.Context, id int64, p *ven
 		SET forma_pagamento = ?, parcelas = ?, valor = ?, taxa_pct = ?, valor_liquido = ?, data_vencimento = ?, data_pagamento = ?, status_pagamento = ?
 		WHERE pagamento_id = ? AND status_pagamento NOT IN (?, ?)`
 	return db.ExecPorID(ctx, r.q, arqPagamentos, "Pagamentos.AtualizarSeNaoQuitado", "vendasmysql: update pagamento nao quitado", vendas.ErrPagamentoNaoEncontrado,
-		q, p.FormaPagamento, p.Parcelas, p.Valor, p.TaxaPct, p.ValorLiquido, p.DataVencimento,
+		q, p.FormaPagamento, p.Parcelas, p.Valor.String(), p.TaxaPct, p.ValorLiquido.String(), p.DataVencimento,
 		nullTime(p.DataPagamento), p.StatusPagamento, id, string(vendas.StatusPago), string(vendas.StatusPagoComAtraso))
 }
 

@@ -121,10 +121,10 @@ func TestParseRow(t *testing.T) {
 				if row.SKU != "SKU-001" {
 					t.Errorf("SKU = %q, want SKU-001", row.SKU)
 				}
-				if row.PrecoTabela != 99.90 {
+				if row.PrecoTabela != reaisT("99.90") {
 					t.Errorf("PrecoTabela = %v, want 99.90", row.PrecoTabela)
 				}
-				if row.CustoUnitario != 45.00 {
+				if row.CustoUnitario != reaisT("45.00") {
 					t.Errorf("CustoUnitario = %v, want 45.00", row.CustoUnitario)
 				}
 				if !row.Ativo {

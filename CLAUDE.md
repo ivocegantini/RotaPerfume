@@ -11,21 +11,23 @@ Sistema com API Go (rotaperfumes-api) e frontend Next.js. Este projeto é gerenc
 | **DataBrain** | Dev Database           | `database.md`       | 🌸 Rosa  | `🌸 DataBrain` |
 | **BackBrain** | Dev Backend            | `backend.md`        | 🟡 Amarelo | `🟡 BackBrain` |
 | **FrontBrain**| Dev Frontend           | `frontend.md`      | 🟢 Verde | `🟢 FrontBrain` |
-| **TestBrain** | Dev Testes / QA       | `tester.md`        | 🔴 Vermelho | `🔴 TestBrain` |
+| **TestBrain** | QA (testes, telas e queries) | `qa.md`     | 🔴 Vermelho | `🔴 TestBrain` |
 | **SecBrain**  | Dev Segurança          | `security.md`       | 🟣 Roxo  | `🟣 SecBrain` |
 
+> **Regra de geração (prompt.md):** todo arquivo gerado é resumido, no máximo 3 linhas por explicação.
+>
 > **Regra de cor:** Toda resposta de um agente deve iniciar com sua **tag visual** (ex: `🤍 MegaBrain`, `🔵 SubBrain`, etc.) e usar a cor correspondente como borda/destaque.
 
 ## Fluxo de Execução (via MegaBrain)
 
 1. **Usuário** envia o pedido.
-2. **🤍 MegaBrain** carrega a skill `megabrain-router` (`.claude/skills/megabrain-router/SKILL.md`), decompõe em tarefas e prioriza.
-3. **🔵 SubBrain** atualiza o Kanban e planeja a divisão por camada.
+2. **🤍 MegaBrain** carrega a skill `megabrain-router`, define o escopo macro, decompõe em tarefas e prioriza.
+3. **🔵 SubBrain** atualiza o Kanban, planeja por camada e faz a ponte entre Database, Backend, Frontend e QA.
 4. **🟣 SecBrain** avalia riscos de segurança da feature e indica correções necessárias às demais camadas.
 5. **🌸 DataBrain** (se houver mudança de schema) → cria tabelas e chaves.
 6. **🟡 BackBrain** implementa APIs (paga o server com logs).
 7. **🟢 FrontBrain** implementa telas consumindo as APIs.
-8. **🔴 TestBrain** escreve e executa testes com cobertura.
+8. **🔴 TestBrain** escreve testes com cobertura e verifica se as telas e queries funcionam.
 9. **🔵 SubBrain** fecha documentação, Postman, manuais e move a tarefa para `feito.md`.
 
 ## Skill de Roteamento
@@ -74,6 +76,10 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 - **SEC-54:** a guarda normaliza o DB_HOST (minúsculas, sem [ ], sem pontos finais e .local, ::ffff:a.b.c.d → a.b.c.d) e recusa porta não numérica; o `make test-integration` só aceita loopback ou o CasaOS 192.168.168.106:3307 (db-guard-integracao). 
 - **SEC-55:** os go build nunca recebem os segredos, nem com INTEGRATION=1
 - **BUG-27:** db-reset/db-rebuild rodam as etapas em sequência e param na primeira recusa, mesmo com `make -k/-j`."
+- **BUG-28** O make -k db-seed com a guarda recusando não roda mais o db-up (CREATE DATABASE + DDL) na produção.
+- **BUG-29** Rodar make ... MAKEFLAGS=-k agora para com erro. Antes, nesse caso o ENV_ARQUIVO não chegava aos sub-makes, que liam o .env padrão sem avisar. O make -k e o MAKEFLAGS=-k make ... continuam funcionando.
+- **SEC-56** Formas numéricas de IPv4 que não sejam o endereço padrão (3232278634, 0xc0a8a86a, 192.168.43114, octal) agora contam como produção, no Makefile e no Go.
+- **SEC-57** A porta com espaço passa a ser recusada nos dois lados, com a mensagem "porta inválida", inclusive com CONFIRMO_PRODUCAO. Antes, o Makefile dizia que era o banco de produção.
 
 ## Instalação do ambiente
 

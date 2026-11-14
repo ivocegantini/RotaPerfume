@@ -28,7 +28,7 @@ func pagamentoRow(pagamentoID, pedidoID int64, forma string, parcelas uint8, val
 	if dataPagamento != nil {
 		dp = *dataPagamento
 	}
-	return []driver.Value{pagamentoID, pedidoID, forma, parcelas, valor, taxaPct, valorLiquido, dataVencimento, dp, status, created, updated}
+	return []driver.Value{pagamentoID, pedidoID, forma, parcelas, decT(valor), taxaPct, decT(valorLiquido), dataVencimento, dp, status, created, updated}
 }
 
 const pagamentoFromRegexp = `FROM pagamentos`
@@ -310,15 +310,15 @@ func TestPagamentoCreate_Success(t *testing.T) {
 		PedidoID:        10,
 		FormaPagamento:  "PIX",
 		Parcelas:        1,
-		Valor:           100.0,
+		Valor:           reaisT("100.0"),
 		TaxaPct:         0,
-		ValorLiquido:    100.0,
+		ValorLiquido:    reaisT("100.0"),
 		DataVencimento:  now,
 		StatusPagamento: "Em aberto",
 	}
 
 	mock.ExpectExec(`INSERT INTO pagamentos \(pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento\)`).
-		WithArgs(p.PedidoID, p.FormaPagamento, p.Parcelas, p.Valor, p.TaxaPct, p.ValorLiquido, p.DataVencimento, nil, p.StatusPagamento).
+		WithArgs(p.PedidoID, p.FormaPagamento, p.Parcelas, p.Valor.String(), p.TaxaPct, p.ValorLiquido.String(), p.DataVencimento, nil, p.StatusPagamento).
 		WillReturnResult(sqlmock.NewResult(42, 1))
 
 	ctx := context.Background()
@@ -339,15 +339,15 @@ func TestPagamentoCreate_ComDataPagamento(t *testing.T) {
 		PedidoID:        10,
 		FormaPagamento:  "PIX",
 		Parcelas:        1,
-		Valor:           100.0,
-		ValorLiquido:    100.0,
+		Valor:           reaisT("100.0"),
+		ValorLiquido:    reaisT("100.0"),
 		DataVencimento:  now,
 		DataPagamento:   &dataPagamento,
 		StatusPagamento: "Pago",
 	}
 
 	mock.ExpectExec(`INSERT INTO pagamentos`).
-		WithArgs(p.PedidoID, p.FormaPagamento, p.Parcelas, p.Valor, p.TaxaPct, p.ValorLiquido, p.DataVencimento, dataPagamento, p.StatusPagamento).
+		WithArgs(p.PedidoID, p.FormaPagamento, p.Parcelas, p.Valor.String(), p.TaxaPct, p.ValorLiquido.String(), p.DataVencimento, dataPagamento, p.StatusPagamento).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	ctx := context.Background()
@@ -380,15 +380,15 @@ func TestPagamentoUpdate_Success(t *testing.T) {
 	p := &vendas.Pagamento{
 		FormaPagamento:  "Boleto 14 dias",
 		Parcelas:        2,
-		Valor:           200.0,
+		Valor:           reaisT("200.0"),
 		TaxaPct:         1.5,
-		ValorLiquido:    197.0,
+		ValorLiquido:    reaisT("197.0"),
 		DataVencimento:  now,
 		StatusPagamento: "Pago com atraso",
 	}
 
 	mock.ExpectExec(`UPDATE pagamentos\s+SET forma_pagamento = \?, parcelas = \?, valor = \?, taxa_pct = \?, valor_liquido = \?, data_vencimento = \?, data_pagamento = \?, status_pagamento = \?\s+WHERE pagamento_id = \?`).
-		WithArgs(p.FormaPagamento, p.Parcelas, p.Valor, p.TaxaPct, p.ValorLiquido, p.DataVencimento, nil, p.StatusPagamento, int64(1)).
+		WithArgs(p.FormaPagamento, p.Parcelas, p.Valor.String(), p.TaxaPct, p.ValorLiquido.String(), p.DataVencimento, nil, p.StatusPagamento, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	ctx := context.Background()

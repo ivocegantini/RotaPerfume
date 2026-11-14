@@ -10,8 +10,8 @@ package deploy_test
 //   - dois peppers diferentes: o script morre antes de qualquer SQL;
 //   - --forcar com o nome do banco errado: nada alterado; com o nome certo:
 //     prossegue até a conferência;
-//   - --admin-senha-prompt: docker run -it (seed-producao.sh, etapa do
-//     admin) com o pepper no --env-file, nunca no argv.
+//   - SEC-52: o --admin-senha-prompt saiu (senha do admin sempre gerada);
+//     o stub do run -it fica e confere que ele nunca é chamado.
 // Cada escrita no stdin espera o prompt aparecer (o read -s só desliga o eco
 // quando começa; escrever antes ecoaria o pepper). Pula sem `script` do
 // util-linux ou sem `unshare`.
@@ -201,12 +201,10 @@ func (e *ensaioSeed) semSQLDeEscrita(t *testing.T) {
 
 func TestTST21_SeedProducao_TerminalReal_PepperSemEco(t *testing.T) {
 	casos := []struct {
-		nome   string
-		args   []string
-		prompt bool // --admin-senha-prompt: docker run -it
+		nome string
+		args []string
 	}{
-		{"senha do admin gerada", nil, false},
-		{"senha do admin digitada (run -it)", []string{"--admin-senha-prompt"}, true},
+		{"senha do admin gerada", nil},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
@@ -221,16 +219,8 @@ func TestTST21_SeedProducao_TerminalReal_PepperSemEco(t *testing.T) {
 			e.semSegredos(t, out)
 
 			envConteudo, envModo := e.ler("state/env_conteudo"), e.ler("state/env_modo")
-			if c.prompt {
-				assert.FileExists(t, filepath.Join(e.dir, "state", "prompt_run_it"), "docker run -it")
-				assert.FileExists(t, filepath.Join(e.dir, "state", "prompt_stdin_tty"), "o -it recebe o terminal")
-				assert.Contains(t, e.ler("state/prompt_argv"), "--env-file\n")
-				envConteudo, envModo = e.ler("state/prompt_env_conteudo"), e.ler("state/prompt_env_modo")
-				assert.Contains(t, out, "Senha inicial do admin: a digitada")
-			} else {
-				assert.NoFileExists(t, filepath.Join(e.dir, "state", "prompt_argv"))
-				assert.Equal(t, senhaAdmSeed+"\n", e.ler("root/rotaperfumes-mariadb/admin-app.senha"))
-			}
+			assert.NoFileExists(t, filepath.Join(e.dir, "state", "prompt_argv"), "SEC-52: nunca run -it com -password-prompt")
+			assert.Equal(t, senhaAdmSeed+"\n", e.ler("root/rotaperfumes-mariadb/admin-app.senha"))
 			assert.Contains(t, envConteudo, "PASSWORD_PEPPER="+pepperTST21+"\n", "pepper só pelo --env-file")
 			assert.Equal(t, "600", strings.TrimSpace(envModo))
 			trab, _ := filepath.Glob(filepath.Join(e.dir, "root", "rotaperfumes-seed.*"))

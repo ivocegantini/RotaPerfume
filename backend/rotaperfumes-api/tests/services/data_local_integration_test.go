@@ -31,6 +31,7 @@ import (
 	"github.com/rotaperfumes/shared/catalogo"
 	"github.com/rotaperfumes/shared/comercial"
 	"github.com/rotaperfumes/shared/comercial/comercialmysql"
+	"github.com/rotaperfumes/shared/kernel"
 	"github.com/rotaperfumes/shared/testkit/integracao"
 )
 
@@ -108,7 +109,7 @@ func TestIntegracaoBUG01_GravaLeReSalvaSemDeslocamento(t *testing.T) {
 						// Varia meta_mensal a cada ciclo para que o re-save
 						// altere a linha de fato (o caso "sem alteração" é
 						// coberto por TestIntegracao_UpdateSemAlteracao).
-						in.MetaMensal = float64(ciclo)
+						in.MetaMensal = kernel.Decimal(fmt.Sprint(ciclo))
 						_, err = casos.AtualizarVendedor(ctx, principalAdmin(), v.ID, in)
 						require.NoError(t, err)
 						assert.Equal(t, data, dataNoBanco(t, db, "vendedores", "data_admissao", v.ID), "re-save ciclo %d", ciclo)
@@ -119,7 +120,7 @@ func TestIntegracaoBUG01_GravaLeReSalvaSemDeslocamento(t *testing.T) {
 					casos := novosCasosCatalogo(db)
 					in := catalogo.DadosProduto{
 						SKU: "ZZ-TEST-BUG01-" + sufixo, Descricao: "Produto teste BUG-01", Categoria: "Teste",
-						Marca: "Teste", Unidade: "UN", PrecoTabela: 1, CustoUnitario: 1, DataLancamento: data,
+						Marca: "Teste", Unidade: "UN", PrecoTabela: "1", CustoUnitario: "1", DataLancamento: data,
 					}
 					p, err := casos.CriarProduto(ctx, in)
 					require.NoError(t, err)
@@ -138,7 +139,7 @@ func TestIntegracaoBUG01_GravaLeReSalvaSemDeslocamento(t *testing.T) {
 						assert.Equal(t, data, dataComoAPI(t, *lido.DataLancamento), "JSON ciclo %d", ciclo)
 
 						in.DataLancamento = dataComoAPI(t, *lido.DataLancamento)
-						in.PrecoTabela = float64(ciclo + 1) // idem: força linha alterada
+						in.PrecoTabela = kernel.Decimal(fmt.Sprint(ciclo + 1)) // idem: força linha alterada
 						_, err = casos.AtualizarProduto(ctx, p.ID, in)
 						require.NoError(t, err)
 						assert.Equal(t, data, dataNoBanco(t, db, "produtos", "data_lancamento", p.ID), "re-save ciclo %d", ciclo)
@@ -165,7 +166,7 @@ func TestIntegracao_UpdateSemAlteracao(t *testing.T) {
 
 	t.Run("vendedor", func(t *testing.T) {
 		casos := casosComercial(db, 0)
-		in := comercial.DadosVendedor{Nome: "ZZ-TEST-BUG01-" + sufixo, Regiao: "Teste", UF: "PR", DataAdmissao: "2024-01-01", MetaMensal: 1}
+		in := comercial.DadosVendedor{Nome: "ZZ-TEST-BUG01-" + sufixo, Regiao: "Teste", UF: "PR", DataAdmissao: "2024-01-01", MetaMensal: "1"}
 		v, err := casos.CriarVendedor(ctx, principalAdmin(), in)
 		require.NoError(t, err)
 		t.Cleanup(func() {
@@ -181,7 +182,7 @@ func TestIntegracao_UpdateSemAlteracao(t *testing.T) {
 		casos := novosCasosCatalogo(db)
 		in := catalogo.DadosProduto{
 			SKU: "ZZ-TEST-BUG01-" + sufixo, Descricao: "Produto teste", Categoria: "Teste",
-			Marca: "Teste", Unidade: "UN", PrecoTabela: 1, CustoUnitario: 1, DataLancamento: "2024-01-01",
+			Marca: "Teste", Unidade: "UN", PrecoTabela: "1", CustoUnitario: "1", DataLancamento: "2024-01-01",
 		}
 		p, err := casos.CriarProduto(ctx, in)
 		require.NoError(t, err)
@@ -213,7 +214,7 @@ const bug05Prefixo = "ZZ-TEST-BUG05-"
 func bug05CriarVendedor(t *testing.T, ctx context.Context, db *sql.DB, casos *comercialapp.Casos, nome string) int64 {
 	t.Helper()
 	v, err := casos.CriarVendedor(ctx, principalAdmin(), comercial.DadosVendedor{
-		Nome: nome, Regiao: "Teste", UF: "PR", DataAdmissao: "2024-01-01", MetaMensal: 1,
+		Nome: nome, Regiao: "Teste", UF: "PR", DataAdmissao: "2024-01-01", MetaMensal: "1",
 	})
 	require.NoError(t, err)
 	require.NotZero(t, v.ID)

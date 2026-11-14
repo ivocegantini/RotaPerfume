@@ -126,7 +126,7 @@ func TestARQ04_ContratoJSON_ByteAByte(t *testing.T) {
 		defer db.Close()
 		mock.ExpectQuery(`FROM vendedores WHERE id = \? LIMIT 1`).WithArgs(int64(3)).WillReturnRows(
 			sqlmock.NewRows([]string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}).
-				AddRow(int64(3), "Ana", "Sul", "PR", quando, nil, 10.5, quando, quando))
+				AddRow(int64(3), "Ana", "Sul", "PR", quando, nil, "10.5", quando, quando))
 		mock.ExpectQuery(`FROM carteiras ca JOIN clientes c`).WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"x"}))
 		status, body := getComToken(t, server.URL+"/api/vendedores/3", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
@@ -205,7 +205,7 @@ func TestARQ04_ContratoJSON_ByteAByte(t *testing.T) {
 		defer db.Close()
 		mock.ExpectQuery(`FROM oportunidades WHERE oportunidade_id = \? LIMIT 1`).WithArgs(int64(8)).WillReturnRows(
 			sqlmock.NewRows([]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"}).
-				AddRow(int64(8), int64(5), int64(3), "indicação", quando, "Fechado perdido", 40.0, 99.9, quando, ciclo, motivo, quando, quando))
+				AddRow(int64(8), int64(5), int64(3), "indicação", quando, "Fechado perdido", "40.0", "99.9", quando, ciclo, motivo, quando, quando))
 		status, body := getComToken(t, server.URL+"/api/oportunidades/8", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
 		assert.Equal(t, envelopeComercialLegado(t, map[string]any{"success": true, "data": legadoOportunidade{

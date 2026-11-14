@@ -46,8 +46,8 @@ func TestSEC21_Montar_CookieSecureEAviso(t *testing.T) {
 
 			scs := w.Result().Header.Values("Set-Cookie")
 			if seguro {
-				// SEC-33: __Host- + expiração dos nomes antigos, todos Secure.
-				require.Len(t, scs, 4)
+				// CHORE-14: só os __Host-, Secure (a expiração dos antigos saiu).
+				require.Len(t, scs, 2)
 				assert.True(t, strings.HasPrefix(scs[0], "__Host-access_token=;"), scs[0])
 				assert.True(t, strings.HasPrefix(scs[1], "__Host-refresh_token=;"), scs[1])
 			} else {

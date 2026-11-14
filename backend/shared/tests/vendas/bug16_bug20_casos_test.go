@@ -31,14 +31,14 @@ const (
 // bug16ItensAtuais são os itens de pedidoValido() como o banco os devolve.
 func bug16ItensAtuais() *sqlmock.Rows {
 	return sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).
-		AddRow(int64(10), 2, 100.0, 10.0).AddRow(int64(11), 1, 50.0, 0.0)
+		AddRow(int64(10), 2, "100.0", "10.0").AddRow(int64(11), 1, "50.0", "0.0")
 }
 
 func bug16LinhaPedido(id int64, status string) *sqlmock.Rows {
 	agora := time.Now()
 	return sqlmock.NewRows([]string{"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido", "canal", "status",
 		"valor_total", "created_at", "updated_at", "c", "v"}).
-		AddRow(id, int64(1), int64(2), agora, "App", status, 230.0, agora, agora, "C", "V")
+		AddRow(id, int64(1), int64(2), agora, "App", status, "230.0", agora, agora, "C", "V")
 }
 
 func bug16Releitura(m sqlmock.Sqlmock, id int64, status string) {
@@ -116,7 +116,7 @@ func TestBUG16_Casos_ItensDiferentesPosFaturamento_409(t *testing.T) {
 			mock.ExpectBegin()
 			mock.ExpectQuery(bug16StatusLockRe).WithArgs(int64(5)).WillReturnRows(sqlmock.NewRows([]string{"status", "vendedor_id"}).AddRow(c.atual, int64(1)))
 			mock.ExpectQuery(bug16ItensAtuaRe).WithArgs(int64(5)).WillReturnRows(
-				sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).AddRow(int64(10), 3, 100.0, 10.0))
+				sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).AddRow(int64(10), 3, "100.0", "10.0"))
 			mock.ExpectRollback()
 
 			_, err := novosCasos(pool, escopoIrrestrito(t)).AtualizarPedido(context.Background(), admin(t), 5, ler(bug16Dados(c.destino)))
@@ -137,7 +137,7 @@ func TestBUG16_Casos_CicloCompleto_SemSegundaBaixa(t *testing.T) {
 
 	// 1. Criado Em separação: sem baixa.
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Em separação", 230.0).
+	mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Em separação", "230.00").
 		WillReturnResult(sqlmock.NewResult(5, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(2, 1))
@@ -167,7 +167,7 @@ func TestBUG16_Casos_CicloCompleto_SemSegundaBaixa(t *testing.T) {
 		mock.ExpectBegin()
 		mock.ExpectQuery(bug16StatusLockRe).WithArgs(int64(5)).WillReturnRows(sqlmock.NewRows([]string{"status", "vendedor_id"}).AddRow(passo.atual, int64(1)))
 		mock.ExpectQuery(bug16ItensAtuaRe).WithArgs(int64(5)).WillReturnRows(bug16ItensAtuais())
-		mock.ExpectExec(`UPDATE pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", passo.destino, 230.0, int64(5)).
+		mock.ExpectExec(`UPDATE pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", passo.destino, "230.00", int64(5)).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 		bug16Releitura(mock, 5, passo.destino)
@@ -190,10 +190,10 @@ func TestBUG16_Casos_CicloCompleto_SemSegundaBaixa(t *testing.T) {
 func TestBUG20_Casos_CriarFaturado_BaixaNaMesmaTx(t *testing.T) {
 	pool, mock := novoMock(t)
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0).
+	mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").
 		WillReturnResult(sqlmock.NewResult(9, 1))
-	mock.ExpectExec(`INSERT INTO itens_pedido`).WithArgs(int64(9), int64(10), 2, 100.0, 10.0, 180.0).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(`INSERT INTO itens_pedido`).WithArgs(int64(9), int64(11), 1, 50.0, 0.0, 50.0).WillReturnResult(sqlmock.NewResult(2, 1))
+	mock.ExpectExec(`INSERT INTO itens_pedido`).WithArgs(int64(9), int64(10), 2, "100.00", 10.0, "180.00").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`INSERT INTO itens_pedido`).WithArgs(int64(9), int64(11), 1, "50.00", 0.0, "50.00").WillReturnResult(sqlmock.NewResult(2, 1))
 	bug16Baixa(mock, 10, "SKU-10", 2)
 	bug16Baixa(mock, 11, "SKU-11", 1)
 	mock.ExpectCommit()
@@ -271,7 +271,7 @@ func TestBUG20_Casos_CriarSemBaixa(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			pool, mock := novoMock(t)
 			mock.ExpectBegin()
-			mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", status, 230.0).
+			mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", status, "230.00").
 				WillReturnResult(sqlmock.NewResult(9, 1))
 			mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(2, 1))

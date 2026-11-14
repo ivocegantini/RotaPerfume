@@ -41,9 +41,9 @@ func TestDASH01_Consultas_Funil_Liberado(t *testing.T) {
 	doVendedor, err := kernel.EscopoDoVendedor(7)
 	require.NoError(t, err)
 	contagens := []analytics.ContagemEtapa{
-		{Etapa: analytics.EtapaProspeccao, Quantidade: 2, Valor: 20},
-		{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: 10},
-		{Etapa: analytics.EtapaPerdido, Quantidade: 1, Valor: 5},
+		{Etapa: analytics.EtapaProspeccao, Quantidade: 2, Valor: reaisT("20")},
+		{Etapa: analytics.EtapaGanho, Quantidade: 1, Valor: reaisT("10")},
+		{Etapa: analytics.EtapaPerdido, Quantidade: 1, Valor: reaisT("5")},
 	}
 	casos := []struct {
 		nome   string
@@ -63,7 +63,9 @@ func TestDASH01_Consultas_Funil_Liberado(t *testing.T) {
 			assert.Equal(t, 1, repo.chamadas)
 			assert.Equal(t, c.escopo, repo.escopo, "o repositório recebe o escopo resolvido")
 			assert.Equal(t, c.janela, repo.janela)
-			assert.Equal(t, analytics.NovoFunil(c.janela, contagens), f)
+			esperado, err := analytics.NovoFunil(c.janela, contagens)
+			require.NoError(t, err)
+			assert.Equal(t, esperado, f)
 			assert.False(t, f.VendedorDesligado)
 		})
 	}

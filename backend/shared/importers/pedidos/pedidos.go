@@ -51,6 +51,7 @@ import (
 	"github.com/rotaperfumes/shared/cmdutil"
 	"github.com/rotaperfumes/shared/importers/clientesdedup"
 	"github.com/rotaperfumes/shared/importers/importkit"
+	"github.com/rotaperfumes/shared/kernel"
 )
 
 // Tag prefixa os logs e as mensagens de erro do importador.
@@ -79,7 +80,7 @@ type PedidoRow struct {
 	DataPedido      time.Time
 	Canal           string
 	Status          string
-	ValorTotal      float64
+	ValorTotal      kernel.Dinheiro
 }
 
 // ItemPedidoRow é uma linha já normalizada de itens_pedido.csv, pronta para o upsert.
@@ -88,9 +89,9 @@ type ItemPedidoRow struct {
 	PedidoIDOrigem int64
 	SKU            string
 	Quantidade     int
-	PrecoPraticado float64
+	PrecoPraticado kernel.Dinheiro
 	DescontoPct    float64
-	ValorBruto     float64
+	ValorBruto     kernel.Dinheiro
 }
 
 // Options configura uma execução do importador.
@@ -268,7 +269,7 @@ func ParsePedidoRow(record []string) (PedidoRow, error) {
 		return PedidoRow{}, fmt.Errorf("status inválido (%q)", status)
 	}
 
-	valorTotal, err := strconv.ParseFloat(record[6], 64)
+	valorTotal, err := kernel.LerDinheiro(record[6]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return PedidoRow{}, fmt.Errorf("valor_total inválido (%q): %w", record[6], err)
 	}
@@ -356,7 +357,7 @@ func ParseItemPedidoRow(record []string) (ItemPedidoRow, error) {
 		return ItemPedidoRow{}, fmt.Errorf("quantidade inválida (%q): %w", record[3], err)
 	}
 
-	precoPraticado, err := strconv.ParseFloat(record[4], 64)
+	precoPraticado, err := kernel.LerDinheiro(record[4]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return ItemPedidoRow{}, fmt.Errorf("preco_praticado inválido (%q): %w", record[4], err)
 	}
@@ -366,7 +367,7 @@ func ParseItemPedidoRow(record []string) (ItemPedidoRow, error) {
 		return ItemPedidoRow{}, fmt.Errorf("desconto_pct inválido (%q): %w", record[5], err)
 	}
 
-	valorBruto, err := strconv.ParseFloat(record[6], 64)
+	valorBruto, err := kernel.LerDinheiro(record[6]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return ItemPedidoRow{}, fmt.Errorf("valor_bruto inválido (%q): %w", record[6], err)
 	}
@@ -443,7 +444,7 @@ func UpsertPedidos(db cmdutil.DB, rows []PedidoRow, clienteIDs map[int64]int64) 
 				return nil, false
 			}
 			return []any{row.PedidoIDOrigem, clienteID, row.VendedorID,
-				row.DataPedido.Format(dataPedidoLayout), row.Canal, row.Status, row.ValorTotal}, true
+				row.DataPedido.Format(dataPedidoLayout), row.Canal, row.Status, row.ValorTotal.String()}, true
 		},
 		LogFalha: func(row PedidoRow, err error) {
 			log.Printf("importpedidos: erro no upsert de pedido_id_origem=%d: %v", row.PedidoIDOrigem, err)
@@ -487,7 +488,7 @@ func UpsertItensPedido(db cmdutil.DB, rows []ItemPedidoRow, pedidoIDs map[int64]
 				return nil, false
 			}
 			return []any{row.ItemIDOrigem, pedidoID, produtoID, row.Quantidade,
-				row.PrecoPraticado, row.DescontoPct, row.ValorBruto}, true
+				row.PrecoPraticado.String(), row.DescontoPct, row.ValorBruto.String()}, true
 		},
 		LogFalha: func(row ItemPedidoRow, err error) {
 			log.Printf("importpedidos: erro no upsert de item_id_origem=%d: %v", row.ItemIDOrigem, err)

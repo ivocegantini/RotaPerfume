@@ -67,7 +67,7 @@ func periodoDe(s string) analytics.Periodo {
 }
 
 // valorEQtd desembrulha os totais de vendas (valor, quantidade, erro).
-func valorEQtd(t analytics.TotaisVendas, err error) (float64, int, error) {
+func valorEQtd(t analytics.TotaisVendas, err error) (kernel.Dinheiro, int, error) {
 	return t.Valor, t.Quantidade, err
 }
 

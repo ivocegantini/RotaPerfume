@@ -160,7 +160,7 @@ func (r *Pedidos) Inserir(ctx context.Context, p *vendas.Pedido) error {
 		INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total)
 		VALUES (?, ?, ?, ?, ?, ?)`
 	id, err := db.Inserir(ctx, r.q, "vendasmysql: create pedido", insertPedido,
-		p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal)
+		p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String())
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (r *Pedidos) inserirItens(ctx context.Context, pedidoID int64, itens []vend
 		it := &itens[i]
 		it.PedidoID = pedidoID
 		id, err := db.Inserir(ctx, r.q, "vendasmysql: create item_pedido", insertItem,
-			it.PedidoID, it.ProdutoID, it.Quantidade, it.PrecoPraticado, it.DescontoPct, it.ValorBruto)
+			it.PedidoID, it.ProdutoID, it.Quantidade, it.PrecoPraticado.String(), it.DescontoPct, it.ValorBruto.String())
 		if err != nil {
 			return err
 		}
@@ -243,7 +243,7 @@ func (r *Pedidos) AtualizarCabecalho(ctx context.Context, id int64, p *vendas.Pe
 		SET cliente_id = ?, vendedor_id = ?, data_pedido = ?, canal = ?, status = ?, valor_total = ?
 		WHERE pedido_id_origem = ?`
 	return db.ExecPorID(ctx, r.q, arqPedidos, "Pedidos.AtualizarCabecalho", "vendasmysql: update pedido", vendas.ErrPedidoNaoEncontrado,
-		updatePedido, p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal, id)
+		updatePedido, p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), id)
 }
 
 // SubstituirItens troca integralmente os itens (DELETE + INSERT).

@@ -43,8 +43,8 @@ func TestSEC50_ValidarNaoProducao_MesmaTabelaDoMakefile(t *testing.T) {
 		recusa      bool
 	}{
 		{" 192.168.168.106 ", "3306", true},
-		{"192.168.168.106", " 3306 ", true}, // espaços nas pontas
-		{"192.168.168.106.", "3306", true},  // "." final
+		// SEC-57: porta com espaço é inválida (não numérica), em TestSEC56SEC57_*
+		{"192.168.168.106.", "3306", true}, // "." final
 		{"ivo-inspiron-15-3530", "", true},
 		{"rotaperfumes-mariadb", "", true},
 	}

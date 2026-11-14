@@ -21,7 +21,7 @@ func oportunidadeRowsForHandler() *sqlmock.Rows {
 		"oportunidade_id", "cliente_id", "vendedor_id", "origem", "data_abertura", "etapa",
 		"probabilidade_pct", "valor_estimado", "data_fechamento", "ciclo_dias", "motivo_perda",
 		"created_at", "updated_at",
-	}).AddRow(int64(1), int64(100), int64(1), "Site", now, "Prospeccao", 10.0, 1000.0, nil, nil, nil, now, now)
+	}).AddRow(int64(1), int64(100), int64(1), "Site", now, "Prospeccao", "10.0", "1000.0", nil, nil, nil, now, now)
 }
 
 func emptyOportunidadeRows() *sqlmock.Rows {
@@ -369,7 +369,7 @@ func TestCreateOportunidade_Success(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	mock.ExpectExec(`INSERT INTO oportunidades`).
-		WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(9, 1))
 
 	req, _ := http.NewRequest("POST", server.URL+"/api/oportunidades", makeJSON(validOportunidadePayload()))
@@ -416,7 +416,7 @@ func TestCreateOportunidade_PermitidoParaNaoAdmin_ForcaVendedorID(t *testing.T) 
 		WithArgs(int64(5)).
 		WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	mock.ExpectExec(`INSERT INTO oportunidades`).
-		WithArgs(int64(100), int64(5), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(int64(100), int64(5), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(9, 1))
 
 	// payload tenta forjar vendedor_id=99 (outro vendedor) — deve ser
@@ -679,7 +679,7 @@ func TestUpdateOportunidade_Success(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	mock.ExpectExec(`UPDATE oportunidades`).
-		WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+		WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + oportunidadeColunasRegexH + ` FROM oportunidades WHERE oportunidade_id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -769,7 +769,7 @@ func TestUpdateOportunidade_PermitidoParaNaoAdmin_ForcaVendedorID(t *testing.T) 
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	mock.ExpectExec(`UPDATE oportunidades`).
-		WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+		WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + oportunidadeColunasRegexH + ` FROM oportunidades WHERE oportunidade_id = \? LIMIT 1`).
 		WithArgs(int64(1)).

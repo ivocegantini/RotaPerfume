@@ -83,5 +83,5 @@ func chore08LinhaPagamentoStatus(id, pedidoID int64, status string) *sqlmock.Row
 	agora := time.Now()
 	return sqlmock.NewRows([]string{"pagamento_id", "pedido_id", "forma_pagamento", "parcelas", "valor", "taxa_pct",
 		"valor_liquido", "data_vencimento", "data_pagamento", "status_pagamento", "created_at", "updated_at"}).
-		AddRow(id, pedidoID, "PIX", uint8(1), 100.0, 0.0, 100.0, agora, nil, status, agora, agora)
+		AddRow(id, pedidoID, "PIX", uint8(1), "100.0", "0.0", "100.0", agora, nil, status, agora, agora)
 }

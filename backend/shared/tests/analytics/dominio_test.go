@@ -70,30 +70,30 @@ func TestAnalytics_Series(t *testing.T) {
 	}
 
 	completa := analytics.SerieCompleta([]string{"2026-02-28", "2026-03-01"},
-		map[string]analytics.PontoVenda{"2026-03-01": {Dia: "2026-03-01", TotalVendas: 9.5, TotalPedidos: 2}, "2026-01-01": {TotalVendas: 1}})
-	assert.Equal(t, []analytics.PontoVenda{{Dia: "2026-02-28"}, {Dia: "2026-03-01", TotalVendas: 9.5, TotalPedidos: 2}}, completa)
+		map[string]analytics.PontoVenda{"2026-03-01": {Dia: "2026-03-01", TotalVendas: reaisT("9.5"), TotalPedidos: 2}, "2026-01-01": {TotalVendas: reaisT("1")}})
+	assert.Equal(t, []analytics.PontoVenda{{Dia: "2026-02-28"}, {Dia: "2026-03-01", TotalVendas: reaisT("9.5"), TotalPedidos: 2}}, completa)
 	require.NotNil(t, analytics.SerieCompleta(nil, nil))
 }
 
 func TestAnalytics_Metricas(t *testing.T) {
-	top := []analytics.VendedorRanking{{ID: 1, Meta: 200}, {ID: 2, Meta: 0, PercentualMeta: 0}}
-	top[0].AplicarVendas(analytics.VendasDoMes{Total: 99.99, Quantidade: 1})
-	top[1].AplicarVendas(analytics.VendasDoMes{Total: 50, Quantidade: 3})
+	top := []analytics.VendedorRanking{{ID: 1, Meta: reaisT("200")}, {ID: 2, Meta: reaisT("0"), PercentualMeta: 0}}
+	top[0].AplicarVendas(analytics.VendasDoMes{Total: reaisT("99.99"), Quantidade: 1})
+	top[1].AplicarVendas(analytics.VendasDoMes{Total: reaisT("50"), Quantidade: 3})
 	assert.InDelta(t, 49.995, top[0].PercentualMeta, 1e-9)
-	assert.Equal(t, analytics.VendedorRanking{ID: 2, TotalVendas: 50, QuantidadeVendas: 3}, top[1], "sem meta: percentual 0")
+	assert.Equal(t, analytics.VendedorRanking{ID: 2, TotalVendas: reaisT("50"), QuantidadeVendas: 3}, top[1], "sem meta: percentual 0")
 
-	metas := []analytics.MetaVendedor{{ID: 1, Meta: 0}, {ID: 2, Meta: 1000}}
-	metas[0].AplicarVendas(analytics.VendasDoMes{Total: 10, Quantidade: 1})
-	metas[1].AplicarVendas(analytics.VendasDoMes{Total: 250, Quantidade: 2})
+	metas := []analytics.MetaVendedor{{ID: 1, Meta: reaisT("0")}, {ID: 2, Meta: reaisT("1000")}}
+	metas[0].AplicarVendas(analytics.VendasDoMes{Total: reaisT("10"), Quantidade: 1})
+	metas[1].AplicarVendas(analytics.VendasDoMes{Total: reaisT("250"), Quantidade: 2})
 	assert.Zero(t, metas[0].Percentual)
 	assert.Equal(t, 25.0, metas[1].Percentual)
 
-	m := analytics.NovasMetricas(analytics.PeriodoSemana, analytics.TotaisVendas{Valor: 100, Quantidade: 3}, 4, nil, nil, 500)
+	m := analytics.NovasMetricas(analytics.PeriodoSemana, analytics.TotaisVendas{Valor: reaisT("100"), Quantidade: 3}, 4, nil, nil, reaisT("500"))
 	assert.InDelta(t, 33.333333, m.TicketMedio, 1e-6)
 	assert.NotNil(t, m.TopVendedores)
 	assert.NotNil(t, m.MetasVendedores)
 	assert.False(t, m.VendedorDesligado)
-	assert.Zero(t, analytics.NovasMetricas(analytics.PeriodoMes, analytics.TotaisVendas{Valor: 10}, 0, nil, nil, 0).TicketMedio)
+	assert.Zero(t, analytics.NovasMetricas(analytics.PeriodoMes, analytics.TotaisVendas{Valor: reaisT("10")}, 0, nil, nil, reaisT("0")).TicketMedio)
 
 	z := analytics.MetricasZeradas(analytics.PeriodoHoje, true)
 	assert.True(t, z.VendedorDesligado)
@@ -108,11 +108,11 @@ func TestAnalytics_Metricas(t *testing.T) {
 // O arredondamento e o ticket são os do legado (mathRound, 2 casas).
 func TestAnalytics_LinhaRanking(t *testing.T) {
 	l := analytics.NovaLinhaRanking(analytics.DadosRanking{VendedorID: 7, VendedorNome: "A", Regiao: "Sul", UF: "PR",
-		Meta: 1000, TotalVendas: 333.333, TotalPedidos: 3, Atingimento: 33.3333})
-	assert.Equal(t, analytics.LinhaRanking{VendedorID: 7, VendedorNome: "A", Regiao: "Sul", UF: "PR", TotalVendas: 333.333,
-		TotalPedidos: 3, TicketMedio: 111.11, Meta: 1000, AtingimentoMeta: 33.33}, l)
+		Meta: reaisT("1000"), TotalVendas: reaisT("333.33"), TotalPedidos: 3, Atingimento: 33.3333})
+	assert.Equal(t, analytics.LinhaRanking{VendedorID: 7, VendedorNome: "A", Regiao: "Sul", UF: "PR", TotalVendas: reaisT("333.33"),
+		TotalPedidos: 3, TicketMedio: 111.11, Meta: reaisT("1000"), AtingimentoMeta: 33.33}, l)
 
-	semPedidos := analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: 50, Atingimento: 12.345})
+	semPedidos := analytics.NovaLinhaRanking(analytics.DadosRanking{TotalVendas: reaisT("50"), Atingimento: 12.345})
 	assert.Zero(t, semPedidos.TicketMedio)
 	assert.Equal(t, 12.35, semPedidos.AtingimentoMeta)
 	assert.Equal(t, -0.0, analytics.NovaLinhaRanking(analytics.DadosRanking{Atingimento: -0.004}).AtingimentoMeta)

@@ -18,7 +18,7 @@ import (
 func dadosProdutoValidos() catalogo.DadosProduto {
 	return catalogo.DadosProduto{
 		SKU: " SKU-1 ", Descricao: " Perfume ", Categoria: "EDP", Marca: "M", NotaOlfativa: " Cítrico ",
-		PrecoTabela: 10, CustoUnitario: 4, Unidade: "UN", DataLancamento: "2024-03-10",
+		PrecoTabela: "10", CustoUnitario: "4", Unidade: "UN", DataLancamento: "2024-03-10",
 	}
 }
 
@@ -56,9 +56,11 @@ func TestNovoProduto_Validacoes(t *testing.T) {
 		{"categoria vazia", func(d *catalogo.DadosProduto) { d.Categoria = "  " }, catalogo.ErrCategoriaObrigatoria, "categoria é obrigatória"},
 		{"marca vazia", func(d *catalogo.DadosProduto) { d.Marca = "" }, catalogo.ErrMarcaObrigatoria, "marca é obrigatória"},
 		{"unidade vazia", func(d *catalogo.DadosProduto) { d.Unidade = "" }, catalogo.ErrUnidadeObrigatoria, "unidade é obrigatória"},
-		{"preço negativo", func(d *catalogo.DadosProduto) { d.PrecoTabela = -0.01 }, catalogo.ErrPrecoTabelaInvalido, "preco_tabela deve ser maior ou igual a zero"},
-		{"custo negativo", func(d *catalogo.DadosProduto) { d.CustoUnitario = -1 }, catalogo.ErrCustoUnitarioInvalido, "custo_unitario deve ser maior ou igual a zero"},
-		{"preço antes do custo", func(d *catalogo.DadosProduto) { d.PrecoTabela, d.CustoUnitario = -1, -1 }, catalogo.ErrPrecoTabelaInvalido, "preco_tabela deve ser maior ou igual a zero"},
+		{"preço negativo", func(d *catalogo.DadosProduto) { d.PrecoTabela = "-0.01" }, catalogo.ErrPrecoTabelaInvalido, "preco_tabela deve ser maior ou igual a zero"},
+		{"custo negativo", func(d *catalogo.DadosProduto) { d.CustoUnitario = "-1" }, catalogo.ErrCustoUnitarioInvalido, "custo_unitario deve ser maior ou igual a zero"},
+		{"preço antes do custo", func(d *catalogo.DadosProduto) { d.PrecoTabela, d.CustoUnitario = "-1", "-1" }, catalogo.ErrPrecoTabelaInvalido, "preco_tabela deve ser maior ou igual a zero"},
+		{"preço com 3 casas (ARQ-09)", func(d *catalogo.DadosProduto) { d.PrecoTabela = "99.999" }, catalogo.ErrPrecoTabelaCasas, "preco_tabela deve ter no máximo 2 casas decimais"},
+		{"custo com 3 casas (ARQ-09)", func(d *catalogo.DadosProduto) { d.CustoUnitario = "0.001" }, catalogo.ErrCustoUnitarioCasas, "custo_unitario deve ter no máximo 2 casas decimais"},
 		{"data malformada", func(d *catalogo.DadosProduto) { d.DataLancamento = "10/03/2024" }, catalogo.ErrDataLancamentoInvalida, "data_lancamento inválida (use o formato AAAA-MM-DD)"},
 		{"data inexistente", func(d *catalogo.DadosProduto) { d.DataLancamento = "2024-02-30" }, catalogo.ErrDataLancamentoInvalida, "data_lancamento inválida (use o formato AAAA-MM-DD)"},
 	}
@@ -89,7 +91,7 @@ func TestNovoProduto_Sucesso(t *testing.T) {
 	assert.Zero(t, p.ID)
 
 	d := dadosProdutoValidos()
-	d.DataLancamento, d.PrecoTabela, d.CustoUnitario = "  ", 0, 0
+	d.DataLancamento, d.PrecoTabela, d.CustoUnitario = "  ", "0", "0"
 	p, err = catalogo.NovoProduto(d)
 	require.NoError(t, err)
 	assert.Nil(t, p.DataLancamento, "data em branco é opcional")

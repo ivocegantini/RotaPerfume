@@ -97,7 +97,7 @@ func TestVendasapp_EscopoZeroValue_FalhaFechado(t *testing.T) {
 	mock.ExpectQuery(`FROM pedidos p .+ WHERE p\.pedido_id_origem = \? LIMIT 1`).WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido", "canal", "status",
 			"valor_total", "created_at", "updated_at", "c", "v"}).
-			AddRow(int64(1), int64(1), int64(2), time.Now(), "App", "Faturado", 1.0, time.Now(), time.Now(), "C", "V"))
+			AddRow(int64(1), int64(1), int64(2), time.Now(), "App", "Faturado", "1.0", time.Now(), time.Now(), "C", "V"))
 	mock.ExpectQuery(`FROM itens_pedido i`).WithArgs(int64(1)).WillReturnRows(sqlmock.NewRows(nil))
 	_, err = c.ObterPedido(ctx, admin(t), 1)
 	assert.ErrorIs(t, err, vendas.ErrPedidoNaoEncontrado)
@@ -144,7 +144,7 @@ func TestVendasapp_Pedido_FalhaNaReleitura(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT status, vendedor_id FROM pedidos`).WillReturnRows(sqlmock.NewRows([]string{"status", "vendedor_id"}).AddRow("Faturado", int64(1)))
 	mock.ExpectQuery(`SELECT produto_id, quantidade`).WillReturnRows(sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).
-		AddRow(int64(10), 2, 100.0, 10.0).AddRow(int64(11), 1, 50.0, 0.0))
+		AddRow(int64(10), 2, "100.0", "10.0").AddRow(int64(11), 1, "50.0", "0.0"))
 	mock.ExpectExec(`UPDATE pedidos`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`FROM pedidos p`).WillReturnError(errBanco)

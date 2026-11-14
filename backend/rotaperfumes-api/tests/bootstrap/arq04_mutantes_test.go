@@ -52,7 +52,7 @@ func TestARQ04_Bootstrap_DesligamentoTodosOsPassosNaMesmaTx(t *testing.T) {
 	mock.ExpectCommit()
 	mock.ExpectQuery(`FROM vendedores WHERE id = \? LIMIT 1`).WithArgs(int64(5)).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "data_admissao", "data_desligamento", "meta_mensal", "created_at", "updated_at"}).
-			AddRow(int64(5), "Cinco", "Sul", "PR", agora, agora, 10.0, agora, agora))
+			AddRow(int64(5), "Cinco", "Sul", "PR", agora, agora, "10.0", agora, agora))
 
 	admin, err := kernel.NovoPrincipal(1, kernel.RoleAdmin)
 	require.NoError(t, err)

@@ -104,7 +104,7 @@ func (r *Produtos) Inserir(ctx context.Context, p *catalogo.Produto) error {
 		INSERT INTO produtos (sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	res, err := r.q.ExecContext(ctx, q, p.SKU.String(), p.Descricao, p.Categoria, p.Marca,
-		nullString(p.NotaOlfativa), p.PrecoTabela, p.CustoUnitario, p.Unidade, nullTime(p.DataLancamento), p.Ativo)
+		nullString(p.NotaOlfativa), p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nullTime(p.DataLancamento), p.Ativo)
 	if err != nil {
 		if db.ChaveDuplicada(err, "uk_produtos_sku") {
 			return catalogo.ErrSKUDuplicado // CHORE-06: sentinela sem embrulhar (o erro do driver traz o SKU)
@@ -127,7 +127,7 @@ func (r *Produtos) Atualizar(ctx context.Context, id int64, c catalogo.CamposPro
 		SET descricao = ?, categoria = ?, marca = ?, nota_olfativa = ?, preco_tabela = ?, custo_unitario = ?, unidade = ?, data_lancamento = ?
 		WHERE id = ?`
 	return r.exec(ctx, "atualizar produto", "UPDATE produtos", q, c.Descricao, c.Categoria, c.Marca,
-		nullString(c.NotaOlfativa), c.PrecoTabela, c.CustoUnitario, c.Unidade, nullTime(c.DataLancamento), id)
+		nullString(c.NotaOlfativa), c.PrecoTabela.String(), c.CustoUnitario.String(), c.Unidade, nullTime(c.DataLancamento), id)
 }
 
 // DefinirAtivo ativa/inativa o produto (exclusão lógica).

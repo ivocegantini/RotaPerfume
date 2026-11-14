@@ -217,7 +217,10 @@ func TestSEC11_Makefile_IncludeEnvEMysqlPwd(t *testing.T) {
 	assert.Less(t, iPwd, iExport, "MYSQL_PWD precisa ser exportado")
 	assert.Less(t, iMsys, iExport)
 	assert.Contains(t, mk.linhaDaVariavel(t, "CR"), `$(shell printf '\r')`)
-	assert.NotContains(t, mk.texto, "$(error", "nada de $(error) no parse: help/build/test não exigem credenciais")
+	// Única exceção: a recusa do BUG-29 (MAKEFLAGS na linha de comando), que
+	// não depende de credenciais.
+	assert.Equal(t, 1, strings.Count(mk.texto, "$(error"), "nada de $(error) no parse: help/build/test não exigem credenciais")
+	assert.Equal(t, 1, strings.Count(mk.texto, "$(error BUG-29: MAKEFLAGS"), "o único $(error) é o do BUG-29")
 }
 
 func TestSEC11_Makefile_AlvosDeBancoDependemDeDbCheckEnv(t *testing.T) {

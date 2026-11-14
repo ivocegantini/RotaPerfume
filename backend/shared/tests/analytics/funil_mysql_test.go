@@ -72,14 +72,14 @@ func TestDASH01_Oportunidades_Funil_SQLPorEscopoEJanela(t *testing.T) {
 					exp = exp.WithArgs(esc.args...)
 				}
 				exp.WillReturnRows(sqlmock.NewRows(funilCols).
-					AddRow(analytics.EtapaProspeccao, 3, 300.5).
+					AddRow(analytics.EtapaProspeccao, 3, "300.5").
 					AddRow(analytics.EtapaPerdido, 1, nil)) // SUM NULL → 0
 
 				got, err := analyticsmysql.NovoOportunidades(db).Funil(context.Background(), esc.e, jan.j)
 				require.NoError(t, err)
 				assert.Equal(t, []analytics.ContagemEtapa{
-					{Etapa: analytics.EtapaProspeccao, Quantidade: 3, Valor: 300.5},
-					{Etapa: analytics.EtapaPerdido, Quantidade: 1, Valor: 0},
+					{Etapa: analytics.EtapaProspeccao, Quantidade: 3, Valor: reaisT("300.5")},
+					{Etapa: analytics.EtapaPerdido, Quantidade: 1, Valor: reaisT("0")},
 				}, got)
 				assert.NoError(t, mock.ExpectationsWereMet())
 			})
@@ -130,11 +130,11 @@ func TestDASH01_Oportunidades_Funil_ErrosDeInfra(t *testing.T) {
 			m.ExpectQuery(sqlFunilBase + sqlFunilFim).WillReturnError(errBanco)
 		}, "analyticsmysql: funil:", errBanco},
 		{"erro de scan (quantidade não numérica)", func(m sqlmock.Sqlmock) {
-			m.ExpectQuery(sqlFunilBase + sqlFunilFim).WillReturnRows(sqlmock.NewRows(funilCols).AddRow(analytics.EtapaGanho, "x", 1.0))
+			m.ExpectQuery(sqlFunilBase + sqlFunilFim).WillReturnRows(sqlmock.NewRows(funilCols).AddRow(analytics.EtapaGanho, "x", "1.0"))
 		}, "analyticsmysql: funil scan:", nil},
 		{"erro de rows.Err", func(m sqlmock.Sqlmock) {
 			m.ExpectQuery(sqlFunilBase + sqlFunilFim).WillReturnRows(sqlmock.NewRows(funilCols).
-				AddRow(analytics.EtapaGanho, 1, 1.0).AddRow(analytics.EtapaPerdido, 1, 1.0).RowError(1, errBanco))
+				AddRow(analytics.EtapaGanho, 1, "1.0").AddRow(analytics.EtapaPerdido, 1, "1.0").RowError(1, errBanco))
 		}, "analyticsmysql: funil rows:", errBanco},
 	}
 	for _, c := range casos {

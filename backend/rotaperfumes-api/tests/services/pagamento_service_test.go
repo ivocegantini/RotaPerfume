@@ -44,7 +44,7 @@ func pagamentoColunasHeader() []string {
 func pagamentoRows(id, pedidoID int64, valor float64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pagamentoColunasHeader()).
-		AddRow(id, pedidoID, "PIX", uint8(1), valor, 0.0, valor, now, nil, "Em aberto", now, now)
+		AddRow(id, pedidoID, "PIX", uint8(1), decT(valor), "0.0", decT(valor), now, nil, "Em aberto", now, now)
 }
 
 func emptyPagamentoRows() *sqlmock.Rows {
@@ -56,9 +56,9 @@ func validPagamentoInput() vendas.DadosNovoPagamento {
 	return vendas.DadosNovoPagamento{PedidoID: 1, DadosPagamento: vendas.DadosPagamento{
 		FormaPagamento:  "PIX",
 		Parcelas:        1,
-		Valor:           100.0,
+		Valor:           "100.0",
 		TaxaPct:         0,
-		ValorLiquido:    100.0,
+		ValorLiquido:    "100.0",
 		DataVencimento:  "2024-01-15",
 		StatusPagamento: "Em aberto",
 	}}
@@ -243,7 +243,7 @@ func pagamentoValidacaoTestCases() []struct {
 			nome: "valor negativo",
 			input: func() vendas.DadosNovoPagamento {
 				in := validPagamentoInput()
-				in.Valor = -0.01
+				in.Valor = "-0.01"
 				return in
 			},
 			wantErr: vendas.ErrValorInvalido,
@@ -261,7 +261,7 @@ func pagamentoValidacaoTestCases() []struct {
 			nome: "valor_liquido negativo",
 			input: func() vendas.DadosNovoPagamento {
 				in := validPagamentoInput()
-				in.ValorLiquido = -1
+				in.ValorLiquido = "-1"
 				return in
 			},
 			wantErr: vendas.ErrValorLiquidoInvalido,
@@ -365,7 +365,7 @@ func TestPagamentoService_CreatePagamento_Sucesso(t *testing.T) {
 	db, mock := newPagamentoTestDB(t)
 	esperarLockPedido(mock, 1, 1)
 	mock.ExpectExec(`INSERT INTO pagamentos \(pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento\)`).
-		WithArgs(int64(1), "PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto").
+		WithArgs(int64(1), "PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
@@ -418,7 +418,7 @@ func TestPagamentoService_UpdatePagamento_IgnoraPedidoIDEPagamentoIDDoInput(t *t
 	// documenta que o Update usa exclusivamente o pagamentoID do path.
 	db, mock := newPagamentoTestDB(t)
 	mock.ExpectExec(`UPDATE pagamentos\s+SET forma_pagamento = \?, parcelas = \?, valor = \?, taxa_pct = \?, valor_liquido = \?, data_vencimento = \?, data_pagamento = \?, status_pagamento = \?\s+WHERE pagamento_id = \?`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegex + pagamentoFromRegex + ` WHERE pagamento_id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -437,7 +437,7 @@ func TestPagamentoService_UpdatePagamento_IgnoraPedidoIDEPagamentoIDDoInput(t *t
 func TestPagamentoService_UpdatePagamento_NaoEncontrado(t *testing.T) {
 	db, mock := newPagamentoTestDB(t)
 	mock.ExpectExec(`UPDATE pagamentos`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(999)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	casos := casosVendas(db, 0)
@@ -463,7 +463,7 @@ func TestPagamentoService_UpdatePagamento_ErroGenericoDoRepo(t *testing.T) {
 func TestPagamentoService_UpdatePagamento_ErroGetByIDAposUpdate(t *testing.T) {
 	db, mock := newPagamentoTestDB(t)
 	mock.ExpectExec(`UPDATE pagamentos`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegex + pagamentoFromRegex + ` WHERE pagamento_id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -479,7 +479,7 @@ func TestPagamentoService_UpdatePagamento_ErroGetByIDAposUpdate(t *testing.T) {
 func TestPagamentoService_UpdatePagamento_ComDataPagamento(t *testing.T) {
 	db, mock := newPagamentoTestDB(t)
 	mock.ExpectExec(`UPDATE pagamentos`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), sqlmock.AnyArg(), "Pago", int64(1)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), sqlmock.AnyArg(), "Pago", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegex + pagamentoFromRegex + ` WHERE pagamento_id = \? LIMIT 1`).
 		WithArgs(int64(1)).

@@ -41,7 +41,7 @@ func produtoRow(id int64, sku, descricao, categoria, marca, notaOlfativa string,
 	if dataLancamento != nil {
 		dl = *dataLancamento
 	}
-	return []driver.Value{id, sku, descricao, categoria, marca, notaOlfativa, precoTabela, custoUnitario, unidade, dl, ativo, "", created, updated}
+	return []driver.Value{id, sku, descricao, categoria, marca, notaOlfativa, decT(precoTabela), decT(custoUnitario), unidade, dl, ativo, "", created, updated}
 }
 
 func TestProdutoList_SemFiltro(t *testing.T) {
@@ -443,15 +443,15 @@ func TestProdutoCreate_Success(t *testing.T) {
 			Categoria:     "Perfumaria",
 			Marca:         "Marca A",
 			NotaOlfativa:  "Floral",
-			PrecoTabela:   100.0,
-			CustoUnitario: 50.0,
+			PrecoTabela:   reaisT("100.0"),
+			CustoUnitario: reaisT("50.0"),
 			Unidade:       "un",
 		},
 		Ativo: true,
 	}
 
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs(p.SKU.String(), p.Descricao, p.Categoria, p.Marca, "Floral", p.PrecoTabela, p.CustoUnitario, p.Unidade, nil, p.Ativo).
+		WithArgs(p.SKU.String(), p.Descricao, p.Categoria, p.Marca, "Floral", p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, p.Ativo).
 		WillReturnResult(sqlmock.NewResult(7, 1))
 
 	repo := catalogomysql.NovoProdutos(db)
@@ -470,7 +470,7 @@ func TestProdutoCreate_NotaOlfativaVazia(t *testing.T) {
 	p := &catalogo.Produto{SKU: "SKU2", CamposProduto: catalogo.CamposProduto{Descricao: "Perfume B"}}
 
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs(p.SKU.String(), p.Descricao, p.Categoria, p.Marca, nil, p.PrecoTabela, p.CustoUnitario, p.Unidade, nil, p.Ativo).
+		WithArgs(p.SKU.String(), p.Descricao, p.Categoria, p.Marca, nil, p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, p.Ativo).
 		WillReturnResult(sqlmock.NewResult(8, 1))
 
 	repo := catalogomysql.NovoProdutos(db)
@@ -507,13 +507,13 @@ func TestProdutoUpdate_Success(t *testing.T) {
 		Categoria:     "Perfumaria",
 		Marca:         "Marca A",
 		NotaOlfativa:  "Cítrico",
-		PrecoTabela:   150.0,
-		CustoUnitario: 60.0,
+		PrecoTabela:   reaisT("150.0"),
+		CustoUnitario: reaisT("60.0"),
 		Unidade:       "un",
 	}}
 
 	mock.ExpectExec("UPDATE produtos").
-		WithArgs(p.Descricao, p.Categoria, p.Marca, "Cítrico", p.PrecoTabela, p.CustoUnitario, p.Unidade, nil, int64(1)).
+		WithArgs(p.Descricao, p.Categoria, p.Marca, "Cítrico", p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	repo := catalogomysql.NovoProdutos(db)

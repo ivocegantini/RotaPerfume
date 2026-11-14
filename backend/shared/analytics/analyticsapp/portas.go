@@ -26,7 +26,7 @@ type IndicadoresVendas interface {
 	// vendas do mês (lista vazia, nunca nil).
 	TopVendedores(ctx context.Context, e kernel.Escopo, limite int) ([]analytics.VendedorRanking, error)
 	MetasVendedores(ctx context.Context, e kernel.Escopo) ([]analytics.MetaVendedor, error)
-	MetaMensalTotal(ctx context.Context, e kernel.Escopo) (float64, error)
+	MetaMensalTotal(ctx context.Context, e kernel.Escopo) (kernel.Dinheiro, error)
 	// SerieVendas: um ponto por dia da janela (nunca nil).
 	SerieVendas(ctx context.Context, e kernel.Escopo, d analytics.Dias) ([]analytics.PontoVenda, error)
 	// Ranking pagina o ranking de vendedores (Itens nunca nil).

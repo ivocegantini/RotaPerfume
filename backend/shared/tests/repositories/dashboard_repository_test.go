@@ -37,7 +37,7 @@ func TestDashboardGetVendasTotais_Success(t *testing.T) {
 			db, mock := newMock(t)
 			defer db.Close()
 
-			rows := sqlmock.NewRows([]string{"valor_total", "quantidade"}).AddRow(1500.50, 5)
+			rows := sqlmock.NewRows([]string{"valor_total", "quantidade"}).AddRow("1500.50", 5)
 			mock.ExpectQuery("SELECT COALESCE\\(SUM\\(valor_total\\), 0\\), COUNT\\(\\*\\) FROM pedidos WHERE .+").
 				WillReturnRows(rows)
 
@@ -45,7 +45,7 @@ func TestDashboardGetVendasTotais_Success(t *testing.T) {
 			valor, qtd, err := valorEQtd(analyticsmysql.NovoDashboard(db, time.Now).VendasTotais(ctx, escopoDe(0), periodoDe(tt.periodo)))
 
 			require.NoError(t, err)
-			assert.Equal(t, 1500.50, valor)
+			assert.Equal(t, reaisT("1500.50"), valor)
 			assert.Equal(t, 5, qtd)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -63,7 +63,7 @@ func TestDashboardGetVendasTotais_TabelaNaoExiste(t *testing.T) {
 	valor, qtd, err := valorEQtd(analyticsmysql.NovoDashboard(db, time.Now).VendasTotais(ctx, escopoDe(0), periodoDe("today")))
 
 	require.NoError(t, err)
-	assert.Equal(t, 0.0, valor)
+	assert.Equal(t, reaisT("0.0"), valor)
 	assert.Equal(t, 0, qtd)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -117,7 +117,7 @@ func TestDashboardGetVendasTotais_PeriodoWeek_UsaDateSub(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"valor_total", "quantidade"}).AddRow(999.0, 3)
+	rows := sqlmock.NewRows([]string{"valor_total", "quantidade"}).AddRow("999.0", 3)
 	mock.ExpectQuery(`SELECT COALESCE\(SUM\(valor_total\), 0\), COUNT\(\*\)\s+FROM pedidos\s+WHERE data_pedido >= DATE_SUB\(CURDATE\(\), INTERVAL 6 DAY\) AND status NOT IN`).
 		WillReturnRows(rows)
 
@@ -125,7 +125,7 @@ func TestDashboardGetVendasTotais_PeriodoWeek_UsaDateSub(t *testing.T) {
 	valor, qtd, err := valorEQtd(analyticsmysql.NovoDashboard(db, time.Now).VendasTotais(ctx, escopoDe(0), periodoDe("week")))
 
 	require.NoError(t, err)
-	assert.Equal(t, 999.0, valor)
+	assert.Equal(t, reaisT("999.0"), valor)
 	assert.Equal(t, 3, qtd)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -181,13 +181,13 @@ func TestDashboardGetMetaMensalTotal_Success(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery("SELECT COALESCE\\(SUM\\(meta_mensal\\), 0\\)\\s+FROM vendedores\\s+WHERE data_desligamento IS NULL").
-		WillReturnRows(sqlmock.NewRows([]string{"meta_total"}).AddRow(35000.75))
+		WillReturnRows(sqlmock.NewRows([]string{"meta_total"}).AddRow("35000.75"))
 
 	ctx := context.Background()
 	meta, err := analyticsmysql.NovoDashboard(db, time.Now).MetaMensalTotal(ctx, escopoDe(0))
 
 	require.NoError(t, err)
-	assert.Equal(t, 35000.75, meta)
+	assert.Equal(t, reaisT("35000.75"), meta)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -197,13 +197,13 @@ func TestDashboardGetMetaMensalTotal_TabelaVazia(t *testing.T) {
 
 	// COALESCE garante 0 quando não há vendedores ativos (SUM de nenhuma linha).
 	mock.ExpectQuery("SELECT COALESCE\\(SUM\\(meta_mensal\\), 0\\)\\s+FROM vendedores\\s+WHERE data_desligamento IS NULL").
-		WillReturnRows(sqlmock.NewRows([]string{"meta_total"}).AddRow(0.0))
+		WillReturnRows(sqlmock.NewRows([]string{"meta_total"}).AddRow("0.0"))
 
 	ctx := context.Background()
 	meta, err := analyticsmysql.NovoDashboard(db, time.Now).MetaMensalTotal(ctx, escopoDe(0))
 
 	require.NoError(t, err)
-	assert.Equal(t, 0.0, meta)
+	assert.Equal(t, reaisT("0.0"), meta)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -218,7 +218,7 @@ func TestDashboardGetMetaMensalTotal_TabelaNaoExiste(t *testing.T) {
 	meta, err := analyticsmysql.NovoDashboard(db, time.Now).MetaMensalTotal(ctx, escopoDe(0))
 
 	require.NoError(t, err)
-	assert.Equal(t, 0.0, meta)
+	assert.Equal(t, reaisT("0.0"), meta)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -243,12 +243,12 @@ func TestDashboardGetTopVendedores_ComEnrich(t *testing.T) {
 	mock.ExpectQuery("SELECT v\\.id, v\\.nome, v\\.meta_mensal AS meta FROM vendedores v WHERE v\\.data_desligamento IS NULL ORDER BY v\\.meta_mensal DESC LIMIT \\?").
 		WithArgs(5).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).
-			AddRow(1, "Vendedor A", 10000.0))
+			AddRow(1, "Vendedor A", "10000.0"))
 
 	mock.ExpectQuery("SELECT vendedor_id, .+ FROM pedidos WHERE vendedor_id IN \\(\\?\\) AND YEAR\\(data_pedido\\).+").
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"vendedor_id", "total", "qtd"}).
-			AddRow(1, 5000.0, 3))
+			AddRow(1, "5000.0", 3))
 
 	ctx := context.Background()
 	result, err := analyticsmysql.NovoDashboard(db, time.Now).TopVendedores(ctx, escopoDe(0), 5)
@@ -256,7 +256,7 @@ func TestDashboardGetTopVendedores_ComEnrich(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	assert.Equal(t, "Vendedor A", result[0].Nome)
-	assert.Equal(t, 5000.0, result[0].TotalVendas)
+	assert.Equal(t, reaisT("5000.0"), result[0].TotalVendas)
 	assert.Equal(t, 3, result[0].QuantidadeVendas)
 	assert.Equal(t, 50.0, result[0].PercentualMeta)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -293,17 +293,17 @@ func TestDashboardGetTopVendedores_EnrichPreservaCentavos(t *testing.T) {
 	mock.ExpectQuery("SELECT v\\.id, v\\.nome, v\\.meta_mensal AS meta FROM vendedores v WHERE v\\.data_desligamento IS NULL ORDER BY v\\.meta_mensal DESC LIMIT \\?").
 		WithArgs(5).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "meta"}).
-			AddRow(1, "Vendedor A", 1000.0))
+			AddRow(1, "Vendedor A", "1000.0"))
 	mock.ExpectQuery("SELECT vendedor_id, .+ FROM pedidos WHERE vendedor_id IN \\(\\?\\) AND YEAR\\(data_pedido\\).+").
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"vendedor_id", "total", "qtd"}).
-			AddRow(1, 1234.56, 2))
+			AddRow(1, "1234.56", 2))
 
 	result, err := analyticsmysql.NovoDashboard(db, time.Now).TopVendedores(context.Background(), escopoDe(0), 5)
 
 	require.NoError(t, err)
 	require.Len(t, result, 1)
-	assert.Equal(t, 1234.56, result[0].TotalVendas)
+	assert.Equal(t, reaisT("1234.56"), result[0].TotalVendas)
 	assert.InDelta(t, 123.456, result[0].PercentualMeta, 1e-9)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -345,19 +345,19 @@ func TestDashboardGetMetasVendedores_ComEnrich(t *testing.T) {
 
 	mock.ExpectQuery("SELECT v\\.id, v\\.nome, v\\.regiao, v\\.uf, v\\.meta_mensal AS meta FROM vendedores v WHERE v\\.data_desligamento IS NULL ORDER BY v\\.meta_mensal DESC").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).
-			AddRow(1, "Vendedor A", "Sudeste", "SP", 10000.0))
+			AddRow(1, "Vendedor A", "Sudeste", "SP", "10000.0"))
 
 	mock.ExpectQuery("SELECT vendedor_id, .+ FROM pedidos WHERE vendedor_id IN \\(\\?\\) AND YEAR\\(data_pedido\\).+").
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"vendedor_id", "total", "qtd"}).
-			AddRow(1, 2500.0, 2))
+			AddRow(1, "2500.0", 2))
 
 	ctx := context.Background()
 	result, err := analyticsmysql.NovoDashboard(db, time.Now).MetasVendedores(ctx, escopoDe(0))
 
 	require.NoError(t, err)
 	require.Len(t, result, 1)
-	assert.Equal(t, 2500.0, result[0].Realizado)
+	assert.Equal(t, reaisT("2500.0"), result[0].Realizado)
 	assert.Equal(t, 2, result[0].QuantidadeVendas)
 	assert.Equal(t, 25.0, result[0].Percentual)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -392,17 +392,17 @@ func TestDashboardGetMetasVendedores_EnrichPreservaCentavos(t *testing.T) {
 
 	mock.ExpectQuery("SELECT v\\.id, v\\.nome, v\\.regiao, v\\.uf, v\\.meta_mensal AS meta FROM vendedores v WHERE v\\.data_desligamento IS NULL ORDER BY v\\.meta_mensal DESC").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}).
-			AddRow(1, "Vendedor A", "Sudeste", "SP", 200.0))
+			AddRow(1, "Vendedor A", "Sudeste", "SP", "200.0"))
 	mock.ExpectQuery("SELECT vendedor_id, .+ FROM pedidos WHERE vendedor_id IN \\(\\?\\) AND YEAR\\(data_pedido\\).+").
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"vendedor_id", "total", "qtd"}).
-			AddRow(1, 99.99, 1))
+			AddRow(1, "99.99", 1))
 
 	result, err := analyticsmysql.NovoDashboard(db, time.Now).MetasVendedores(context.Background(), escopoDe(0))
 
 	require.NoError(t, err)
 	require.Len(t, result, 1)
-	assert.Equal(t, 99.99, result[0].Realizado)
+	assert.Equal(t, reaisT("99.99"), result[0].Realizado)
 	assert.InDelta(t, 49.995, result[0].Percentual, 1e-9)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -428,7 +428,7 @@ func TestDashboardGetVendasSeries_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT DATE_FORMAT\\(data_pedido, '%Y-%m-%d'\\) AS data, .+ FROM pedidos WHERE data_pedido >= DATE_SUB\\(CURDATE\\(\\), INTERVAL \\? DAY\\).+").
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"data", "valor", "quantidade"}).
-			AddRow("2024-01-01", 100.0, 2))
+			AddRow("2024-01-01", "100.0", 2))
 
 	mock.ExpectQuery("SELECT DATE_FORMAT\\(DATE_SUB\\(CURDATE\\(\\), INTERVAL n DAY\\), '%Y-%m-%d'\\) AS dia .+").
 		WithArgs(1).
@@ -440,7 +440,7 @@ func TestDashboardGetVendasSeries_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, series, 1)
 	assert.Equal(t, "2024-01-01", series[0].Dia)
-	assert.Equal(t, 100.0, series[0].TotalVendas)
+	assert.Equal(t, reaisT("100.0"), series[0].TotalVendas)
 	assert.Equal(t, 2, series[0].TotalPedidos)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -491,7 +491,7 @@ func TestDashboardGetVendasSeries_FormatoDataISO_BuildFullSeries(t *testing.T) {
 
 			pedidosRows := sqlmock.NewRows([]string{"data", "valor", "quantidade"})
 			for _, d := range tt.diasComVenda {
-				pedidosRows.AddRow(d, 100.0, 2)
+				pedidosRows.AddRow(d, "100.0", 2)
 			}
 			mock.ExpectQuery("SELECT DATE_FORMAT\\(data_pedido, '%Y-%m-%d'\\) AS data, .+ FROM pedidos WHERE data_pedido >= DATE_SUB\\(CURDATE\\(\\), INTERVAL \\? DAY\\).+").
 				WithArgs(tt.dias).
@@ -526,10 +526,10 @@ func TestDashboardGetVendasSeries_FormatoDataISO_BuildFullSeries(t *testing.T) {
 				assert.Equal(t, tt.diasDaSerieBD[i], dia)
 
 				if vendaSet[dia] {
-					assert.Equal(t, 100.0, ponto.TotalVendas)
+					assert.Equal(t, reaisT("100.0"), ponto.TotalVendas)
 					assert.Equal(t, 2, ponto.TotalPedidos)
 				} else {
-					assert.Equal(t, 0.0, ponto.TotalVendas)
+					assert.Equal(t, reaisT("0.0"), ponto.TotalVendas)
 					assert.Equal(t, 0, ponto.TotalPedidos)
 				}
 			}
@@ -635,7 +635,7 @@ func TestDashboardGetVendasSeries_EmptySeries_FormatoDataReal(t *testing.T) {
 				assert.Regexp(t, `^\d{4}-\d{2}-\d{2}$`, dia)
 				assert.Equal(t, dataEsperada, dia)
 
-				assert.Equal(t, 0.0, ponto.TotalVendas)
+				assert.Equal(t, reaisT("0.0"), ponto.TotalVendas)
 				assert.Equal(t, 0, ponto.TotalPedidos)
 			}
 
@@ -651,7 +651,7 @@ func TestDashboardGetVendasSeries_BuildFullSeriesErro(t *testing.T) {
 	mock.ExpectQuery("SELECT DATE_FORMAT\\(data_pedido, '%Y-%m-%d'\\) AS data, .+ FROM pedidos WHERE data_pedido >= DATE_SUB\\(CURDATE\\(\\), INTERVAL \\? DAY\\).+").
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"data", "valor", "quantidade"}).
-			AddRow("2024-01-01", 100.0, 2))
+			AddRow("2024-01-01", "100.0", 2))
 
 	mock.ExpectQuery("SELECT DATE_FORMAT\\(DATE_SUB\\(CURDATE\\(\\), INTERVAL n DAY\\), '%Y-%m-%d'\\) AS dia .+").
 		WithArgs(1).
@@ -676,7 +676,7 @@ func TestDashboardGetVendedoresRanking_ComVendas(t *testing.T) {
 	mock.ExpectQuery("SELECT(.|\\n)*FROM vendedores v(.|\\n)*LEFT JOIN(.|\\n)*ORDER BY v.meta_mensal DESC, atingimento_meta DESC(.|\\n)*LIMIT \\? OFFSET \\?").
 		WithArgs(10, 0).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta_mensal", "total_vendas", "total_pedidos", "atingimento_meta"}).
-			AddRow(1, "Vendedor A", "Sudeste", "SP", 10000.0, 4000.0, 4, 40.0))
+			AddRow(1, "Vendedor A", "Sudeste", "SP", "10000.0", "4000.0", 4, "40.0"))
 
 	ctx := context.Background()
 	result, total, err := itensETotal(analyticsmysql.NovoDashboard(db, time.Now).Ranking(ctx, escopoDe(0), kernel.NovaPagina(1, 10)))
@@ -685,7 +685,7 @@ func TestDashboardGetVendedoresRanking_ComVendas(t *testing.T) {
 	assert.Equal(t, 1, total)
 	require.Len(t, result, 1)
 	assert.Equal(t, "Vendedor A", result[0].VendedorNome)
-	assert.Equal(t, 4000.0, result[0].TotalVendas)
+	assert.Equal(t, reaisT("4000.0"), result[0].TotalVendas)
 	assert.Equal(t, 4, result[0].TotalPedidos)
 	assert.Equal(t, 1000.0, result[0].TicketMedio)
 	assert.Equal(t, 40.0, result[0].AtingimentoMeta)
@@ -785,9 +785,9 @@ func TestDashboardGetVendedoresRanking_EmpateMeta_OrdenaPorAtingimento(t *testin
 	rankingRows := sqlmock.NewRows([]string{
 		"id", "nome", "regiao", "uf", "meta_mensal", "total_vendas", "total_pedidos", "atingimento_meta",
 	}).
-		AddRow(1, "Vendedor Alto Atingimento", "Sudeste", "SP", 10000.0, 8000.0, 10, 80.0).
-		AddRow(2, "Vendedor Medio Atingimento", "Sul", "PR", 10000.0, 5000.0, 6, 50.0).
-		AddRow(3, "Vendedor Baixo Atingimento", "Nordeste", "BA", 10000.0, 2000.0, 3, 20.0)
+		AddRow(1, "Vendedor Alto Atingimento", "Sudeste", "SP", "10000.0", "8000.0", 10, "80.0").
+		AddRow(2, "Vendedor Medio Atingimento", "Sul", "PR", "10000.0", "5000.0", 6, "50.0").
+		AddRow(3, "Vendedor Baixo Atingimento", "Nordeste", "BA", "10000.0", "2000.0", 3, "20.0")
 
 	mock.ExpectQuery(orderByRegex.String()).
 		WithArgs(10, 0).
@@ -814,9 +814,9 @@ func TestDashboardGetVendedoresRanking_EmpateMeta_OrdenaPorAtingimento(t *testin
 	// Todos os vendedores tem a mesma meta_mensal, confirmando que o empate
 	// foi desfeito apenas pelo atingimento_meta (nao houve reordenacao por
 	// meta, ja que ela e identica para os tres).
-	assert.Equal(t, 10000.0, result[0].Meta)
-	assert.Equal(t, 10000.0, result[1].Meta)
-	assert.Equal(t, 10000.0, result[2].Meta)
+	assert.Equal(t, reaisT("10000.0"), result[0].Meta)
+	assert.Equal(t, reaisT("10000.0"), result[1].Meta)
+	assert.Equal(t, reaisT("10000.0"), result[2].Meta)
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

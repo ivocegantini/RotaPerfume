@@ -30,7 +30,7 @@ const (
 // bug16ItensIguaisH são os itens de validPedidoPayload() como o banco os lê.
 func bug16ItensIguaisH() *sqlmock.Rows {
 	return sqlmock.NewRows([]string{"produto_id", "quantidade", "preco_praticado", "desconto_pct"}).
-		AddRow(int64(10), 2, 100.0, 10.0).AddRow(int64(11), 1, 50.0, 0.0)
+		AddRow(int64(10), 2, "100.0", "10.0").AddRow(int64(11), 1, "50.0", "0.0")
 }
 
 func bug16PayloadH(status string) map[string]any {
@@ -127,7 +127,7 @@ func TestBUG16_HTTP_PUT_PosFaturamentoPermitido_200SemBaixa(t *testing.T) {
 			defer server.Close()
 			defer db.Close()
 			bug16ExpectLockH(mock, c.atual, bug16ItensIguaisH())
-			mock.ExpectExec(updatePedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", c.destino, 230.0, int64(1)).
+			mock.ExpectExec(updatePedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", c.destino, "230.00", int64(1)).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			mock.ExpectCommit()
 			bug16ExpectReleituraH(mock, c.destino)
@@ -150,7 +150,7 @@ func TestBUG16_HTTP_PUT_NaoFaturados_200(t *testing.T) {
 			defer server.Close()
 			defer db.Close()
 			bug16ExpectLockH(mock, c.atual, bug16ItensIguaisH())
-			mock.ExpectExec(updatePedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", c.destino, 230.0, int64(1)).
+			mock.ExpectExec(updatePedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", c.destino, "230.00", int64(1)).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			mock.ExpectExec(deleteItensPedidoRegexH).WithArgs(int64(1)).WillReturnResult(sqlmock.NewResult(0, 2))
 			mock.ExpectExec(insertItemRegexH).WillReturnResult(sqlmock.NewResult(1, 1))
@@ -192,7 +192,7 @@ func TestBUG20_HTTP_POST_Faturado_FalhaNaBaixa_Rollback500(t *testing.T) {
 	defer server.Close()
 	defer db.Close()
 	mock.ExpectBegin()
-	mock.ExpectExec(insertPedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", 230.0).WillReturnResult(sqlmock.NewResult(100, 1))
+	mock.ExpectExec(insertPedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").WillReturnResult(sqlmock.NewResult(100, 1))
 	mock.ExpectExec(insertItemRegexH).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(insertItemRegexH).WillReturnResult(sqlmock.NewResult(2, 1))
 	expectBaixaEstoquePorItemH(mock, 10, "SKU-010")
@@ -213,7 +213,7 @@ func TestBUG20_HTTP_POST_SemBaixa(t *testing.T) {
 			defer server.Close()
 			defer db.Close()
 			mock.ExpectBegin()
-			mock.ExpectExec(insertPedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", st, 230.0).WillReturnResult(sqlmock.NewResult(100, 1))
+			mock.ExpectExec(insertPedidoRegexH).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", st, "230.00").WillReturnResult(sqlmock.NewResult(100, 1))
 			mock.ExpectExec(insertItemRegexH).WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectExec(insertItemRegexH).WillReturnResult(sqlmock.NewResult(2, 1))
 			mock.ExpectCommit()

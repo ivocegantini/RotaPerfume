@@ -45,12 +45,12 @@ func TestParsePedidoRow(t *testing.T) {
 		{
 			nome: "ISO completo",
 			rec:  []string{"10", "1", "7", "2024-03-05", "App", "Faturado", "150.50"},
-			want: pedidos.PedidoRow{PedidoIDOrigem: 10, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 3, 5), Canal: "App", Status: "Faturado", ValorTotal: 150.5},
+			want: pedidos.PedidoRow{PedidoIDOrigem: 10, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 3, 5), Canal: "App", Status: "Faturado", ValorTotal: reaisT("150.5")},
 		},
 		{
 			nome: "data BR e espaços aparados",
 			rec:  []string{" 11 ", " 2 ", " 8 ", " 05/03/2024 ", " WhatsApp ", " Em separação ", " 99 "},
-			want: pedidos.PedidoRow{PedidoIDOrigem: 11, ClienteIDOrigem: 2, VendedorID: 8, DataPedido: data(2024, 3, 5), Canal: "WhatsApp", Status: "Em separação", ValorTotal: 99},
+			want: pedidos.PedidoRow{PedidoIDOrigem: 11, ClienteIDOrigem: 2, VendedorID: 8, DataPedido: data(2024, 3, 5), Canal: "WhatsApp", Status: "Em separação", ValorTotal: reaisT("99")},
 		},
 		{nome: "pedido_id inválido", rec: []string{"x", "1", "7", "2024-03-05", "App", "Faturado", "1"}, errSub: "pedido_id inválido"},
 		{nome: "cliente_id inválido", rec: []string{"10", "", "7", "2024-03-05", "App", "Faturado", "1"}, errSub: "cliente_id inválido"},
@@ -160,7 +160,7 @@ func TestParseItemPedidoRow(t *testing.T) {
 		{
 			nome: "válido com espaços",
 			rec:  []string{" 100 ", "10", " SKU-1 ", "3", "19.90", "5", "59.70"},
-			want: pedidos.ItemPedidoRow{ItemIDOrigem: 100, PedidoIDOrigem: 10, SKU: "SKU-1", Quantidade: 3, PrecoPraticado: 19.9, DescontoPct: 5, ValorBruto: 59.7},
+			want: pedidos.ItemPedidoRow{ItemIDOrigem: 100, PedidoIDOrigem: 10, SKU: "SKU-1", Quantidade: 3, PrecoPraticado: reaisT("19.9"), DescontoPct: 5, ValorBruto: reaisT("59.7")},
 		},
 		{nome: "item_id inválido", rec: []string{"a", "10", "S", "1", "1", "0", "1"}, errSub: "item_id inválido"},
 		{nome: "pedido_id inválido", rec: []string{"1", "", "S", "1", "1", "0", "1"}, errSub: "pedido_id inválido"},
@@ -337,18 +337,18 @@ func TestUpsertPedidos(t *testing.T) {
 	capturarLog(t)
 	db, mock := novoMock(t)
 	rows := []pedidos.PedidoRow{
-		{PedidoIDOrigem: 1, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 2), Canal: "App", Status: "Faturado", ValorTotal: 10},
-		{PedidoIDOrigem: 2, ClienteIDOrigem: 999, VendedorID: 7, DataPedido: data(2024, 1, 2), Canal: "App", Status: "Faturado", ValorTotal: 10},
-		{PedidoIDOrigem: 3, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 3), Canal: "Visita", Status: "Entregue", ValorTotal: 20},
-		{PedidoIDOrigem: 4, ClienteIDOrigem: 1, VendedorID: 99, DataPedido: data(2024, 1, 4), Canal: "App", Status: "Cancelado", ValorTotal: 0},
-		{PedidoIDOrigem: 5, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 5), Canal: "App", Status: "Faturado", ValorTotal: 5},
+		{PedidoIDOrigem: 1, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 2), Canal: "App", Status: "Faturado", ValorTotal: reaisT("10")},
+		{PedidoIDOrigem: 2, ClienteIDOrigem: 999, VendedorID: 7, DataPedido: data(2024, 1, 2), Canal: "App", Status: "Faturado", ValorTotal: reaisT("10")},
+		{PedidoIDOrigem: 3, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 3), Canal: "Visita", Status: "Entregue", ValorTotal: reaisT("20")},
+		{PedidoIDOrigem: 4, ClienteIDOrigem: 1, VendedorID: 99, DataPedido: data(2024, 1, 4), Canal: "App", Status: "Cancelado", ValorTotal: reaisT("0")},
+		{PedidoIDOrigem: 5, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 5), Canal: "App", Status: "Faturado", ValorTotal: reaisT("5")},
 	}
 	mock.ExpectPrepare("INSERT INTO pedidos")
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(1), int64(1), int64(7), "2024-01-02", "App", "Faturado", 10.0).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(1), int64(1), int64(7), "2024-01-02", "App", "Faturado", "10.00").WillReturnResult(sqlmock.NewResult(0, 1))
 	// pedido 2: cliente 999 não está no lookup -> nenhum Exec.
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(3), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", 20.0).WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(4), int64(1), int64(99), "2024-01-04", "App", "Cancelado", 0.0).WillReturnError(errBanco) // FK de vendedor
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(5), int64(1), int64(7), "2024-01-05", "App", "Faturado", 5.0).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(3), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", "20.00").WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(4), int64(1), int64(99), "2024-01-04", "App", "Cancelado", "0.00").WillReturnError(errBanco) // FK de vendedor
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(5), int64(1), int64(7), "2024-01-05", "App", "Faturado", "5.00").WillReturnResult(sqlmock.NewResult(0, 0))
 
 	ins, upd, fail, err := pedidos.UpsertPedidos(db, rows, map[int64]int64{1: 1})
 	require.NoError(t, err)
@@ -362,18 +362,18 @@ func TestUpsertItensPedido(t *testing.T) {
 	capturarLog(t)
 	db, mock := novoMock(t)
 	rows := []pedidos.ItemPedidoRow{
-		{ItemIDOrigem: 100, PedidoIDOrigem: 10, SKU: "SKU-A", Quantidade: 2, PrecoPraticado: 10, DescontoPct: 0, ValorBruto: 20},
-		{ItemIDOrigem: 101, PedidoIDOrigem: 99, SKU: "SKU-A", Quantidade: 1, PrecoPraticado: 10, ValorBruto: 10}, // pedido ausente
-		{ItemIDOrigem: 102, PedidoIDOrigem: 10, SKU: "SKU-X", Quantidade: 1, PrecoPraticado: 10, ValorBruto: 10}, // sku ausente
-		{ItemIDOrigem: 103, PedidoIDOrigem: 10, SKU: "SKU-B", Quantidade: 1, PrecoPraticado: 5, DescontoPct: 10, ValorBruto: 5},
-		{ItemIDOrigem: 104, PedidoIDOrigem: 10, SKU: "SKU-B", Quantidade: 1, PrecoPraticado: 5, ValorBruto: 5},
-		{ItemIDOrigem: 105, PedidoIDOrigem: 10, SKU: "SKU-B", Quantidade: 1, PrecoPraticado: 5, ValorBruto: 5},
+		{ItemIDOrigem: 100, PedidoIDOrigem: 10, SKU: "SKU-A", Quantidade: 2, PrecoPraticado: reaisT("10"), DescontoPct: 0, ValorBruto: reaisT("20")},
+		{ItemIDOrigem: 101, PedidoIDOrigem: 99, SKU: "SKU-A", Quantidade: 1, PrecoPraticado: reaisT("10"), ValorBruto: reaisT("10")}, // pedido ausente
+		{ItemIDOrigem: 102, PedidoIDOrigem: 10, SKU: "SKU-X", Quantidade: 1, PrecoPraticado: reaisT("10"), ValorBruto: reaisT("10")}, // sku ausente
+		{ItemIDOrigem: 103, PedidoIDOrigem: 10, SKU: "SKU-B", Quantidade: 1, PrecoPraticado: reaisT("5"), DescontoPct: 10, ValorBruto: reaisT("5")},
+		{ItemIDOrigem: 104, PedidoIDOrigem: 10, SKU: "SKU-B", Quantidade: 1, PrecoPraticado: reaisT("5"), ValorBruto: reaisT("5")},
+		{ItemIDOrigem: 105, PedidoIDOrigem: 10, SKU: "SKU-B", Quantidade: 1, PrecoPraticado: reaisT("5"), ValorBruto: reaisT("5")},
 	}
 	mock.ExpectPrepare("INSERT INTO itens_pedido")
-	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(100), int64(10), int64(3), 2, 10.0, 0.0, 20.0).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(103), int64(10), int64(4), 1, 5.0, 10.0, 5.0).WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(104), int64(10), int64(4), 1, 5.0, 0.0, 5.0).WillReturnError(errBanco)
-	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(105), int64(10), int64(4), 1, 5.0, 0.0, 5.0).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(100), int64(10), int64(3), 2, "10.00", 0.0, "20.00").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(103), int64(10), int64(4), 1, "5.00", 10.0, "5.00").WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(104), int64(10), int64(4), 1, "5.00", 0.0, "5.00").WillReturnError(errBanco)
+	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(105), int64(10), int64(4), 1, "5.00", 0.0, "5.00").WillReturnResult(sqlmock.NewResult(0, 0))
 
 	ins, upd, fail, err := pedidos.UpsertItensPedido(db, rows, map[int64]int64{10: 10}, map[string]int64{"SKU-A": 3, "SKU-B": 4})
 	require.NoError(t, err)
@@ -443,15 +443,15 @@ func TestRun_ImportaAsDuasFasesComUnificacao(t *testing.T) {
 	mock.ExpectQuery("SELECT cliente_id_origem FROM clientes").
 		WillReturnRows(sqlmock.NewRows([]string{"cliente_id_origem"}).AddRow(1))
 	mock.ExpectPrepare("INSERT INTO pedidos")
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(10), int64(1), int64(7), "2024-01-02", "App", "Faturado", 100.0).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(10), int64(1), int64(7), "2024-01-02", "App", "Faturado", "100.00").WillReturnResult(sqlmock.NewResult(0, 1))
 	// NEG-01: pedido do cliente 3001 (cópia) é gravado no sobrevivente 1.
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(11), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", 50.0).WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(11), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", "50.00").WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectQuery("SELECT pedido_id_origem FROM pedidos").
 		WillReturnRows(sqlmock.NewRows([]string{"pedido_id_origem"}).AddRow(10).AddRow(11))
 	mock.ExpectQuery("SELECT id, sku FROM produtos").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "sku"}).AddRow(3, "SKU-A"))
 	mock.ExpectPrepare("INSERT INTO itens_pedido")
-	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(100), int64(10), int64(3), 2, 50.0, 0.0, 100.0).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO itens_pedido").WithArgs(int64(100), int64(10), int64(3), 2, "50.00", 0.0, "100.00").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
 	aberturas := 0

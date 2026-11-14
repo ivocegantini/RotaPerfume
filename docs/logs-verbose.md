@@ -13,8 +13,10 @@ No backend, os logs seguem 4 níveis (seção 2). No frontend continua valendo o
 ## 2. Formato e níveis (backend)
 
 ```
-[arquivo] [Funcao] descrição
+2026/11/13 14:05:09.123456 [arquivo] [Funcao] descrição
 ```
+
+**LOG-04:** toda linha começa com data e hora locais, com segundos. No Go, vem das flags do `log` (a API usa `LstdFlags|Lmicroseconds`; os CLIs, `LstdFlags`). No frontend, vem do `carimbo()` de `frontend/src/lib/vlog.ts`, usado pelo `vlog` e pelos avisos do `apiClient` (sem microssegundos).
 
 | Nível | Quem emite | Exemplo |
 |---|---|---|

@@ -36,12 +36,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/rotaperfumes/shared/cmdutil"
 	"github.com/rotaperfumes/shared/importers/importkit"
+	"github.com/rotaperfumes/shared/kernel"
 )
 
 // Tag prefixa os logs e as mensagens de erro do importador.
@@ -60,8 +60,8 @@ type Row struct {
 	Categoria      string
 	Marca          string
 	NotaOlfativa   string
-	PrecoTabela    float64
-	CustoUnitario  float64
+	PrecoTabela    kernel.Dinheiro
+	CustoUnitario  kernel.Dinheiro
 	Unidade        string
 	Ativo          bool
 	DataLancamento *time.Time
@@ -151,12 +151,12 @@ func ParseRow(record []string) (Row, error) {
 		return Row{}, fmt.Errorf("descricao, categoria ou marca vazios")
 	}
 
-	precoTabela, err := strconv.ParseFloat(record[5], 64)
+	precoTabela, err := kernel.LerDinheiro(record[5]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return Row{}, fmt.Errorf("preco_tabela inválido (%q): %w", record[5], err)
 	}
 
-	custoUnitario, err := strconv.ParseFloat(record[6], 64)
+	custoUnitario, err := kernel.LerDinheiro(record[6]) // exato, sem float64 (ARQ-09)
 	if err != nil {
 		return Row{}, fmt.Errorf("custo_unitario inválido (%q): %w", record[6], err)
 	}
@@ -256,6 +256,6 @@ func argsProduto(row Row) ([]any, bool) {
 	}
 	return []any{
 		row.SKU, row.Descricao, row.Categoria, row.Marca, notaOlfativa,
-		row.PrecoTabela, row.CustoUnitario, row.Unidade, dataLancamento, row.Ativo,
+		row.PrecoTabela.String(), row.CustoUnitario.String(), row.Unidade, dataLancamento, row.Ativo,
 	}, true
 }

@@ -49,6 +49,10 @@ var (
 	ErrSenhaFraca                    = kernel.NovoErro(kernel.KindInvalido, "senha deve conter ao menos 3 dos 4 tipos: letra minúscula, letra maiúscula, dígito e símbolo")
 
 	ErrUsuarioNaoEncontrado = kernel.NovoErro(kernel.KindNaoEncontrado, "usuário não encontrado")
+	// ErrContaRemovidaNaTroca (BUG-25): a conta do próprio usuário sumiu
+	// durante a troca de senha. 400 (falha no processamento do pedido), não
+	// 401 (credencial) nem 404; o cliente deve refazer o login.
+	ErrContaRemovidaNaTroca = kernel.NovoErro(kernel.KindInvalido, "não foi possível trocar a senha: a conta não existe mais; faça login novamente")
 	// ErrAcessoRestritoAdmin: defesa em profundidade dos casos de uso de
 	// gestão de usuários (I-05), além da política AdminOnly da rota.
 	ErrAcessoRestritoAdmin   = kernel.NovoErro(kernel.KindProibido, "acesso restrito a administradores")

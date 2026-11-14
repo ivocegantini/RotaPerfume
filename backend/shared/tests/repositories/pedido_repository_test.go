@@ -22,7 +22,7 @@ var pedidoColumns = []string{
 }
 
 func pedidoRow(idOrigem, clienteID, vendedorID int64, dataPedido time.Time, canal, status string, valorTotal float64, created, updated time.Time, clienteNome, vendedorNome string) []driver.Value {
-	return []driver.Value{idOrigem, clienteID, vendedorID, dataPedido, canal, status, valorTotal, created, updated, clienteNome, vendedorNome}
+	return []driver.Value{idOrigem, clienteID, vendedorID, dataPedido, canal, status, decT(valorTotal), created, updated, clienteNome, vendedorNome}
 }
 
 var itemPedidoColumns = []string{
@@ -31,7 +31,7 @@ var itemPedidoColumns = []string{
 }
 
 func itemPedidoRow(idOrigem, pedidoID, produtoID int64, quantidade int, preco, desconto, valorBruto float64, created, updated time.Time, sku, descricao string) []driver.Value {
-	return []driver.Value{idOrigem, pedidoID, produtoID, quantidade, preco, desconto, valorBruto, created, updated, sku, descricao}
+	return []driver.Value{idOrigem, pedidoID, produtoID, quantidade, decT(preco), desconto, decT(valorBruto), created, updated, sku, descricao}
 }
 
 const pedidoFromRegexp = `FROM pedidos p JOIN clientes c ON c\.cliente_id_origem = p\.cliente_id JOIN vendedores v ON v\.id = p\.vendedor_id`
@@ -386,18 +386,18 @@ func TestPedidoCreateComItens_Success(t *testing.T) {
 		DataPedido: now,
 		Canal:      "online",
 		Status:     "aprovado",
-		ValorTotal: 150.0,
+		ValorTotal: reaisT("150.0"),
 	}
 	itens := []vendas.ItemPedido{
-		{ProdutoID: 1, Quantidade: 3, PrecoPraticado: 50.0, DescontoPct: 0, ValorBruto: 150.0},
+		{ProdutoID: 1, Quantidade: 3, PrecoPraticado: reaisT("50.0"), DescontoPct: 0, ValorBruto: reaisT("150.0")},
 	}
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String()).
 		WillReturnResult(sqlmock.NewResult(10, 1))
 	mock.ExpectExec("INSERT INTO itens_pedido").
-		WithArgs(int64(10), int64(1), 3, 50.0, 0.0, 150.0).
+		WithArgs(int64(10), int64(1), 3, "50.00", 0.0, "150.00").
 		WillReturnResult(sqlmock.NewResult(20, 1))
 	mock.ExpectCommit()
 
@@ -416,11 +416,11 @@ func TestPedidoCreateComItens_SemItens(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "aprovado", ValorTotal: 0}
+	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "aprovado", ValorTotal: reaisT("0")}
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String()).
 		WillReturnResult(sqlmock.NewResult(11, 1))
 	mock.ExpectCommit()
 
@@ -455,7 +455,7 @@ func TestPedidoCreateComItens_ErroInsertItem(t *testing.T) {
 	defer db.Close()
 
 	p := &vendas.Pedido{}
-	itens := []vendas.ItemPedido{{ProdutoID: 1, Quantidade: 1, PrecoPraticado: 10.0}}
+	itens := []vendas.ItemPedido{{ProdutoID: 1, Quantidade: 1, PrecoPraticado: reaisT("10.0")}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO pedidos").
@@ -483,9 +483,9 @@ func TestPedidoUpdateComItens_Success(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "aprovado", ValorTotal: 200.0}
+	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "aprovado", ValorTotal: reaisT("200.0")}
 	itens := []vendas.ItemPedido{
-		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: 50.0, DescontoPct: 0, ValorBruto: 200.0},
+		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: reaisT("50.0"), DescontoPct: 0, ValorBruto: reaisT("200.0")},
 	}
 
 	mock.ExpectBegin()
@@ -496,13 +496,13 @@ func TestPedidoUpdateComItens_Success(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal, int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec("INSERT INTO itens_pedido").
-		WithArgs(int64(1), int64(2), 4, 50.0, 0.0, 200.0).
+		WithArgs(int64(1), int64(2), 4, "50.00", 0.0, "200.00").
 		WillReturnResult(sqlmock.NewResult(30, 1))
 	mock.ExpectCommit()
 
@@ -588,9 +588,9 @@ func TestPedidoUpdateComItens_TransicaoParaFaturado_BaixaEstoque(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: 200.0}
+	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: reaisT("200.0")}
 	itens := []vendas.ItemPedido{
-		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: 50.0, DescontoPct: 0, ValorBruto: 200.0},
+		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: reaisT("50.0"), DescontoPct: 0, ValorBruto: reaisT("200.0")},
 	}
 
 	mock.ExpectBegin()
@@ -601,13 +601,13 @@ func TestPedidoUpdateComItens_TransicaoParaFaturado_BaixaEstoque(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal, int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO itens_pedido").
-		WithArgs(int64(1), int64(2), 4, 50.0, 0.0, 200.0).
+		WithArgs(int64(1), int64(2), 4, "50.00", 0.0, "200.00").
 		WillReturnResult(sqlmock.NewResult(30, 1))
 	// baixa de estoque: resolve sku pelo produto_id, depois ajusta saldo.
 	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).
@@ -632,10 +632,10 @@ func TestPedidoUpdateComItens_ReenvioFaturadoIdempotente_NaoBaixaEstoqueDeNovo(t
 
 	now := time.Now()
 	itens := []vendas.ItemPedido{
-		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: 50.0, DescontoPct: 0, ValorBruto: 200.0},
+		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: reaisT("50.0"), DescontoPct: 0, ValorBruto: reaisT("200.0")},
 	}
 	// payload igual aos itens já persistidos (mesmo produto/qtd/preco/desconto).
-	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: 200.0}
+	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: reaisT("200.0")}
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(selectStatusForUpdateRegexp).
@@ -644,9 +644,9 @@ func TestPedidoUpdateComItens_ReenvioFaturadoIdempotente_NaoBaixaEstoqueDeNovo(t
 	mock.ExpectQuery(selectItensAtuaisTxRegexp).
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns).
-			AddRow(int64(2), 4, 50.0, 0.0))
+			AddRow(int64(2), 4, "50.0", "0.0"))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal, int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// pedido já estava Faturado: não reescreve itens_pedido (sem DELETE/INSERT)
 	// nem dispara baixa de estoque novamente (statusAtual já era Faturado).
@@ -666,9 +666,9 @@ func TestPedidoUpdateComItens_FaturadoTentaAlterarItens_Erro(t *testing.T) {
 	now := time.Now()
 	// payload com item DIFERENTE do persistido (quantidade mudou).
 	itens := []vendas.ItemPedido{
-		{ProdutoID: 2, Quantidade: 99, PrecoPraticado: 50.0, DescontoPct: 0, ValorBruto: 200.0},
+		{ProdutoID: 2, Quantidade: 99, PrecoPraticado: reaisT("50.0"), DescontoPct: 0, ValorBruto: reaisT("200.0")},
 	}
-	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: 200.0}
+	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: reaisT("200.0")}
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(selectStatusForUpdateRegexp).
@@ -677,7 +677,7 @@ func TestPedidoUpdateComItens_FaturadoTentaAlterarItens_Erro(t *testing.T) {
 	mock.ExpectQuery(selectItensAtuaisTxRegexp).
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns).
-			AddRow(int64(2), 4, 50.0, 0.0))
+			AddRow(int64(2), 4, "50.0", "0.0"))
 	mock.ExpectRollback()
 
 	ctx := context.Background()
@@ -692,9 +692,9 @@ func TestPedidoUpdateComItens_ErroBaixaEstoque_RollbackTudo(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now()
-	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: 200.0}
+	p := &vendas.Pedido{ClienteID: 1, VendedorID: 1, DataPedido: now, Canal: "online", Status: "Faturado", ValorTotal: reaisT("200.0")}
 	itens := []vendas.ItemPedido{
-		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: 50.0, DescontoPct: 0, ValorBruto: 200.0},
+		{ProdutoID: 2, Quantidade: 4, PrecoPraticado: reaisT("50.0"), DescontoPct: 0, ValorBruto: reaisT("200.0")},
 	}
 
 	mock.ExpectBegin()
@@ -705,13 +705,13 @@ func TestPedidoUpdateComItens_ErroBaixaEstoque_RollbackTudo(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal, int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO itens_pedido").
-		WithArgs(int64(1), int64(2), 4, 50.0, 0.0, 200.0).
+		WithArgs(int64(1), int64(2), 4, "50.00", 0.0, "200.00").
 		WillReturnResult(sqlmock.NewResult(30, 1))
 	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).
 		WithArgs(int64(2)).

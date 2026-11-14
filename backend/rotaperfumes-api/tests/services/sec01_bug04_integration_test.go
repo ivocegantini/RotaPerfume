@@ -29,7 +29,7 @@ func criarVendedorTemp(t *testing.T, ctx context.Context, db *sql.DB, tag string
 	t.Helper()
 	nome := fmt.Sprintf("ZZ-TEST-%s-%d", tag, time.Now().UnixNano())
 	v, err := casosComercial(db, 0).CriarVendedor(ctx, principalAdmin(), comercial.DadosVendedor{
-		Nome: nome, Regiao: "Teste", UF: "PR", DataAdmissao: "2024-01-01", MetaMensal: 1,
+		Nome: nome, Regiao: "Teste", UF: "PR", DataAdmissao: "2024-01-01", MetaMensal: "1",
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {

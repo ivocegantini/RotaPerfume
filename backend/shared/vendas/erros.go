@@ -5,8 +5,8 @@
 //
 // O pacote é puro (docs/arquitetura-ddd.md §4.1): importa só a stdlib e o
 // kernel. Não loga, não conhece SQL nem HTTP e não tem tags JSON. As
-// entidades têm campos exportados com os mesmos nomes e tipos dos models
-// legados (registro ARQ-02, divergência b).
+// entidades têm campos exportados com os mesmos nomes dos models legados
+// (registro ARQ-02, divergência b); dinheiro é kernel.Dinheiro (ARQ-09).
 package vendas
 
 import "github.com/rotaperfumes/shared/kernel"
@@ -33,6 +33,7 @@ var (
 	ErrProdutoIDObrigatorio   = kernel.NovoErro(kernel.KindInvalido, "produto_id é obrigatório em todos os itens")
 	ErrQuantidadeInvalida     = kernel.NovoErro(kernel.KindInvalido, "quantidade deve ser maior que zero em todos os itens")
 	ErrPrecoPraticadoInvalido = kernel.NovoErro(kernel.KindInvalido, "preco_praticado deve ser maior ou igual a zero em todos os itens")
+	ErrPrecoPraticadoCasas    = kernel.NovoErro(kernel.KindInvalido, "preco_praticado deve ter no máximo 2 casas decimais em todos os itens") // ARQ-09
 	ErrDescontoPctInvalido    = kernel.NovoErro(kernel.KindInvalido, "desconto_pct deve estar entre 0 e 100 em todos os itens")
 	// ErrPedidoJaFaturadoNaoPodeAlterarItens: pedido faturado (ou entregue,
 	// que é pós-faturamento) não troca os itens (dessincronizaria o estoque
@@ -54,10 +55,9 @@ var (
 	// ErrPedidoEntregueNaoPodeSerExcluido (BUG-16): Entregue é pós-faturamento
 	// (estoque já baixado) e terminal; mesma trava da exclusão de Faturado.
 	ErrPedidoEntregueNaoPodeSerExcluido = kernel.NovoErro(kernel.KindConflito, "pedido entregue não pode ser excluído")
-	// ErrValorForaDoLimite (N-9): o cálculo de valor_bruto/valor_total
-	// estourou o float64 (+Inf), o que só acontece com entradas absurdas.
-	// O legado mandava o +Inf ao banco, que o recusava (DECIMAL(15,2)) com
-	// 500; aqui o domínio recusa antes, com o mesmo 500 "erro interno".
+	// ErrValorForaDoLimite (N-9): valor_bruto/valor_total passou de
+	// DECIMAL(15,2) (ARQ-09: em centavos, antes o +Inf do float64). O banco
+	// recusaria com 500; o domínio recusa antes, com o mesmo "erro interno".
 	ErrValorForaDoLimite = kernel.NovoErro(kernel.KindInterno, "erro interno")
 )
 
@@ -69,8 +69,10 @@ var (
 	ErrStatusPagamentoInvalido   = kernel.NovoErro(kernel.KindInvalido, "status_pagamento inválido")
 	ErrParcelasInvalidas         = kernel.NovoErro(kernel.KindInvalido, "parcelas deve ser maior ou igual a 1")
 	ErrValorInvalido             = kernel.NovoErro(kernel.KindInvalido, "valor deve ser maior ou igual a zero")
+	ErrValorCasas                = kernel.NovoErro(kernel.KindInvalido, "valor deve ter no máximo 2 casas decimais") // ARQ-09
 	ErrTaxaPctInvalida           = kernel.NovoErro(kernel.KindInvalido, "taxa_pct deve estar entre 0 e 30")
 	ErrValorLiquidoInvalido      = kernel.NovoErro(kernel.KindInvalido, "valor_liquido deve ser maior ou igual a zero")
+	ErrValorLiquidoCasas         = kernel.NovoErro(kernel.KindInvalido, "valor_liquido deve ter no máximo 2 casas decimais") // ARQ-09
 	ErrDataVencimentoObrigatoria = kernel.NovoErro(kernel.KindInvalido, "data_vencimento é obrigatória (use o formato AAAA-MM-DD)")
 	ErrDataVencimentoInvalida    = kernel.NovoErro(kernel.KindInvalido, "data_vencimento inválida (use o formato AAAA-MM-DD)")
 	ErrDataPagamentoInvalida     = kernel.NovoErro(kernel.KindInvalido, "data_pagamento inválida (use o formato AAAA-MM-DD)")

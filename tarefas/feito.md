@@ -2,6 +2,8 @@
 
 > Histórico de tarefas finalizadas.
 >
+> Atualizado em 2026-11-14 (🔵 SubBrain, decisões do usuário via 🤍 MegaBrain): **Lote 38** (bloco logo abaixo): DEPLOY-08, SETUP-02 e as sugestões de `CLAUDE.md` dos Lotes 37 e SETUP-02 confirmados pelo usuário; BUG-25, CHORE-14, SEC-52, ARQ-09 e DEP-04 concluídos. Commit na `main` pelo 🤍 MegaBrain, a pedido do usuário; o push (dispara o 1º deploy) fica com o usuário: a sessão do agente não tem credencial do GitHub.
+>
 > Atualizado em 2026-11-13 (🔵 SubBrain, pedido do usuário via 🤍 MegaBrain): o **SETUP-02** (`setup-linux.sh` instala o Docker via apt, `docker.io`) foi criado e concluído no mesmo dia (card logo abaixo; **não commitado**, pendente do usuário).
 >
 > Antes, em 2026-11-05 (fechamento do Lote 36, 🔵 SubBrain): o **Lote 36** foi fechado (bloco "Lote 36 de 2026-11-05" logo abaixo): **TST-22**, **DB-07** e **TST-16** concluídos (o TST-16 com a execução real como root pendente); o **TST-17** ficou **parcial** e voltou para `afazer.md`. Registro do incidente do `MAKEFLAGS=-k` no bloco do lote. Entraram em `afazer.md` (bloco "Achados do Lote 36"): BUG-29 (MÉDIA), SEC-58 e TST-23 (BAIXA), além do TST-17 parcial. Commit do lote na `main` pelo 🤍 MegaBrain, sem push (inclui o `CLAUDE.md` alterado pelo usuário).
@@ -11,6 +13,47 @@
 > Antes, ainda em 2026-11-05 (fechamento do Lote 35, 🔵 SubBrain): o **Lote 35** (BUG-27, SEC-54, TST-19, SEC-55, TST-20, TST-21, FE-18 e CHORE-16) foi concluído (bloco "Lote 35 de 2026-11-05" logo abaixo; commitado na `main` pelo 🤍 MegaBrain, a pedido do usuário). Dele saíram 3 cards em `afazer.md` (bloco "Achados do Lote 35"): SEC-56, SEC-57 e BUG-28 (BAIXA).
 >
 > Antes, ainda em 2026-11-04 (decisões do usuário após o Lote 34, repassadas pelo 🤍 MegaBrain; 🔵 SubBrain): **OPS-02** (SMTP de produção configurado pelo usuário, por ora via Gmail) e **CHORE-18** (hostname do servidor confirmado, sem alteração de código) foram concluídos (bloco "Decisões do usuário de 2026-11-04 (após o Lote 34)" abaixo). O DOC-09 continua em `afazer.md` (o `CLAUDE.md` não foi alterado pelo agente).
+
+---
+
+## Lote 38 de 2026-11-14: decisões do usuário (8 cards concluídos)
+
+> Aberto pelo 🤍 MegaBrain com as decisões do usuário de 2026-11-14. Testes: `go clean -testcache && env -u INTEGRATION make -k test` rc=0 (10390 PASS, 0 FAIL e 48 SKIP, já com o ARQ-09); `make lint` e `make shellcheck` ok. Regra nova do usuário: cards com `sudo` viram **execução assistida** (comando pronto; o usuário aprova e digita a senha).
+
+- **DEPLOY-08 (ALTA):** concluído pelo usuário (passos da §11 de `docs/deploy-servidor.md` no servidor). Desbloqueia o 1º deploy da `main`.
+- **SETUP-02:** o usuário rodou a instalação real (`make setup`) e funcionou; a sugestão do `CLAUDE.md` (linha do Docker) foi aplicada por ele. Pendências do card atendidas.
+- **CLAUDE.md:** sugestões do Lote 37 (BUG-28, BUG-29, SEC-56, SEC-57) e do SETUP-02 aplicadas pelo usuário.
+- **Item "setup-servidor.sh --apenas-banco" (pendência do Lote 29):** obsoleto. A opção saiu no DEPLOY-06; o banco é só o `deploy/mariadb-docker.sh`, já rodado no DEPLOY-08.
+- **BUG-25 (decisão do usuário: 400):** conta apagada no meio da troca da própria senha responde `400` "não foi possível trocar a senha: a conta não existe mais; faça login novamente" (`identidade.ErrContaRemovidaNaTroca`, `KindInvalido`). Causa do 500: o INSERT do histórico falha pela FK antes do UPDATE; após falha na tx, `contaRemovida` relê o usuário (infra fora segue 500). Testes em `SH/tests/identidade/casos_test.go`; Postman atualizado.
+- **CHORE-14:** saiu a expiração dos cookies sem prefixo no modo seguro (`API/internal/httpx/cookies.go`); o SEC-33 não tinha ido para a produção, então não há cookies antigos lá. Testes `sec33_*`, `sec21_*`, `arq03_auth_test.go` e `sec20_sec21_http_test.go` ajustados.
+- **SEC-52 (decisão do usuário):** senha inicial do admin sempre aleatória; o `--admin-senha-prompt` saiu do `deploy/seed-producao.sh` (recusado com mensagem). Build do `resetpassword` com `--cap-drop ALL` e `tar -xof` (sem chown). Testes `deploy07_*` e `tst21_*` ajustados; `docs/deploy-servidor.md` §11 atualizado. A execução real do build fica no TST-17.
+- **TST-17 (parte do código):** `seed-producao.sh` com `--container`, `--rede-nome`, `--ip-admin` (IPv4 canônico), `--segredos-dir`, `--ssl-dir` e `--trabalho-dir`; diretórios passados por opção conferidos como privados (root, 700, ancestrais sem escrita de grupo/outros; o `--ssl-dir` é 755 por desenho e fica fora). Execução real com `sudo` continua no card em `afazer.md`.
+- **ARQ-09 (liberado pelo usuário: "vamos assumir o risco"):** dinheiro em centavos `int64` (`SH/kernel/dinheiro.go`), com JSON em reais e `DECIMAL(15,2)` inalterados. Entrada via `kernel.Decimal` (literal JSON, até 2 casas, sem NaN/Inf/negativo/estouro); scan do DECIMAL como texto (float64 recusado); arredondamento half away from zero no bruto do item (`big.Rat`); overflow vira erro. Percentuais e estatísticas seguem float64. Feito pelo 🟡 BackBrain em worktree e aplicado na `main` (110 arquivos, sem conflito). Regressão: `SH/tests/vendas/arq09_regressao_totais_test.go` (594 itens iguais ao legado; 0,1+0,2 e 3×33,33 com 10%), `SH/tests/kernel/arq09_dinheiro_test.go`, `API/tests/handlers/arq09_dinheiro_http_test.go`. Cobertura: shared 91,90% → 92,12%; API 94,5%. **Mudanças de contrato (só erros):** mais de 2 casas e valor acima de `DECIMAL(15,2)` agora dão 400. **Divergência documentada:** o total do pedido é a soma dos brutos já arredondados (meio centavo pode diferir 0,01 do legado). Pendências: TST-24 e FE-19 (`afazer.md`).
+- **DEP-04 (auditoria antes do deploy, `make deps-audit`):** frontend sem vulnerabilidades (`npm audit` 0); Go com vulnerabilidades da stdlib corrigidas até o 1.26.11 (a pior: GO-2026-6859, crash do servidor HTTP/1). Build da API subiu de Go 1.26.9 para **1.26.11** (`backend/Dockerfile`) e o `GO_IMAGE` do `Jenkinsfile`/`seed-producao.sh` para `golang:1.26.11-alpine@sha256:ae52b5bc…` (digest do Docker Hub em 2026-11-14). Testes `deploy` e `config` verdes. O Go local (1.26.0) segue desatualizado (só dev). Digests novos do MariaDB e do Node: card DEP-05.
+- **TST-04 (parcial):** 1.1 e 1.2 aprovados (sem credenciais, `db-create`, `db-fix-reuso-detectado` e `db-down CONFIRMAR=rotaperfumes_l12` param no SEC-11 sem chamar o `mariadb`). 1.7 aguarda a CA de dev (`deploy/ca-cert.pem`). Em 2026-11-14 o usuário copiou `deploy/ca.pem`, que é a CA de **produção** (`f31ee820…`, a do `db-ca.fingerprint`): não usada e fora do commit.
+
+---
+
+## Lote 37 de 2026-11-13: 5 cards concluídos (não commitado)
+
+> Aberto e fechado no mesmo dia pelo 🤍 MegaBrain (pedido "continue com as tarefas a fazer"); critério: executáveis sem usuário, Docker ou banco.
+> Testes: `go clean -testcache && env -u INTEGRATION make -k test` rc=0 e 0 FAIL; `make lint` e `make shellcheck` ok; frontend `tsc`/`eslint` limpos e `npm test` com 44 arquivos e 1745 testes ok. 🟣 SecBrain: aprovado.
+
+- **LOG-04 (MÉDIA):** o Go já gravava data/hora com segundos (API com `Lmicroseconds`, CLIs com `LstdFlags`). O frontend ganhou `carimbo()` em `frontend/src/lib/vlog.ts` ("2026/11/13 14:05:09"), usado pelo `vlog` e pelos avisos do `apiClient`. Teste: `frontend/tests/lib/vlog.test.ts`; doc em `docs/logs-verbose.md` §2.
+- **BUG-29 (MÉDIA):** `MAKEFLAGS`/`MAKEOVERRIDES` na linha de comando abortam o make (`$(error BUG-29 ...)`); `MAKEFLAGS` no ambiente continua valendo e repassa o `ENV_ARQUIVO`. Confirmado: nesse caso o `CONFIRMAR`/`CONFIRMO_PRODUCAO` viravam "environment" (fail-closed), só o `ENV_ARQUIVO` falhava aberto. O teste do SEC-11 aceita só esse `$(error)`.
+- **BUG-28 (BAIXA):** `db-seed` com pré-requisitos só guardas + `db-check-env`; o `db-up` virou a 1ª linha da receita (`$(MAKE) db-up`). Com `-k` e guarda recusada, nenhum CREATE/DDL.
+- **SEC-56 (BAIXA):** host começando por dígito e só com `[0-9a-fx.]` que não seja IPv4 canônico (decimal, hex, curto, octal, zero à esquerda, octeto > 255) conta como produção no `PRODUCAO_DETECTA` e no `integracao.ValidarNaoProducao`.
+- **SEC-57 (BAIXA):** porta com espaço/não numérica: o Go recusa (sem `TrimSpace`); as 3 guardas do Makefile recusam com "SEC-57: DB_PORT=... invalida", mesmo com `CONFIRMO_PRODUCAO`. O espaço à esquerda o próprio make descarta na atribuição (só o Go o vê).
+- Testes novos: `SH/tests/config/bug28_bug29_makefile_test.go` e `sec56_sec57_guarda_test.go`; ajustados `sec11_*`, `sec50_*` e `sec54_*`.
+- **Sugestão ao usuário (não aplicada; o `CLAUDE.md` é alterado só pelo usuário):** citar BUG-28, BUG-29, SEC-56 e SEC-57 na lista de guardas do `CLAUDE.md`.
+
+---
+
+## CHORE-19: limpeza do `afazer.md` — 2026-11-13
+
+**Status:** ✅ concluído (pedido do usuário).
+Removidos do `afazer.md` o histórico de atualizações (2026-10-11 a 2026-11-13), os blocos sem cards pendentes e as notas de cards já concluídos; tudo isso já constava nos blocos de cada lote deste arquivo.
+Os cards pendentes foram resumidos, com uma tabela no topo; o pedido "Correção de log" virou o card **LOG-04** (MÉDIA).
 
 ---
 

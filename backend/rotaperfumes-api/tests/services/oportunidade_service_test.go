@@ -34,7 +34,7 @@ func oportunidadeRows() *sqlmock.Rows {
 		"oportunidade_id", "cliente_id", "vendedor_id", "origem", "data_abertura", "etapa",
 		"probabilidade_pct", "valor_estimado", "data_fechamento", "ciclo_dias", "motivo_perda",
 		"created_at", "updated_at",
-	}).AddRow(int64(1), int64(100), int64(1), "Site", now, "Prospeccao", 10.0, 1000.0, nil, nil, nil, now, now)
+	}).AddRow(int64(1), int64(100), int64(1), "Site", now, "Prospeccao", "10.0", "1000.0", nil, nil, nil, now, now)
 }
 
 func clienteExistsRows() *sqlmock.Rows {
@@ -183,7 +183,7 @@ func validOportunidadeInput() comercial.DadosOportunidade {
 		DataAbertura:     "2024-01-15",
 		Etapa:            "Prospeccao",
 		ProbabilidadePct: 10,
-		ValorEstimado:    1000,
+		ValorEstimado:    "1000",
 	}
 }
 
@@ -206,7 +206,7 @@ func TestOportunidadeService_CreateOportunidade(t *testing.T) {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`INSERT INTO oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(9, 1))
 			},
 		},
@@ -280,7 +280,7 @@ func TestOportunidadeService_CreateOportunidade(t *testing.T) {
 			nome: "valor_estimado negativo",
 			input: func() comercial.DadosOportunidade {
 				in := validOportunidadeInput()
-				in.ValorEstimado = -100
+				in.ValorEstimado = "-100"
 				return in
 			},
 			mock:      func(mock sqlmock.Sqlmock) {},
@@ -314,7 +314,7 @@ func TestOportunidadeService_CreateOportunidade(t *testing.T) {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`INSERT INTO oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Fechado perdido", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Fechado perdido", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(9, 1))
 			},
 		},
@@ -380,7 +380,7 @@ func TestOportunidadeService_CreateOportunidade(t *testing.T) {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`INSERT INTO oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(9, 1))
 			},
 		},
@@ -467,7 +467,7 @@ func TestOportunidadeService_UpdateOportunidade(t *testing.T) {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`UPDATE oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectQuery(`SELECT ` + oportunidadeColunasRegex + ` FROM oportunidades WHERE oportunidade_id = \? LIMIT 1`).
 					WithArgs(int64(1)).
@@ -505,7 +505,7 @@ func TestOportunidadeService_UpdateOportunidade(t *testing.T) {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`UPDATE oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(999)).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(999)).
 					WillReturnResult(sqlmock.NewResult(0, 0))
 			},
 			wantErr:   comercial.ErrOportunidadeNaoEncontrada,
@@ -537,7 +537,7 @@ func TestOportunidadeService_UpdateOportunidade(t *testing.T) {
 					WithArgs(int64(1)).
 					WillReturnRows(vendedorExistsRows())
 				mock.ExpectExec(`UPDATE oportunidades`).
-					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, 1000.0, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+					WithArgs(int64(100), int64(1), "Site", sqlmock.AnyArg(), "Prospeccao", 10.0, "1000.00", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectQuery(`SELECT ` + oportunidadeColunasRegex + ` FROM oportunidades WHERE oportunidade_id = \? LIMIT 1`).
 					WithArgs(int64(1)).

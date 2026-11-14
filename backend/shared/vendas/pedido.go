@@ -1,6 +1,9 @@
 package vendas
 
 import (
+	"math"
+	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,9 +56,9 @@ func NovoCanal(s string) (Canal, error) {
 // DescontoPct é o desconto percentual de um item (0..100).
 type DescontoPct struct{ v float64 }
 
-// NovoDescontoPct valida a faixa 0..100.
+// NovoDescontoPct valida a faixa 0..100 (NaN e ±Inf também são recusados).
 func NovoDescontoPct(v float64) (DescontoPct, error) {
-	if v < 0 || v > 100 {
+	if math.IsNaN(v) || v < 0 || v > 100 {
 		return DescontoPct{}, ErrDescontoPctInvalido
 	}
 	return DescontoPct{v: v}, nil
@@ -63,6 +66,14 @@ func NovoDescontoPct(v float64) (DescontoPct, error) {
 
 // Float64 devolve o percentual.
 func (d DescontoPct) Float64() float64 { return d.v }
+
+// fator devolve quantidade × (1 - desconto/100) exato (ARQ-09): o percentual
+// vira o decimal mais curto do float64, que é o que o cliente enviou.
+func (d DescontoPct) fator(quantidade int) *big.Rat {
+	pct, _ := new(big.Rat).SetString(strconv.FormatFloat(d.v, 'f', -1, 64))
+	restante := new(big.Rat).Sub(big.NewRat(1, 1), pct.Quo(pct, big.NewRat(100, 1)))
+	return restante.Mul(restante, new(big.Rat).SetInt64(int64(quantidade)))
+}
 
 // Pedido é o aggregate root de Vendas: o cabeçalho (com os nomes de cliente
 // e vendedor da leitura, via JOIN) e os itens. PedidoIDOrigem é a PK
@@ -75,7 +86,7 @@ type Pedido struct {
 	DataPedido     time.Time
 	Canal          string
 	Status         string
-	ValorTotal     float64
+	ValorTotal     kernel.Dinheiro
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	ClienteNome    string
@@ -90,9 +101,9 @@ type ItemPedido struct {
 	PedidoID         int64
 	ProdutoID        int64
 	Quantidade       int
-	PrecoPraticado   float64
+	PrecoPraticado   kernel.Dinheiro
 	DescontoPct      float64
-	ValorBruto       float64
+	ValorBruto       kernel.Dinheiro
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	ProdutoSKU       string
@@ -103,7 +114,7 @@ type ItemPedido struct {
 type DadosItem struct {
 	ProdutoID      int64
 	Quantidade     int
-	PrecoPraticado float64
+	PrecoPraticado kernel.Decimal
 	DescontoPct    float64
 }
 
@@ -121,8 +132,9 @@ type DadosPedido struct {
 
 // NovoPedido valida o comando na ordem do legado (cliente, vendedor, data,
 // canal, status, itens e, item a item, produto, quantidade, preço e
-// desconto) e calcula o valor_bruto de cada item e o valor_total (V-03),
-// com a fórmula de hoje: quantidade * preco_praticado * (1 - desconto/100).
+// desconto) e calcula o valor_bruto de cada item e o valor_total (V-03):
+// bruto = quantidade * preco_praticado * (1 - desconto/100), exato e
+// arredondado ao centavo (metade para longe do zero); total = soma dos brutos.
 func NovoPedido(d DadosPedido) (*Pedido, error) {
 	switch {
 	case d.ClienteID <= 0:
@@ -147,14 +159,14 @@ func NovoPedido(d DadosPedido) (*Pedido, error) {
 		return nil, err
 	}
 	return &Pedido{ClienteID: d.ClienteID, VendedorID: d.VendedorID, DataPedido: data,
-		Canal: string(canal), Status: string(status), ValorTotal: total.Float64(), Itens: itens}, nil
+		Canal: string(canal), Status: string(status), ValorTotal: total, Itens: itens}, nil
 }
 
 // MaxItensPedido é o teto de itens de um pedido, na criação e no PUT
 // (SEC-14). O maior pedido histórico tinha 16 itens (conferido em 2026-10-31).
 const MaxItensPedido = 200
 
-// novosItens valida os itens e soma o valor_total (P3: Dinheiro).
+// novosItens valida os itens e soma o valor_total em centavos (ARQ-09).
 func novosItens(ds []DadosItem) ([]ItemPedido, kernel.Dinheiro, error) {
 	var total kernel.Dinheiro
 	if len(ds) == 0 {
@@ -169,11 +181,10 @@ func novosItens(ds []DadosItem) ([]ItemPedido, kernel.Dinheiro, error) {
 		if err != nil {
 			return nil, total, err
 		}
-		total = total.Somar(bruto)
+		if total, err = total.Somar(bruto); err != nil {
+			return nil, total, ErrValorForaDoLimite // N-9: a soma passou de DECIMAL(15,2)
+		}
 		itens = append(itens, it)
-	}
-	if _, err := kernel.NovoDinheiro(total.Float64()); err != nil {
-		return nil, total, ErrValorForaDoLimite // N-9: a soma estourou (+Inf)
 	}
 	return itens, total, nil
 }
@@ -185,20 +196,20 @@ func novoItem(d DadosItem) (ItemPedido, kernel.Dinheiro, error) {
 	case d.Quantidade <= 0:
 		return ItemPedido{}, kernel.Dinheiro{}, ErrQuantidadeInvalida
 	}
-	preco, err := kernel.NovoDinheiro(d.PrecoPraticado)
+	preco, err := d.PrecoPraticado.Dinheiro(ErrPrecoPraticadoInvalido, ErrPrecoPraticadoCasas)
 	if err != nil {
-		return ItemPedido{}, kernel.Dinheiro{}, ErrPrecoPraticadoInvalido
+		return ItemPedido{}, kernel.Dinheiro{}, err
 	}
 	desconto, err := NovoDescontoPct(d.DescontoPct)
 	if err != nil {
 		return ItemPedido{}, kernel.Dinheiro{}, err
 	}
-	bruto, err := kernel.NovoDinheiro(float64(d.Quantidade) * preco.Float64() * (1 - desconto.Float64()/100))
+	bruto, err := preco.MultiplicarPor(desconto.fator(d.Quantidade))
 	if err != nil {
-		return ItemPedido{}, kernel.Dinheiro{}, ErrValorForaDoLimite // N-9: o produto estourou (+Inf)
+		return ItemPedido{}, kernel.Dinheiro{}, ErrValorForaDoLimite // N-9: o produto passou de DECIMAL(15,2)
 	}
-	return ItemPedido{ProdutoID: d.ProdutoID, Quantidade: d.Quantidade, PrecoPraticado: d.PrecoPraticado,
-		DescontoPct: d.DescontoPct, ValorBruto: bruto.Float64()}, bruto, nil
+	return ItemPedido{ProdutoID: d.ProdutoID, Quantidade: d.Quantidade, PrecoPraticado: preco,
+		DescontoPct: d.DescontoPct, ValorBruto: bruto}, bruto, nil
 }
 
 // PodeExcluir aplica as travas da exclusão (V-01), na ordem do legado:

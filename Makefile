@@ -13,6 +13,13 @@
 # shell; "make DB_SENHA=x" na linha de comando ganha de tudo.
 # Formato do .env: DB_SENHA sem "$", "#", aspas, espaços nas pontas e sem
 # começar com "/" (o make e o Git Bash interpretariam esses caracteres).
+# BUG-29: "make ... MAKEFLAGS=-k" (ou MAKEOVERRIDES=...) na linha de comando
+# substitui a lista de variaveis repassada aos sub-makes: neles o ENV_ARQUIVO
+# vira "environment" e o .env padrao seria lido sem aviso. Recusado sempre;
+# use a opcao (make -k ...) ou MAKEFLAGS no ambiente (MAKEFLAGS=-k make ...).
+ifneq ($(filter command line,$(origin MAKEFLAGS) $(origin MAKEOVERRIDES)),)
+$(error BUG-29: MAKEFLAGS/MAKEOVERRIDES na linha de comando nao chegam corretamente aos sub-makes (ENV_ARQUIVO, CONFIRMAR e CONFIRMO_PRODUCAO se perdem). Use a opcao direto (ex.: make -k <alvo>) ou MAKEFLAGS no ambiente (MAKEFLAGS=-k make <alvo>))
+endif
 ifeq ($(origin ENV_ARQUIVO),command line)
 # DEPLOY-07: outro arquivo NO LUGAR do .env (ex.: .env.producao da maquina do
 # admin); o .env NAO e lido. So pela linha de comando:
@@ -157,16 +164,26 @@ HOST_LOOPBACK = { ! $$eralocal && { [ "$$h" = localhost ] || [ "$$h" = ::1 ] || 
 # (backend/shared/testkit/integracao; paridade testada). SEC-54: porta nao
 # numerica e literal com ":" que nao seja ::1 (IPv6) contam como PRODUCAO
 # (fail-closed).
+# SEC-56: host que comeca com digito e so tem [0-9a-fx.] (formas decimal
+# 3232278634, hex 0xc0a8a86a, curta 192.168.43114, octal 0300.0250...,
+# aceitas pelo getaddrinfo) e que nao e um IPv4 canonico (4 octetos 0-255,
+# sem zero a esquerda) conta como PRODUCAO (fail-closed).
+# SEC-57: porta nao numerica (inclusive com espaco) marca $$portainv; as
+# guardas recusam com mensagem propria ($(PORTA_INVALIDA_RECUSA)).
+IPV4_CANONICO := ^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$$
 PRODUCAO_DETECTA = $(NORMALIZA_HOST); \
-	porta=$$(printf '%s' "$(DB_PORT)" | sed 's/^+//; s/^0*\([0-9]\)/\1/'); prod=false; \
-	pnum="$(DB_PORT)"; case "$$pnum" in +) prod=true ;; esac; case "$${pnum\#+}" in *[!0-9]*) prod=true ;; esac; \
+	porta=$$(printf '%s' "$(DB_PORT)" | sed 's/^+//; s/^0*\([0-9]\)/\1/'); prod=false; portainv=false; \
+	pnum="$(DB_PORT)"; case "$$pnum" in +) prod=true; portainv=true ;; esac; case "$${pnum\#+}" in *[!0-9]*) prod=true; portainv=true ;; esac; \
 	case "$$h" in ::1) ;; *:*) prod=true ;; esac; \
+	if printf '%s' "$$h" | grep -Eq '^[0-9][0-9a-fx.]*$$' && ! printf '%s' "$$h" | grep -Eq '$(IPV4_CANONICO)'; then prod=true; fi; \
 	for p in $(PRODUCAO_HOSTS_REDE); do [ "$$h" = "$$p" ] && prod=true; done; \
 	for p in $(PRODUCAO_HOSTS_LAN); do \
 	  if [ "$$h" = "$$p" ] && { [ -z "$$porta" ] || [ "$$porta" = 3306 ]; }; then prod=true; fi; \
 	done
+PORTA_INVALIDA_RECUSA = if $$portainv; then echo "SEC-57: DB_PORT=$(DB_PORT) invalida: use so digitos, sem espacos (ex.: 3307)."; exit 1; fi
 db-guard-producao: ## DEPLOY-07: recusa o banco de producao (salvo CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME> na linha de comando)
 	@$(PRODUCAO_DETECTA); \
+	$(PORTA_INVALIDA_RECUSA); \
 	$$prod || exit 0; \
 	if [ "$(origin CONFIRMO_PRODUCAO)" = "command line" ] && [ "$(CONFIRMO_PRODUCAO)" = "$(DB_HOST)/$(DB_NAME)" ]; then \
 	  echo "AVISO (DEPLOY-07): $(DB_HOST):$${porta:-3306} e PRODUCAO; confirmado por CONFIRMO_PRODUCAO=$(DB_HOST)/$(DB_NAME)."; exit 0; \
@@ -182,6 +199,7 @@ db-guard-producao: ## DEPLOY-07: recusa o banco de producao (salvo CONFIRMO_PROD
 # --recriar e seed-producao.sh. Pre-requisito direto (vale com make -j).
 db-guard-sem-producao: ## SEC-46: recusa db-down/db-reset/db-rebuild/db-seed na producao, mesmo com CONFIRMO_PRODUCAO
 	@$(PRODUCAO_DETECTA); \
+	$(PORTA_INVALIDA_RECUSA); \
 	$$prod || exit 0; \
 	echo "SEC-46: DB_HOST=$(DB_HOST) DB_PORT=$${porta:-3306} e PRODUCAO: db-down/db-reset/db-rebuild/db-seed sao recusados mesmo com CONFIRMO_PRODUCAO (apagam ou sobrescrevem dados reais). Recriar producao: backup (BACKUP-01), sudo bash deploy/mariadb-docker.sh --recriar e sudo bash deploy/seed-producao.sh no servidor."; \
 	exit 1
@@ -211,6 +229,7 @@ db-guard-drop: ## SEC-46: DROP DATABASE rotaperfumes fora do loopback exige CONF
 INTEGRACAO_PERMITIDOS := localhost 127.0.0.0/8 ::1 192.168.168.106:3307
 db-guard-integracao: ## SEC-54: testes de integracao so no loopback ou no CasaOS de dev (192.168.168.106:3307)
 	@$(PRODUCAO_DETECTA); \
+	$(PORTA_INVALIDA_RECUSA); \
 	ok=false; $$prod || $$eralocal || for e in $(INTEGRACAO_PERMITIDOS); do \
 	  case "$$e" in \
 	    127.0.0.0/8) printf '%s' "$$h" | grep -Eq '^127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$$' && ok=true ;; \
@@ -237,7 +256,11 @@ db-up: db-guard-producao db-create ## Cria o schema (tabelas vazias) na ordem de
 	  $(DB_CLI) $(DB_NAME) < "sql/$$f" || exit 1; \
 	done
 
-db-seed: db-guard-producao db-guard-sem-producao db-up ## Cria o schema, carrega dados e corrige hashes (DEV; producao: deploy/seed-producao.sh)
+# BUG-28: o db-up (CREATE DATABASE + DDL) roda na receita, por sub-make, e
+# nao como pre-requisito irmao das guardas: com "make -k" e uma guarda
+# recusada, a receita nem comeca. Nada e repassado a mao (ver BUG-27).
+db-seed: db-guard-producao db-guard-sem-producao db-check-env ## Cria o schema, carrega dados e corrige hashes (DEV; producao: deploy/seed-producao.sh)
+	$(MAKE) db-up
 	@echo "=== Seed: admin principal ==="
 	$(DB_CLI) $(DB_NAME) < sql/02_seed_admin.sql
 	@echo "=== Seed: usuarios dos 42 vendedores ==="

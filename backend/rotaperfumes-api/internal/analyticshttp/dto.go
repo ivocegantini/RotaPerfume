@@ -1,48 +1,51 @@
 package analyticshttp
 
-import "github.com/rotaperfumes/shared/analytics"
+import (
+	"github.com/rotaperfumes/shared/analytics"
+	"github.com/rotaperfumes/shared/kernel"
+)
 
 // DTOs do contrato do Dashboard. O legado respondia map[string]any (o
 // encoder ordena as chaves), então os campos que vinham de map estão em
 // ORDEM ALFABÉTICA de chave JSON; os que vinham de struct legada
 // (VendedorRanking, MetaVendedor, SegmentoContagem, UFContagem) mantêm a
-// ordem dos campos daquela struct. Os tipos numéricos são os mesmos (int
-// continua int, float64 continua float64): o JSON sai byte a byte igual.
+// ordem dos campos daquela struct. Os números saem byte a byte iguais: int
+// continua int e dinheiro (kernel.Dinheiro, ARQ-09) sai como o float64 saía.
 // Listas são sempre [] (nunca null).
 
 // metricasResposta era o map de metricsResponse (dashboard_service.go).
 type metricasResposta struct {
-	MetaMes           float64            `json:"meta_mes"`
+	MetaMes           kernel.Dinheiro    `json:"meta_mes"`
 	MetasVendedores   []metaVendedorJSON `json:"metas_vendedores"`
 	Periodo           string             `json:"periodo"`
 	TicketMedio       float64            `json:"ticket_medio"`
 	TopVendedores     []topVendedorJSON  `json:"top_vendedores"`
 	TotalPedidos      int                `json:"total_pedidos"`
-	TotalVendas       float64            `json:"total_vendas"`
+	TotalVendas       kernel.Dinheiro    `json:"total_vendas"`
 	TotalVendasQtd    int                `json:"total_vendas_qtd"`
 	VendedorDesligado bool               `json:"vendedor_desligado"`
 }
 
 // topVendedorJSON era repositories.VendedorRanking (ordem da struct).
 type topVendedorJSON struct {
-	ID               int64   `json:"id"`
-	Nome             string  `json:"nome"`
-	TotalVendas      float64 `json:"total_vendas"`
-	Meta             float64 `json:"meta"`
-	PercentualMeta   float64 `json:"percentual_meta"`
-	QuantidadeVendas int     `json:"quantidade_vendas"`
+	ID               int64           `json:"id"`
+	Nome             string          `json:"nome"`
+	TotalVendas      kernel.Dinheiro `json:"total_vendas"`
+	Meta             kernel.Dinheiro `json:"meta"`
+	PercentualMeta   float64         `json:"percentual_meta"`
+	QuantidadeVendas int             `json:"quantidade_vendas"`
 }
 
 // metaVendedorJSON era repositories.MetaVendedor (ordem da struct).
 type metaVendedorJSON struct {
-	ID               int64   `json:"id"`
-	Nome             string  `json:"nome"`
-	Regiao           string  `json:"regiao"`
-	UF               string  `json:"uf"`
-	Meta             float64 `json:"meta"`
-	Realizado        float64 `json:"realizado"`
-	Percentual       float64 `json:"percentual"`
-	QuantidadeVendas int     `json:"quantidade_vendas"`
+	ID               int64           `json:"id"`
+	Nome             string          `json:"nome"`
+	Regiao           string          `json:"regiao"`
+	UF               string          `json:"uf"`
+	Meta             kernel.Dinheiro `json:"meta"`
+	Realizado        kernel.Dinheiro `json:"realizado"`
+	Percentual       float64         `json:"percentual"`
+	QuantidadeVendas int             `json:"quantidade_vendas"`
 }
 
 func metricasJSON(m analytics.Metricas) metricasResposta {
@@ -67,9 +70,9 @@ type serieResposta struct {
 
 // pontoJSON era o map de cada ponto da série.
 type pontoJSON struct {
-	Dia          string  `json:"dia"`
-	TotalPedidos int     `json:"total_pedidos"`
-	TotalVendas  float64 `json:"total_vendas"`
+	Dia          string          `json:"dia"`
+	TotalPedidos int             `json:"total_pedidos"`
+	TotalVendas  kernel.Dinheiro `json:"total_vendas"`
 }
 
 func serieJSON(s analytics.SerieVendas) serieResposta {
@@ -83,15 +86,15 @@ func serieJSON(s analytics.SerieVendas) serieResposta {
 
 // linhaRankingResposta era o map de cada linha de GetVendedoresRanking.
 type linhaRankingResposta struct {
-	AtingimentoMeta float64 `json:"atingimento_meta"`
-	Meta            float64 `json:"meta"`
-	Regiao          string  `json:"regiao"`
-	TicketMedio     float64 `json:"ticket_medio"`
-	TotalPedidos    int     `json:"total_pedidos"`
-	TotalVendas     float64 `json:"total_vendas"`
-	UF              string  `json:"uf"`
-	VendedorID      int64   `json:"vendedor_id"`
-	VendedorNome    string  `json:"vendedor_nome"`
+	AtingimentoMeta float64         `json:"atingimento_meta"`
+	Meta            kernel.Dinheiro `json:"meta"`
+	Regiao          string          `json:"regiao"`
+	TicketMedio     float64         `json:"ticket_medio"`
+	TotalPedidos    int             `json:"total_pedidos"`
+	TotalVendas     kernel.Dinheiro `json:"total_vendas"`
+	UF              string          `json:"uf"`
+	VendedorID      int64           `json:"vendedor_id"`
+	VendedorNome    string          `json:"vendedor_nome"`
 }
 
 func linhaRankingJSON(l analytics.LinhaRanking) linhaRankingResposta {
@@ -156,17 +159,17 @@ type funilResposta struct {
 
 // etapaFunilJSON é uma etapa do funil cumulativo.
 type etapaFunilJSON struct {
-	Etapa                string  `json:"etapa"`
-	Quantidade           int     `json:"quantidade"`
-	ValorEstimado        float64 `json:"valor_estimado"`
-	ConversaoAnteriorPct float64 `json:"conversao_anterior_pct"`
-	ConversaoTopoPct     float64 `json:"conversao_topo_pct"`
+	Etapa                string          `json:"etapa"`
+	Quantidade           int             `json:"quantidade"`
+	ValorEstimado        kernel.Dinheiro `json:"valor_estimado"`
+	ConversaoAnteriorPct float64         `json:"conversao_anterior_pct"`
+	ConversaoTopoPct     float64         `json:"conversao_topo_pct"`
 }
 
 // totalEtapaJSON são as perdidas (quantidade e valor estimado).
 type totalEtapaJSON struct {
-	Quantidade    int     `json:"quantidade"`
-	ValorEstimado float64 `json:"valor_estimado"`
+	Quantidade    int             `json:"quantidade"`
+	ValorEstimado kernel.Dinheiro `json:"valor_estimado"`
 }
 
 func funilJSON(f analytics.Funil) funilResposta {

@@ -44,7 +44,7 @@ import {
   ROTA_TROCAR_SENHA,
   isTrocaSenhaObrigatoriaResponse,
 } from "./trocaSenhaObrigatoria";
-import { vlog } from "./vlog";
+import { carimbo, vlog } from "./vlog";
 
 export { ApiError };
 
@@ -192,7 +192,7 @@ async function callRefreshToken(): Promise<RefreshStatus> {
 
     vlog(F, "callRefreshToken", "verificando se refresh retornou ok, status:", res.status);
     if (!res.ok) {
-      console.warn("[apiClient] Refresh falhou com status:", res.status);
+      console.warn(carimbo() + " [apiClient] Refresh falhou com status:", res.status);
     }
 
     return res.status;
@@ -203,10 +203,10 @@ async function callRefreshToken(): Promise<RefreshStatus> {
     const name = errorName(error);
     vlog(F, "callRefreshToken", "verificando se o erro do refresh foi timeout/abort");
     if (name === "AbortError" || name === "TimeoutError") {
-      console.warn("[apiClient] Refresh timeout");
+      console.warn(carimbo() + " [apiClient] Refresh timeout");
       return new NetworkError("timeout", error);
     }
-    console.error("[apiClient] Erro no refresh:", error);
+    console.error(carimbo() + " [apiClient] Erro no refresh:", error);
     return new NetworkError("conexao", error);
   } finally {
     vlog(F, "callRefreshToken", "cancelando timeout do refresh");
@@ -239,7 +239,7 @@ async function refreshSerializado(): Promise<RefreshStatus> {
     } catch (err) {
       // FE-07: falha do proprio Web Lock e transitoria (nao diz nada sobre a
       // sessao): nao desloga, a proxima chamada tenta de novo.
-      console.error("[apiClient] Falha no Web Lock do refresh:", err);
+      console.error(carimbo() + " [apiClient] Falha no Web Lock do refresh:", err);
       return new NetworkError("conexao", err);
     }
   }

@@ -31,7 +31,7 @@ func sec27LinhaPagamento(id, pedidoID int64, status string) *sqlmock.Rows {
 	agora := time.Now()
 	return sqlmock.NewRows([]string{"pagamento_id", "pedido_id", "forma_pagamento", "parcelas", "valor", "taxa_pct",
 		"valor_liquido", "data_vencimento", "data_pagamento", "status_pagamento", "created_at", "updated_at"}).
-		AddRow(id, pedidoID, "PIX", uint8(1), 100.0, 0.0, 100.0, agora, nil, status, agora, agora)
+		AddRow(id, pedidoID, "PIX", uint8(1), "100.0", "0.0", "100.0", agora, nil, status, agora, agora)
 }
 
 func TestSEC27_TaxaPctMaxima_EMensagem(t *testing.T) {
@@ -96,13 +96,13 @@ func TestSEC27_PodeEditar_PorStatus(t *testing.T) {
 // O adapter condiciona o UPDATE aos dois status quitados vindos do domínio.
 func TestSEC27_Adapter_AtualizarSeNaoQuitado(t *testing.T) {
 	ctx := context.Background()
-	pag := &vendas.Pagamento{FormaPagamento: "PIX", Parcelas: 1, Valor: 100, TaxaPct: 30, ValorLiquido: 70,
+	pag := &vendas.Pagamento{FormaPagamento: "PIX", Parcelas: 1, Valor: reaisT("100"), TaxaPct: 30, ValorLiquido: reaisT("70"),
 		DataVencimento: time.Date(2024, 1, 15, 0, 0, 0, 0, time.Local), StatusPagamento: "Pago"}
 
 	t.Run("1 linha", func(t *testing.T) {
 		pool, mock := novoMock(t)
 		mock.ExpectExec(sec27UpdateCondRe).
-			WithArgs("PIX", uint8(1), 100.0, 30.0, 70.0, sqlmock.AnyArg(), nil, "Pago", int64(3), "Pago", "Pago com atraso").
+			WithArgs("PIX", uint8(1), "100.00", 30.0, "70.00", sqlmock.AnyArg(), nil, "Pago", int64(3), "Pago", "Pago com atraso").
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		assert.NoError(t, vendasmysql.NovoPagamentos(pool).AtualizarSeNaoQuitado(ctx, 3, pag))
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -126,7 +126,7 @@ func TestSEC27_Adapter_AtualizarSeNaoQuitado(t *testing.T) {
 	t.Run("o UPDATE do admin continua sem a condição", func(t *testing.T) {
 		pool, mock := novoMock(t)
 		mock.ExpectExec(sec27UpdateRe+`$`).
-			WithArgs("PIX", uint8(1), 100.0, 30.0, 70.0, sqlmock.AnyArg(), nil, "Pago", int64(3)).
+			WithArgs("PIX", uint8(1), "100.00", 30.0, "70.00", sqlmock.AnyArg(), nil, "Pago", int64(3)).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		assert.NoError(t, vendasmysql.NovoPagamentos(pool).Atualizar(ctx, 3, pag))
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -222,7 +222,7 @@ func TestSEC27_Casos_Admin(t *testing.T) {
 	ctx := context.Background()
 	t.Run("quitado editável", func(t *testing.T) {
 		pool, mock := novoMock(t)
-		mock.ExpectExec(sec27UpdateRe+`$`).WithArgs("PIX", uint8(2), 100.0, 1.5, 98.5, sqlmock.AnyArg(), sqlmock.AnyArg(), "Pago com atraso", int64(5)).
+		mock.ExpectExec(sec27UpdateRe+`$`).WithArgs("PIX", uint8(2), "100.00", 1.5, "98.50", sqlmock.AnyArg(), sqlmock.AnyArg(), "Pago com atraso", int64(5)).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectQuery(arq05PagamentoPorIDRe).WithArgs(int64(5)).WillReturnRows(sec27LinhaPagamento(5, 1, "Pago com atraso"))
 		d := pagamentoValido()

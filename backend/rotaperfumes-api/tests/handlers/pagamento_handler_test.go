@@ -27,7 +27,7 @@ func pagamentoColunasHeaderForHandler() []string {
 func pagamentoRowsForHandler(id, pedidoID int64, valor float64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pagamentoColunasHeaderForHandler()).
-		AddRow(id, pedidoID, "PIX", uint8(1), valor, 0.0, valor, now, nil, "Em aberto", now, now)
+		AddRow(id, pedidoID, "PIX", uint8(1), decT(valor), "0.0", decT(valor), now, nil, "Em aberto", now, now)
 }
 
 func emptyPagamentoRowsForHandler() *sqlmock.Rows {
@@ -375,7 +375,7 @@ func TestCreatePagamento_Success(t *testing.T) {
 
 	expectLockPedidoH(mock, 1, 2) // SEC-35: o INSERT roda na tx, com o pedido travado
 	mock.ExpectExec(`INSERT INTO pagamentos \(pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento\)`).
-		WithArgs(int64(1), "PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto").
+		WithArgs(int64(1), "PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegexH + pagamentoFromRegexH + ` WHERE pagamento_id = \? LIMIT 1`).
@@ -600,7 +600,7 @@ func TestUpdatePagamento_Success(t *testing.T) {
 	userToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE pagamentos\s+SET forma_pagamento = \?, parcelas = \?, valor = \?, taxa_pct = \?, valor_liquido = \?, data_vencimento = \?, data_pagamento = \?, status_pagamento = \?\s+WHERE pagamento_id = \?`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegexH + pagamentoFromRegexH + ` WHERE pagamento_id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -636,7 +636,7 @@ func TestUpdatePagamento_IgnoraPedidoIDNoPayload(t *testing.T) {
 	userToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE pagamentos`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + pagamentoColunasRegexH + pagamentoFromRegexH + ` WHERE pagamento_id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -732,7 +732,7 @@ func TestUpdatePagamento_NaoEncontrado(t *testing.T) {
 	userToken := generateToken(t, cfg, 1, "admin")
 
 	mock.ExpectExec(`UPDATE pagamentos`).
-		WithArgs("PIX", uint8(1), 100.0, 0.0, 100.0, sqlmock.AnyArg(), nil, "Em aberto", int64(999)).
+		WithArgs("PIX", uint8(1), "100.00", 0.0, "100.00", sqlmock.AnyArg(), nil, "Em aberto", int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/pagamentos/999", makeJSON(validPagamentoPayload()))
@@ -773,7 +773,7 @@ func TestUpdatePagamento_NaoAutenticado(t *testing.T) {
 func pagamentoRowsComStatusForHandler(id, pedidoID int64, valor float64, status string) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pagamentoColunasHeaderForHandler()).
-		AddRow(id, pedidoID, "PIX", uint8(1), valor, 0.0, valor, now, nil, status, now, now)
+		AddRow(id, pedidoID, "PIX", uint8(1), decT(valor), "0.0", decT(valor), now, nil, status, now, now)
 }
 
 func TestDeletePagamento_Success(t *testing.T) {

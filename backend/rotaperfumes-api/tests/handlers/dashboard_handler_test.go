@@ -21,7 +21,7 @@ import (
 // (só disparadas quando há resultados).
 func mockDashboardMetricsQueries(mock sqlmock.Sqlmock) {
 	mock.ExpectQuery(`SELECT COALESCE\(SUM\(valor_total\), 0\), COUNT\(\*\)\s+FROM pedidos`).
-		WillReturnRows(sqlmock.NewRows([]string{"valor", "quantidade"}).AddRow(1000.0, 5))
+		WillReturnRows(sqlmock.NewRows([]string{"valor", "quantidade"}).AddRow("1000.0", 5))
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM pedidos\s+WHERE`).
 		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(5))
 	mock.ExpectQuery(`SELECT\s+v\.id,\s+v\.nome,\s+v\.meta_mensal AS meta\s+FROM vendedores v`).
@@ -30,7 +30,7 @@ func mockDashboardMetricsQueries(mock sqlmock.Sqlmock) {
 	mock.ExpectQuery(`SELECT\s+v\.id,\s+v\.nome,\s+v\.regiao,\s+v\.uf,\s+v\.meta_mensal AS meta\s+FROM vendedores v`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}))
 	mock.ExpectQuery(`SELECT COALESCE\(SUM\(meta_mensal\), 0\)\s+FROM vendedores\s+WHERE data_desligamento IS NULL`).
-		WillReturnRows(sqlmock.NewRows([]string{"meta"}).AddRow(2000.0))
+		WillReturnRows(sqlmock.NewRows([]string{"meta"}).AddRow("2000.0"))
 }
 
 func TestGetMetrics_Success_Month(t *testing.T) {
@@ -148,7 +148,7 @@ func TestGetMetrics_PermitidoParaNaoAdmin(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"desligado"}).AddRow(0))
 	mock.ExpectQuery(`SELECT COALESCE\(SUM\(valor_total\), 0\), COUNT\(\*\)\s+FROM pedidos`).
 		WithArgs(int64(10)).
-		WillReturnRows(sqlmock.NewRows([]string{"valor", "quantidade"}).AddRow(1000.0, 5))
+		WillReturnRows(sqlmock.NewRows([]string{"valor", "quantidade"}).AddRow("1000.0", 5))
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM pedidos\s+WHERE`).
 		WithArgs(int64(10)).
 		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(5))
@@ -160,7 +160,7 @@ func TestGetMetrics_PermitidoParaNaoAdmin(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "nome", "regiao", "uf", "meta"}))
 	mock.ExpectQuery(`SELECT COALESCE\(SUM\(meta_mensal\), 0\)\s+FROM vendedores\s+WHERE data_desligamento IS NULL AND id = \?`).
 		WithArgs(int64(10)).
-		WillReturnRows(sqlmock.NewRows([]string{"meta"}).AddRow(2000.0))
+		WillReturnRows(sqlmock.NewRows([]string{"meta"}).AddRow("2000.0"))
 
 	req, _ := http.NewRequest("GET", server.URL+"/api/dashboard/metrics", nil)
 	req.Header.Set("Authorization", "Bearer "+userToken)

@@ -40,12 +40,12 @@ func TestParseRow(t *testing.T) {
 			nome: "fechada: todos os opcionais preenchidos",
 			rec:  []string{"1", "5", "7", "Indicação", "2024-01-02", "Perdida", "0", "1500.5", "01/02/2024", "30", "Preço"},
 			want: oportunidades.Row{OportunidadeID: 1, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Indicação", DataAbertura: dia(2024, 1, 2), Etapa: "Perdida",
-				ProbabilidadePct: 0, ValorEstimado: 1500.5, DataFechamento: &fech, CicloDias: sql.NullInt64{Int64: 30, Valid: true}, MotivoPerda: sql.NullString{String: "Preço", Valid: true}},
+				ProbabilidadePct: 0, ValorEstimado: reaisT("1500.5"), DataFechamento: &fech, CicloDias: sql.NullInt64{Int64: 30, Valid: true}, MotivoPerda: sql.NullString{String: "Preço", Valid: true}},
 		},
 		{
 			nome: "aberta: opcionais vazios viram NULL",
 			rec:  []string{" 2 ", " 5 ", " 7 ", " Site ", " 02/01/2024 ", " Proposta ", " 60 ", " 900 ", "", " ", ""},
-			want: oportunidades.Row{OportunidadeID: 2, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 2), Etapa: "Proposta", ProbabilidadePct: 60, ValorEstimado: 900},
+			want: oportunidades.Row{OportunidadeID: 2, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 2), Etapa: "Proposta", ProbabilidadePct: 60, ValorEstimado: reaisT("900")},
 		},
 		{nome: "id inválido", rec: []string{"x", "5", "7", "S", "2024-01-02", "E", "0", "0", "", "", ""}, errSub: "oportunidade_id inválido"},
 		{nome: "cliente inválido", rec: []string{"1", "x", "7", "S", "2024-01-02", "E", "0", "0", "", "", ""}, errSub: "cliente_id inválido"},
@@ -196,20 +196,20 @@ func TestUpsertAll(t *testing.T) {
 	db, mock := novoMock(t)
 	fech := dia(2024, 2, 1)
 	rows := []oportunidades.Row{
-		{OportunidadeID: 1, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 2), Etapa: "Perdida", ProbabilidadePct: 0, ValorEstimado: 10,
+		{OportunidadeID: 1, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 2), Etapa: "Perdida", ProbabilidadePct: 0, ValorEstimado: reaisT("10"),
 			DataFechamento: &fech, CicloDias: sql.NullInt64{Int64: 30, Valid: true}, MotivoPerda: sql.NullString{String: "Preço", Valid: true}},
 		{OportunidadeID: 2, ClienteIDOrigem: 999, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 2), Etapa: "Proposta"},
-		{OportunidadeID: 3, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 3), Etapa: "Proposta", ProbabilidadePct: 50, ValorEstimado: 20},
+		{OportunidadeID: 3, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 3), Etapa: "Proposta", ProbabilidadePct: 50, ValorEstimado: reaisT("20")},
 		{OportunidadeID: 4, ClienteIDOrigem: 5, VendedorID: 404, Origem: "Site", DataAbertura: dia(2024, 1, 3), Etapa: "Proposta"},
 		{OportunidadeID: 5, ClienteIDOrigem: 5, VendedorID: 7, Origem: "Site", DataAbertura: dia(2024, 1, 3), Etapa: "Proposta"},
 	}
 	mock.ExpectPrepare("INSERT INTO oportunidades")
 	mock.ExpectExec("INSERT INTO oportunidades").
-		WithArgs(int64(1), int64(5), int64(7), "Site", "2024-01-02", "Perdida", 0.0, 10.0, "2024-02-01", int64(30), "Preço").
+		WithArgs(int64(1), int64(5), int64(7), "Site", "2024-01-02", "Perdida", 0.0, "10.00", "2024-02-01", int64(30), "Preço").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// oportunidade 3: aberta, opcionais vão como NULL.
 	mock.ExpectExec("INSERT INTO oportunidades").
-		WithArgs(int64(3), int64(5), int64(7), "Site", "2024-01-03", "Proposta", 50.0, 20.0, nil, nil, nil).
+		WithArgs(int64(3), int64(5), int64(7), "Site", "2024-01-03", "Proposta", 50.0, "20.00", nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec("INSERT INTO oportunidades").WithArgs(int64(4), int64(5), int64(404), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), nil, nil, nil).
 		WillReturnError(errBanco) // FK de vendedor
@@ -256,10 +256,10 @@ func TestRun_ImportaComUnificacao(t *testing.T) {
 	mock.ExpectPing()
 	mock.ExpectQuery("SELECT cliente_id_origem FROM clientes").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
 	mock.ExpectPrepare("INSERT INTO oportunidades")
-	mock.ExpectExec("INSERT INTO oportunidades").WithArgs(int64(1), int64(1), int64(7), "Site", "2024-01-02", "Proposta", 60.0, 900.0, nil, nil, nil).
+	mock.ExpectExec("INSERT INTO oportunidades").WithArgs(int64(1), int64(1), int64(7), "Site", "2024-01-02", "Proposta", 60.0, "900.00", nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// NEG-01: a oportunidade do cliente 3001 (cópia) vai para o sobrevivente 1.
-	mock.ExpectExec("INSERT INTO oportunidades").WithArgs(int64(2), int64(1), int64(7), "Site", "2024-01-03", "Proposta", 60.0, 900.0, nil, nil, nil).
+	mock.ExpectExec("INSERT INTO oportunidades").WithArgs(int64(2), int64(1), int64(7), "Site", "2024-01-03", "Proposta", 60.0, "900.00", nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
