@@ -1,7 +1,6 @@
 # A Fazer
 
-> Atualizado em 2026-11-14 (🔵 SubBrain; Lote 38 concluído, inclusive TST-04 e TST-24, ver `feito.md`; TST-25 concluído).
-> Regra (usuário, 2026-11-14): card que precisa de `sudo` vira **execução assistida** (comando pronto; o usuário aprova e digita a senha). Este arquivo contém **só cards pendentes**; o histórico de lotes e cards concluídos fica em `feito.md`.
+> Só cards pendentes, resumidos; o histórico fica em `feito.md`. Card com `sudo` vira **execução assistida** (comando pronto; o usuário aprova e digita a senha).
 > Caminhos: `SH` = `backend/shared`.
 
 ## Resumo
