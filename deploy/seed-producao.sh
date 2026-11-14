@@ -311,7 +311,9 @@ mariadb_cli() {
     --ssl-ca="$C_CA" --ssl-verify-server-cert \
     --default-character-set=utf8mb4 "$@"
 }
-consulta() { mariadb_cli -N -B "$DB_NOME" -e "$1"; }
+# </dev/null: o docker run -i leria o terminal e comeria o que o operador ja
+# digitou (ex.: a confirmacao do --forcar; travou o teste real do TST-17).
+consulta() { mariadb_cli -N -B "$DB_NOME" -e "$1" </dev/null; }
 
 # ---------------------------------------------------------------------------
 etapa "Estado do banco $DB_NOME"
@@ -348,7 +350,7 @@ for f in "${SEEDS[@]}"; do
   mariadb_cli "$DB_NOME" < "$SQL_DIR/$f" >/dev/null || die "falhou o seed sql/$f"
 done
 # Os 42 vendedores sao reais: entram INATIVOS (o admin ativa pelo reset).
-mariadb_cli "$DB_NOME" -e "UPDATE usuarios SET ativo = 0 WHERE role <> 'admin'" \
+mariadb_cli "$DB_NOME" -e "UPDATE usuarios SET ativo = 0 WHERE role <> 'admin'" </dev/null \
   || die "falhou a inativacao dos usuarios nao-admin"
 info "Usuarios nao-admin inativos: $(consulta "SELECT COUNT(*) FROM usuarios WHERE role <> 'admin' AND ativo = 0")."
 

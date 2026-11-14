@@ -8,7 +8,6 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| TST-17 | MÉDIA | aguarda execução assistida (`sudo`) | usuário → 🔴 TestBrain |
 | BACKUP-01 | MÉDIA | pendente | 🌸 DataBrain |
 | TST-04 | MÉDIA | 1.1/1.2 ok; 1.7 aguarda `deploy/ca-cert.pem` | usuário → 🔴 TestBrain |
 | TST-24 | MÉDIA | aguarda `deploy/ca-cert.pem` | 🔴 TestBrain |
@@ -19,14 +18,6 @@
 | SEC-47, SEC-48 | BAIXA | pendente | 🟡/🟢 → 🔴 |
 | SEC-51 | BAIXA | pendente | 🟣 → 🌸/🟡 |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
-
----
-
-## TST-17: testes reais com Docker do `seed-producao.sh` e do `mariadb-docker.sh` — MÉDIA
-
-**Status:** opções de isolamento do `seed-producao.sh` prontas (Lote 38). Falta só a execução real.
-**Falta:** (1) execução assistida, nesta máquina (192.168.168.105, nunca no servidor de produção): `cd backend/shared && sudo -E env PATH="$PATH" TST15_DOCKER=1 TST17_DOCKER=1 go test -count=1 -v -run 'TestTST15_MariadbDocker_Real|TestTST17_SeedProducao_Real' ./tests/deploy/`; valida também o build do `resetpassword` com `--cap-drop ALL` (SEC-52); (2) usuário confere o `make setup-check`.
-**Aceite:** os dois testes reais verdes como root fora do servidor; opções novas cobertas por testes.
 
 ---
 

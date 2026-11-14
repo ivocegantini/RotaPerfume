@@ -127,6 +127,15 @@ func TestTST17_SeedProducao_Real(t *testing.T) {
 		criadoBuild = true
 	}
 	const nome, rede, subnet, ipAdmin = "tst17-mariadb", "tst17-db", "172.30.244.0/24", "172.30.244.20"
+	// Sobras de uma execução interrompida (sem o Cleanup): container e rede
+	// tst17-* com a CA antiga quebram o TLS da nova (visto em 2026-11-14).
+	_ = exec.Command("docker", "rm", "-f", nome).Run()
+	_ = exec.Command("docker", "network", "rm", rede).Run()
+	if velhos, _ := filepath.Glob("/root/tst17-*"); len(velhos) > 0 {
+		for _, v := range velhos {
+			_ = os.RemoveAll(v)
+		}
+	}
 	dir, err := os.MkdirTemp("/root", "tst17-")
 	require.NoError(t, err)
 	require.NoError(t, os.Chmod(dir, 0o700))
