@@ -937,9 +937,10 @@ if $PUBLICAR; then
 EOF
 fi
 
-# DEPLOY-07: fingerprint da CA de DEV (MariaDB do CasaOS, porta 3307,
-# deploy/ca-cert.pem). Nunca pode ir para o deploy/db-ca.fingerprint.
-readonly CA_DEV_FP="ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
+# DEPLOY-07: fingerprints das CAs de DEV (MariaDB do CasaOS, porta 3307,
+# deploy/ca-cert.pem): a atual (CN=MariaDB_CA, trocada em 2026-11) e a
+# aposentada (CN=RotaPerfumes_MySQL_CA). Nunca vao para o db-ca.fingerprint.
+readonly CA_DEV_FPS=("d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2" "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b")
 CA_SUBJECT=$(openssl x509 -in "$SSL_DIR/ca.pem" -noout -subject)
 
 cat <<EOF
@@ -1000,9 +1001,11 @@ fi
 FP_REPO="$(dirname "$0")/db-ca.fingerprint"
 if [[ -r "$FP_REPO" ]]; then
   FPS_REPO=$(grep -Ev '^[[:space:]]*(#|$)' "$FP_REPO" | tr -d ' \t\r' || true)
-  if grep -qxF "$CA_DEV_FP" <<<"$FPS_REPO"; then
-    aviso "$FP_REPO contem o fingerprint da CA de DEV ($CA_DEV_FP): remova essa linha (a CA de dev nunca vale em producao)."
-  fi
+  for _fp_dev in "${CA_DEV_FPS[@]}"; do
+    if grep -qxF "$_fp_dev" <<<"$FPS_REPO"; then
+      aviso "$FP_REPO contem o fingerprint da CA de DEV ($_fp_dev): remova essa linha (a CA de dev nunca vale em producao)."
+    fi
+  done
   if grep -qxF "$CA_FP" <<<"$FPS_REPO"; then
     info "$FP_REPO ja contem $CA_FP: OK."
   elif [[ -z "$FPS_REPO" ]]; then

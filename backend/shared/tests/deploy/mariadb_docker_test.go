@@ -218,11 +218,11 @@ func TestSEC45_SanSemHostDockerInternal(t *testing.T) {
 	assert.NotRegexp(t, `(?m)^[^#]*-p "?0\.0\.0\.0`, md)
 }
 
-// fpCADev é o fingerprint SHA-256 da CA de DEV (MariaDB do CasaOS, porta
-// 3307, deploy/ca-cert.pem). DEPLOY-07: nunca pode estar no
-// deploy/db-ca.fingerprint (roda também no Jenkins, onde o ca-cert.pem não
-// existe).
-const fpCADev = "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
+// fpsCADev: fingerprints SHA-256 das CAs de DEV (MariaDB do CasaOS, porta
+// 3307, deploy/ca-cert.pem): a atual (CN=MariaDB_CA, 2026-11) e a aposentada
+// (CN=RotaPerfumes_MySQL_CA). DEPLOY-07: nunca no deploy/db-ca.fingerprint
+// (roda também no Jenkins, onde o ca-cert.pem não existe).
+var fpsCADev = []string{"d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2", "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"}
 
 // DEPLOY-07 / SEC-45: deploy/db-ca.fingerprint lista só a CA de PRODUCAO.
 // Zero fingerprints é o estado pré-instalação (o Jenkins falha fechado, ver
@@ -236,10 +236,13 @@ func TestSEC45_FingerprintVersionadoConfereComCA(t *testing.T) {
 	for _, fp := range fps {
 		assert.Regexp(t, `^[0-9a-f]{64}$`, fp)
 	}
-	assert.NotContains(t, fps, fpCADev, "a CA de dev (CasaOS) não pode estar no db-ca.fingerprint")
+	for _, dev := range fpsCADev {
+		assert.NotContains(t, fps, dev, "a CA de dev (CasaOS) não pode estar no db-ca.fingerprint")
+	}
+	assert.Contains(t, lerRaiz(t, "deploy", "mariadb-docker.sh"), fpsCADev[0], "o mariadb-docker.sh avisa sobre a CA de dev atual")
 	ca := caminhoRaiz(t, "deploy", "ca-cert.pem")
 	if _, err := os.Stat(ca); err != nil {
-		t.Log("deploy/ca-cert.pem ausente nesta máquina (Jenkins): só a constante fpCADev foi conferida")
+		t.Log("deploy/ca-cert.pem ausente nesta máquina (Jenkins): só as constantes fpsCADev foram conferidas")
 		return
 	}
 	precisaOpenSSL(t)

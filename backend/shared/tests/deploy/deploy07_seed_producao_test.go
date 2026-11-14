@@ -207,8 +207,9 @@ func TestDEPLOY07_Jenkinsfile_FingerprintVazioFalhaClaro(t *testing.T) {
 // deploy/db-ca.fingerprint, e o mariadb-docker.sh não manda copiar a CA de
 // produção para deploy/ca-cert.pem.
 func TestDEPLOY07_CADevNuncaEmProducao(t *testing.T) {
-	const caDev = "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
-	assert.NotContains(t, linhasUteis(lerRaiz(t, "deploy", "db-ca.fingerprint")), caDev)
+	for _, caDev := range fpsCADev {
+		assert.NotContains(t, linhasUteis(lerRaiz(t, "deploy", "db-ca.fingerprint")), caDev)
+	}
 	md := lerRaiz(t, "deploy", "mariadb-docker.sh")
 	assert.Contains(t, md, "NAO copie esta CA para deploy/ca-cert.pem")
 	assert.NotRegexp(t, `copie \$SSL_DIR/ca\.pem para\s+deploy/ca-cert\.pem`, md)

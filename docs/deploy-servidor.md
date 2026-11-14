@@ -240,7 +240,7 @@ Só suba **patch** do 11.4 assim. Mudança de versão menor/maior é card própr
 - Conteúdo: SHA-256 do DER de cada certificado aceito no arquivo da CA do host, hex minúsculo sem `:`, um por linha (`#` e linhas vazias ignoradas). Normal: **um**; durante uma troca de CA, **dois** (o antigo sai num commit seguinte).
 - Calcular: `openssl x509 -in /etc/mysql/ssl/ca.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d : | tr A-F a-f` (o `mariadb-docker.sh` imprime o mesmo valor no fim).
 - Toda troca de CA no servidor exige um commit revisado desse arquivo; sem ele, o estágio `CA do banco` barra o deploy e a API continua com a CA anterior. Isso impede que um arquivo trocado no host (por engano ou por um atacante) passe a ser a CA confiada pela API.
-- Só a CA de **produção** entra na lista (DEPLOY-07). O `deploy/ca-cert.pem` é a CA de **dev** (MariaDB do CasaOS, porta 3307, `CN=RotaPerfumes_MySQL_CA`, fingerprint `ef31b656...`) e **não** pode estar no arquivo: os testes (`TestSEC45_FingerprintVersionadoConfereComCA`, `TestDEPLOY07_CADevNuncaEmProducao`) garantem que ele não está, e o `mariadb-docker.sh` avisa se encontrar essa linha. Na primeira instalação o arquivo só tem o cabeçalho; sem nenhuma linha útil, o estágio `CA do banco` falha com `deploy/db-ca.fingerprint sem fingerprint: rode mariadb-docker.sh --nova-ca e grave o CA_FP (DEPLOY-07)`.
+- Só a CA de **produção** entra na lista (DEPLOY-07). O `deploy/ca-cert.pem` é a CA de **dev** (MariaDB do CasaOS, porta 3307, `CN=MariaDB_CA`, fingerprint `d150ee67...`; a anterior, `ef31b656...`, foi aposentada em 2026-11) e **não** pode estar no arquivo: os testes (`TestSEC45_FingerprintVersionadoConfereComCA`, `TestDEPLOY07_CADevNuncaEmProducao`) garantem que ele não está, e o `mariadb-docker.sh` avisa se encontrar essa linha. Na primeira instalação o arquivo só tem o cabeçalho; sem nenhuma linha útil, o estágio `CA do banco` falha com `deploy/db-ca.fingerprint sem fingerprint: rode mariadb-docker.sh --nova-ca e grave o CA_FP (DEPLOY-07)`.
 
 ### 3.8 Regra: integração só em banco descartável
 
@@ -475,7 +475,7 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 | Estágio **CA do banco**: "bind source path does not exist" ou "nao legivel pelo uid 65532" | `/etc/mysql/ssl/ca.pem` ausente, ou arquivo/diretório sem permissão para "outros" | `docs/Instal_SSL.md` passo 5 (`chmod 644`/`755` **no host**) |
 | Estágio **CA do banco**: "deploy/db-ca.fingerprint sem fingerprint: rode mariadb-docker.sh --nova-ca e grave o CA_FP (DEPLOY-07)" | Primeira instalação: o arquivo só tem o cabeçalho | Seção 11, passos 2 e 4 (rodar o script, commitar o `CA_FP` como única linha útil) |
 | Estágio **CA do banco**: "fora de deploy/db-ca.fingerprint" | CA trocada no servidor sem commit do fingerprint (ou arquivo adulterado) | Confira a CA do host; se a troca foi legítima, commit do fingerprint novo (seção 3.7) |
-| `mariadb-docker.sh` avisa "contem o fingerprint da CA de DEV" | A linha `ef31b656...` (CA de dev, `deploy/ca-cert.pem`) está em `deploy/db-ca.fingerprint` | Remova essa linha e commite: a CA de dev nunca vale em produção (seção 3.7) |
+| `mariadb-docker.sh` avisa "contem o fingerprint da CA de DEV" | A linha `d150ee67...` ou `ef31b656...` (CA de dev, `deploy/ca-cert.pem`) está em `deploy/db-ca.fingerprint` | Remova essa linha e commite: a CA de dev nunca vale em produção (seção 3.7) |
 | `make db-*`: "DEPLOY-07: DB_HOST=... DB_PORT=... e o banco de PRODUCAO: alvo recusado" | Guarda `db-guard-producao`: host do servidor com `DB_PORT` vazio/3306, ou host da rede Docker (o dev do CasaOS é a porta 3307) | Confira se era mesmo para a produção. Se sim (e o alvo não apaga dados), repita com `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>` na linha de comando (seção 3.8) |
 | `make db-down/db-reset/db-rebuild/db-seed`: "SEC-46: ... e PRODUCAO: ... sao recusados mesmo com CONFIRMO_PRODUCAO" | Guarda `db-guard-sem-producao`: esses alvos nunca rodam na produção | Na produção, use backup (seção 9), `sudo bash deploy/mariadb-docker.sh --recriar` e `sudo bash deploy/seed-producao.sh` no servidor (seção 11) |
 | `make db-down/db-reset/db-rebuild`: "SEC-46: DROP DATABASE rotaperfumes em ... (fora do loopback): repita com CONFIRMAR=rotaperfumes" | Guarda `db-guard-drop`: `DROP DATABASE rotaperfumes` fora do loopback (ex.: CasaOS :3307) | Confira o `DB_HOST`/`DB_PORT`. Se for mesmo para apagar esse banco, repita com `CONFIRMAR=rotaperfumes` na linha de comando |
@@ -585,7 +585,7 @@ git add deploy/db-ca.fingerprint
 git commit -m "DEPLOY-07: fingerprint da CA de producao"
 ```
 
-- Mantenha as 3 linhas de cabeçalho (`#`); a **única** linha útil é o `CA_FP`. **Nunca** acrescente o fingerprint da CA de dev (`ef31b656...`, `deploy/ca-cert.pem`): o teste `TestDEPLOY07_CADevNuncaEmProducao` falha e o `mariadb-docker.sh` avisa.
+- Mantenha as 3 linhas de cabeçalho (`#`); a **única** linha útil é o `CA_FP`. **Nunca** acrescente o fingerprint da CA de dev (`d150ee67...` ou a aposentada `ef31b656...`, `deploy/ca-cert.pem`): o teste `TestDEPLOY07_CADevNuncaEmProducao` falha e o `mariadb-docker.sh` avisa.
 - Para conferir no servidor: `openssl x509 -in /etc/mysql/ssl/ca.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d : | tr A-F a-f`.
 - **Não faça push ainda**: o push é o passo 9, depois das credenciais e do seed.
 
@@ -665,7 +665,7 @@ Esperado: `tabelas` = 13; uma linha de admin (`admin@rotaperfumes.com.br`) com `
 
 - [ ] `docker ps` mostra `rotaperfumes-mariadb` `Up` e `docker network inspect rotaperfumes-db` funciona;
 - [ ] `/etc/mysql/ssl/ca.pem` legível por "outros" (`sudo -u nobody cat /etc/mysql/ssl/ca.pem >/dev/null && echo OK`; `docs/Instal_SSL.md`, passo 5);
-- [ ] o fingerprint de `/etc/mysql/ssl/ca.pem` é a **única** linha útil do `deploy/db-ca.fingerprint` **commitado** (passo 4), e não é o da CA de dev (`ef31b656...`);
+- [ ] o fingerprint de `/etc/mysql/ssl/ca.pem` é a **única** linha útil do `deploy/db-ca.fingerprint` **commitado** (passo 4), e não é o de uma CA de dev (`d150ee67...` ou a aposentada `ef31b656...`);
 - [ ] a chave da CA saiu do servidor (`test ! -e /root/rotaperfumes-ca/ca-key.pem && echo OK`);
 - [ ] Secret file `rotaperfumes-api-env` cadastrado ou atualizado (passo 5), com o **mesmo** `PASSWORD_PEPPER` do seed, `JWT_SECRET` novo, `TURNSTILE_SECRET_KEY` real, `SMTP_*`, `COOKIE_SECURE=true` e sem `DB_TLS_REQUIRED=false`; credencial `rotaperfumes-db-admin` cadastrada;
 - [ ] seed conferido (passo 7);

@@ -9,8 +9,8 @@
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
 | BACKUP-01 | MÉDIA | pendente | 🌸 DataBrain |
-| TST-04 | MÉDIA | 1.1/1.2 ok; 1.7 aguarda `deploy/ca-cert.pem` | usuário → 🔴 TestBrain |
-| TST-24 | MÉDIA | aguarda `deploy/ca-cert.pem` | 🔴 TestBrain |
+| TST-04 | MÉDIA | 1.1/1.2 ok; 1.7 aguarda credencial do CasaOS | usuário → 🔴 TestBrain |
+| TST-24 | MÉDIA | aguarda credencial do CasaOS | usuário → 🔴 TestBrain |
 | DEP-05 | MÉDIA | pendente (backup + `--recriar`) | 🌸 DataBrain + usuário |
 | SEC-58 | BAIXA | pendente | 🟣 → 🟡 → 🔴 |
 | FE-19 | BAIXA | pendente | 🟢 FrontBrain → 🔴 |
@@ -31,7 +31,7 @@
 
 ## TST-04: itens 1.1, 1.2 e 1.7 do roteiro do Lote 12 (testam o próprio `make`) — MÉDIA
 
-**Status:** 1.1 e 1.2 aprovados em 2026-11-14 (env temporário com `DB_NAME=rotaperfumes_l12`, CasaOS :3307). O 1.7 aguarda a CA de dev em `deploy/ca-cert.pem` (ausente nesta máquina; gitignored).
+**Status:** 1.1 e 1.2 aprovados em 2026-11-14 (env temporário com `DB_NAME=rotaperfumes_l12`, CasaOS :3307). O 1.7 aguarda a credencial: com a CA de dev certa (`deploy/ca-cert.pem`, `d150ee67…`), o CasaOS recusa a senha do `.env` (`Access denied for user 'casaOS'@'192.168.168.105'`, mesmo sem override). O usuário precisa conferir a senha/o host liberado da conta `casaOS`.
 **Regras:** usar só `DB_NAME=rotaperfumes_l12` (conferir com `make -n`), nunca `rotaperfumes`; apagar ao final.
 **Aceite:** resultado na seção "Execução" de `docs/roteiro-teste-manual-lote12.md`.
 
@@ -40,7 +40,7 @@
 ## TST-24: integração real do ARQ-09 (DECIMAL ↔ centavos) e revisão dos testes ajustados — MÉDIA
 
 **Ação:** `make test-integration ENV_ARQUIVO=<descartável>` para confirmar o scan do DECIMAL (`[]byte`) e a gravação por texto ("x.yy") no MariaDB; revisar os ~60 testes ajustados mecanicamente (helpers `reaisT`/`decT`).
-**Bloqueio:** a CA de dev (`deploy/ca-cert.pem`, `CN=RotaPerfumes_MySQL_CA`, `ef31b656…`) não está nesta máquina; o `deploy/ca.pem` copiado em 2026-11-14 é a CA de produção e não serve. Alternativa: banco descartável local com Docker (execução assistida).
+**Bloqueio:** a CA de dev já está em `deploy/ca-cert.pem` (`CN=MariaDB_CA`, `d150ee67…`), mas o CasaOS recusa a senha da conta `casaOS` do `.env` a partir de 192.168.168.105 (mesmo bloqueio do TST-04). Alternativa: banco descartável local com Docker (execução assistida).
 **Aceite:** integração verde; nenhuma asserção enfraquecida nos testes ajustados.
 
 ---
