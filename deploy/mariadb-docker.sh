@@ -94,6 +94,10 @@ NOVA_CA=false
 READ_ONLY=true
 CASAOS_NATIVE_MOTIVO=""
 DEV_IPS=()
+# SEC-59: IPs de --dev-ip-ro (tambem entram em DEV_IPS: porta e firewall), so
+# com casaos_ro (sem o casaos ALL). Uso tipico: producao, consultas do admin.
+RO_IPS=()
+DEV_IPS_RW=()
 
 readonly CONTAINER_PADRAO="rotaperfumes-mariadb"
 readonly DB_NOME="rotaperfumes"
@@ -134,6 +138,9 @@ Uso: sudo bash $0 [opcoes]
                       (DOCKER-USER) e cria casaos@IP (ALL, migracoes) e
                       casaos_ro@IP (so SELECT, SEC-51). Sem --dev-ip: nenhuma
                       porta publicada e nenhuma conta casaos/casaos_ro.
+  --dev-ip-ro IP      como --dev-ip, mas cria SO casaos_ro@IP (sem o casaos
+                      ALL; SEC-59, para a producao). Repetivel; o mesmo IP
+                      nao pode vir tambem em --dev-ip.
   --ca-key ARQ        chave da CA existente (mantida FORA do servidor, ex.:
                       pendrive). Lida de la, nunca copiada. Exigida quando o
                       certificado do servidor precisa ser (re)emitido.
@@ -189,7 +196,8 @@ exigir_valor() { [[ $# -ge 2 && -n "$2" ]] || die "a opcao $1 exige um valor (ve
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dev-ip) exigir_valor "$@"; DEV_IPS+=("$2"); shift 2 ;;
+    --dev-ip) exigir_valor "$@"; DEV_IPS+=("$2"); DEV_IPS_RW+=("$2"); shift 2 ;;
+    --dev-ip-ro) exigir_valor "$@"; DEV_IPS+=("$2"); RO_IPS+=("$2"); shift 2 ;;
     --ca-key) exigir_valor "$@"; CA_KEY="$2"; shift 2 ;;
     --nova-ca) NOVA_CA=true; NOVO_CERT=true; shift ;;
     --novo-cert) NOVO_CERT=true; shift ;;
@@ -342,6 +350,15 @@ for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do
   DEV_IPS_OK+=("$ip")
 done
 DEV_IPS=("${DEV_IPS_OK[@]+"${DEV_IPS_OK[@]}"}")
+# SEC-59: so_ro IP = o IP veio de --dev-ip-ro. Um IP nos dois: ambiguo, aborta.
+declare -A _so_ro=()
+for ip in "${RO_IPS[@]+"${RO_IPS[@]}"}"; do _so_ro[$ip]=1; done
+so_ro() { [[ -n "${_so_ro[$1]:-}" ]]; }
+TEM_MAKE=false
+for ip in "${DEV_IPS_RW[@]+"${DEV_IPS_RW[@]}"}"; do
+  so_ro "$ip" && die "$ip veio em --dev-ip e em --dev-ip-ro: escolha um (--dev-ip-ro = so casaos_ro, SEC-59)"
+  TEM_MAKE=true
+done
 PUBLICAR=false
 (( ${#DEV_IPS[@]} > 0 )) && PUBLICAR=true
 if $PUBLICAR && [[ "$CONTAINER" != "$CONTAINER_PADRAO" ]]; then
@@ -352,6 +369,7 @@ if [[ -n "$CA_KEY" ]]; then
 fi
 if [[ -n "$CASAOS_NATIVE_MOTIVO" ]]; then
   [[ "$CASAOS_NATIVE_MOTIVO" =~ ^[[:print:]]{10,300}$ ]] || die "--casaos-native-motivo precisa de 10 a 300 caracteres imprimiveis"
+  $TEM_MAKE || die "--casaos-native-motivo so com --dev-ip (a conta casaos nao existe com --dev-ip-ro, SEC-59)"
 fi
 if [[ -n "$SEM_BACKUP_MOTIVO" ]]; then
   [[ "$SEM_BACKUP_MOTIVO" =~ ^[[:print:]]{10,300}$ ]] || die "--sem-backup precisa de um motivo com 10 a 300 caracteres imprimiveis"
@@ -662,7 +680,7 @@ done
 # Lista vazia com o arquivo ja existente: o arquivo fica (a senha volta a ser
 # usada se --dev-ip voltar; reexecucao nunca troca senha).
 for u in "$DB_MAKE" "$DB_MAKE_RO"; do
-  if $PUBLICAR; then
+  if $PUBLICAR && { [[ "$u" == "$DB_MAKE_RO" ]] || $TEM_MAKE; }; then
     senha_arquivo "$SEGREDOS_DIR/$u.senha"
   elif [[ -e "$SEGREDOS_DIR/$u.senha" ]]; then
     info "Sem --dev-ip: conta $u removida; $SEGREDOS_DIR/$u.senha mantido (reaproveitado se --dev-ip voltar). Para descartar: shred -u."
@@ -864,9 +882,12 @@ SENHAS_CONFERIR=("$SENHA_APP" "$SENHA_ADMIN")
 SENHA_MAKE=""
 SENHA_RO=""
 if $PUBLICAR; then # CHORE-17: casaos.senha so existe/importa com --dev-ip
-  SENHA_MAKE=$(<"$SEGREDOS_DIR/$DB_MAKE.senha")
   SENHA_RO=$(<"$SEGREDOS_DIR/$DB_MAKE_RO.senha")
-  SENHAS_CONFERIR+=("$SENHA_MAKE" "$SENHA_RO")
+  SENHAS_CONFERIR+=("$SENHA_RO")
+  if $TEM_MAKE; then # SEC-59: so --dev-ip-ro = sem casaos (nem senha)
+    SENHA_MAKE=$(<"$SEGREDOS_DIR/$DB_MAKE.senha")
+    SENHAS_CONFERIR+=("$SENHA_MAKE")
+  fi
 fi
 for s in "${SENHAS_CONFERIR[@]}"; do
   [[ "$s" =~ ^[A-Za-z0-9]{20,}$ ]] || die "senha em $SEGREDOS_DIR fora do formato [A-Za-z0-9]{20,} (gerada fora do script?)"
@@ -875,7 +896,10 @@ unset SENHAS_CONFERIR
 
 # Contas desejadas (user@host); o resto das contas do projeto sai (convergencia).
 DESEJADAS=("$DB_APP@$IP_API" "$DB_ADMIN@$IP_ADMIN")
-for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do DESEJADAS+=("$DB_MAKE@$ip" "$DB_MAKE_RO@$ip"); done
+for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do
+  so_ro "$ip" || DESEJADAS+=("$DB_MAKE@$ip")
+  DESEJADAS+=("$DB_MAKE_RO@$ip")
+done
 
 # SQL pelo stdin (nunca no argv). As senhas sao [A-Za-z0-9]: sem escape.
 # ALTER USER a cada execucao: converge plugin (ed25519), senha e REQUIRE SSL.
@@ -898,6 +922,7 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM '$DB_ADMIN'@'$IP_ADMIN';
 GRANT ALL PRIVILEGES ON \`$DB_NOME\`.* TO '$DB_ADMIN'@'$IP_ADMIN';
 EOF
   for ip in "${DEV_IPS[@]+"${DEV_IPS[@]}"}"; do
+    if ! so_ro "$ip"; then
     cat <<EOF
 
 -- make db-* da maquina do admin $ip (db-down/db-create precisam de DROP/CREATE).
@@ -906,6 +931,9 @@ CREATE USER IF NOT EXISTS '$DB_MAKE'@'$ip' IDENTIFIED VIA ed25519 USING PASSWORD
 ALTER USER '$DB_MAKE'@'$ip' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_MAKE') REQUIRE SSL;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM '$DB_MAKE'@'$ip';
 GRANT ALL PRIVILEGES ON \`$DB_NOME\`.* TO '$DB_MAKE'@'$ip';
+EOF
+    fi
+    cat <<EOF
 
 -- SEC-51: consultas da maquina do admin $ip, so SELECT nas tabelas de
 -- negocio (GRANT por tabela depois, so das que existem), com limites.
@@ -913,7 +941,7 @@ CREATE USER IF NOT EXISTS '$DB_MAKE_RO'@'$ip' IDENTIFIED VIA ed25519 USING PASSW
 ALTER USER '$DB_MAKE_RO'@'$ip' IDENTIFIED VIA ed25519 USING PASSWORD('$SENHA_RO') REQUIRE SSL WITH MAX_USER_CONNECTIONS $RO_MAX_CONEXOES MAX_STATEMENT_TIME $RO_MAX_STATEMENT_TIME;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM '$DB_MAKE_RO'@'$ip';
 EOF
-    if [[ -n "$CASAOS_NATIVE_MOTIVO" ]]; then
+    if [[ -n "$CASAOS_NATIVE_MOTIVO" ]] && ! so_ro "$ip"; then
       # SEC-30, saida de emergencia (so casaos): cliente sem ed25519.
       printf "ALTER USER '%s'@'%s' IDENTIFIED VIA mysql_native_password USING PASSWORD('%s') REQUIRE SSL;\n" \
         "$DB_MAKE" "$ip" "$SENHA_MAKE"
@@ -1096,7 +1124,7 @@ Senhas (so root le; nao foram impressas):
   $SEGREDOS_DIR/$DB_APP.senha   API: DB_SENHA do Secret file rotaperfumes-api-env
   $SEGREDOS_DIR/$DB_ADMIN.senha credencial Jenkins rotaperfumes-db-admin (import) e seed-producao.sh
 EOF
-if $PUBLICAR; then
+if $PUBLICAR && $TEM_MAKE; then
   printf '  %s/%s.senha             .env.producao da maquina do admin (--dev-ip; ALL, so migracoes)\n' "$SEGREDOS_DIR" "$DB_MAKE"
   printf '  %s/%s.senha          consultas da maquina do admin (--dev-ip; so SELECT, SEC-51)\n' "$SEGREDOS_DIR" "$DB_MAKE_RO"
 fi
@@ -1113,7 +1141,19 @@ Proximos passos:
   3. NAO copie esta CA para deploy/ca-cert.pem: esse arquivo e a CA do MariaDB
      de DEV (CasaOS, 3307).
 EOF
-if $PUBLICAR; then
+if $PUBLICAR && ! $TEM_MAKE; then
+  cat <<EOF
+     SEC-59 (so --dev-ip-ro): na maquina do admin, copie $SSL_DIR/ca.pem para
+     deploy/ca-producao.pem (no .gitignore) e use um .env.producao.ro SEPARADO
+     (no .gitignore), so para consultas (a conta $DB_MAKE nao existe):
+       DB_HOST=$SITE_IP
+       DB_PORT=$PORTA
+       DB_USUARIO=$DB_MAKE_RO
+       DB_SENHA=<conteudo de $SEGREDOS_DIR/$DB_MAKE_RO.senha>
+       DB_TLS_CA=deploy/ca-producao.pem
+     So SELECT nas tabelas de negocio; nunca make db-* com este arquivo.
+EOF
+elif $PUBLICAR; then
   cat <<EOF
      Na maquina do admin (so as de --dev-ip), copie $SSL_DIR/ca.pem para
      deploy/ca-producao.pem (no .gitignore) e use um arquivo SEPARADO,

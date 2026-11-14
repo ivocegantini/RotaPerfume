@@ -16,6 +16,9 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // DEP-06: o Node 26 tem localStorage nativo (Web Storage), que encobre o
+    // do jsdom e vem undefined sem --localstorage-file; desligado nos workers.
+    execArgv: ["--no-experimental-webstorage"],
     globals: false,
     setupFiles: ["./vitest.setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],

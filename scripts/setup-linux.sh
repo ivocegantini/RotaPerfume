@@ -693,6 +693,19 @@ docker_compose_instalar() {
 	fi
 }
 
+# DEPLOY-09: sem o buildx o "docker build" cai no legacy builder (deprecated)
+# e os Dockerfiles com "# syntax=docker/dockerfile:1" pedem BuildKit.
+docker_buildx_instalar() {
+	docker buildx version >/dev/null 2>&1 && return
+	docker_pode_instalar || return
+	if apt-cache show docker-buildx >/dev/null 2>&1; then
+		info "Instalando docker-buildx..."
+		apt_instalar docker-buildx || true
+	else
+		info "docker-buildx não existe no apt desta distro: instale o plugin buildx à parte (docs/deploy-servidor.md)"
+	fi
+}
+
 docker_avisos_pos_instalacao() {
 	if [ "$(id -u)" -ne 0 ] && ! id -nG "$(id -un)" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
 		aviso "seu usuário não está no grupo docker (equivale a root; decisão sua): sudo usermod -aG docker \"\$USER\" e faça login de novo"
@@ -713,10 +726,13 @@ etapa_docker() {
 	if ! tem docker; then registrar docker AVISO "não encontrado (opcional; apt: docker.io; ver docs/deploy-servidor.md)"; return; fi
 	[ "$instalou" -eq 1 ] && docker_avisos_pos_instalacao
 	docker_compose_instalar
+	docker_buildx_instalar
 	v="$(docker --version 2>/dev/null | extrair_versao)"
 	[ "$instalou" -eq 1 ] && v="$v (instalado)"
-	if c="$(docker compose version --short 2>/dev/null)"; then
-		registrar docker OK "$v, compose $c"
+	if ! docker buildx version >/dev/null 2>&1; then
+		registrar docker AVISO "$v, sem o plugin 'docker buildx' (docker build cai no legacy builder; apt: docker-buildx)"
+	elif c="$(docker compose version --short 2>/dev/null)"; then
+		registrar docker OK "$v, compose $c, buildx $(docker buildx version 2>/dev/null | extrair_versao)"
 	else
 		registrar docker AVISO "$v, sem o plugin 'docker compose' (opcional; o deploy exige compose >= 2.17)"
 	fi

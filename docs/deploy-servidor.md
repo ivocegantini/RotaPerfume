@@ -33,7 +33,7 @@ As **duas credenciais do Jenkins** continuam sendo cadastradas **à mão**: o `s
    # ou, com uma CA existente cuja chave está na mídia offline:
    sudo bash deploy/mariadb-docker.sh --ca-key /media/<pendrive>/ca-key.pem
    ```
-   Acrescente `--dev-ip <IP>` só para a máquina do admin que precisa acessar o banco de produção (seção 3.3 e seção 11, passo 11). **Hoje não se aplica (2026-11-05):** a produção só responde localmente no servidor, sem `--dev-ip`; as conferências do banco são pelo passo 7 da seção 11. Numa instalação nova, o seed inicial é o `deploy/seed-producao.sh` (seção 11, passo 6), nunca o `make db-seed`.
+   Acrescente `--dev-ip <IP>` só para a máquina do admin que precisa acessar o banco de produção (seção 3.3 e seção 11, passo 11). **SEC-59 (2026-11-14):** a produção usa `--dev-ip-ro 192.168.168.105` (porta só para o admin, conta `casaos_ro` só de leitura, **sem** o `casaos` ALL); migrações seguem pelo servidor (passo 7 da seção 11). Numa instalação nova, o seed inicial é o `deploy/seed-producao.sh` (seção 11, passo 6), nunca o `make db-seed`.
 2. **No Windows**, na raiz do projeto, copie o dump e o `.env` para o `/tmp` do servidor:
    ```powershell
    scp deploy\dumps\rotaperfumes-AAAAMMDD-HHMMSS.sql.gz .env SEU_USUARIO@ivo-inspiron-15-3530:/tmp/
@@ -190,6 +190,7 @@ No fim, imprime o fingerprint da CA (formato do `deploy/db-ca.fingerprint`), ond
 ### 3.3 Porta para as máquinas de dev (`--dev-ip`) e firewall `DOCKER-USER`
 
 - Sem `--dev-ip`: **nenhuma** porta publicada e nenhuma conta `casaos`/`casaos_ro`.
+- **SEC-59:** `--dev-ip-ro IP` publica a porta e libera o firewall igual ao `--dev-ip`, mas cria **só** o `casaos_ro@IP` (sem `casaos` nem `casaos.senha`; um `casaos@IP` antigo sai). O mesmo IP nos dois é recusado; `--casaos-native-motivo` exige um `--dev-ip`. É o modo da produção.
 - Com `--dev-ip IP` (repetível, um IPv4 por máquina): publica `-p 192.168.168.106:3306:3306` (nunca `0.0.0.0`) e cria a chain `ROTAPERFUMES-DB` com `-s <IP>/32 -j RETURN` por máquina e `-j DROP` no fim, com um salto no topo de `DOCKER-USER` (`-p tcp -m conntrack --ctorigdst 192.168.168.106 --ctorigdstport 3306 --ctdir ORIGINAL -j ROTAPERFUMES-DB`). A recarga é atômica (`iptables-restore --noflush`).
 - **`--ctdir ORIGINAL` é obrigatório (DEPLOY-08):** o tuple original (`--ctorigdst`/`--ctorigdstport`) é o mesmo nos pacotes de ida e de volta. Sem o `--ctdir ORIGINAL`, a resposta do container (origem `172.30.42.2`) também salta para a chain, não casa nenhum `-s <IP>/32` e cai no `DROP`: o SYN-ACK morre e a máquina liberada recebe timeout na 3306. A reexecução do script insere o salto novo **antes** de remover o antigo (sem `--ctdir`), então não há janela aberta.
 - Persistência: `/usr/local/sbin/rotaperfumes-db-firewall` (root, 700) + unit `rotaperfumes-db-firewall.service` (`After=docker.service`, `PartOf=docker.service`, habilitada), que reaplica a regra depois de um reboot ou restart do Docker. Rodar sem `--dev-ip` depois de já ter usado a opção recarrega a chain só com o `DROP` (fail closed).
@@ -205,7 +206,7 @@ Todas `IDENTIFIED VIA ed25519` + `REQUIRE SSL` (SEC-30/SEC-39), criadas e altera
 | `rotaperfumes_app` | `172.30.42.10` | `SELECT, INSERT, UPDATE, DELETE ON rotaperfumes.*` | `rotaperfumes_app.senha` | `DB_SENHA` do Secret file `rotaperfumes-api-env` |
 | `rotaperfumes_admin` | `172.30.42.20` | `ALL ON rotaperfumes.*` | `rotaperfumes_admin.senha` | credencial `rotaperfumes-db-admin` |
 | `casaos` | cada `--dev-ip` | `ALL ON rotaperfumes.*` (só esse banco, DEPLOY-07); **só migrações** | `casaos.senha` | `.env.producao` da máquina do admin (seção 11, passo 11); **não se aplica hoje** (produção só local, sem `--dev-ip`; conferência pelo passo 7) |
-| `casaos_ro` | cada `--dev-ip` | `SELECT` por tabela de negócio (SEC-51), `MAX_USER_CONNECTIONS 5`, `MAX_STATEMENT_TIME 30` | `casaos_ro.senha` | `.env.producao.ro` da máquina do admin, para **consultas**; mesma situação do `casaos` (só existe com `--dev-ip`) |
+| `casaos_ro` | cada `--dev-ip` e `--dev-ip-ro` (SEC-59) | `SELECT` por tabela de negócio (SEC-51), `MAX_USER_CONNECTIONS 5`, `MAX_STATEMENT_TIME 30` | `casaos_ro.senha` | `.env.producao.ro` da máquina do admin, para **consultas**; mesma situação do `casaos` (só existe com `--dev-ip`) |
 | `root` | `localhost` | (todos) | `root.senha` | só `docker exec` (socket) |
 
 **SEC-51 (Lote 39):** o `casaos_ro` é a conta do dia a dia da máquina do admin (consultas, conferências): só `SELECT` nas tabelas de negócio (`TABELAS_RO` do script: `vendedores`, `clientes`, `produtos`, `pedidos`, `itens_pedido`, `pagamentos`, `carteiras`, `oportunidades`, `visitas`, `estoque`; **sem** `usuarios`, `refresh_tokens` e `senha_historico`; um teste confere a lista contra a DDL do `sql/ordem-ddl.txt`), no máximo 5 conexões e 30 s por comando, ed25519, `REQUIRE SSL`, restrita ao IP do `--dev-ip`, senha aleatória própria (600). O `casaos` (`ALL`) fica só para migrações (`db-fix-*`). O GRANT é por tabela e só nas que já existem: antes do seed a conta fica sem acesso (o script avisa) e é preciso rodá-lo de novo depois do `seed-producao.sh`; tabela nova entra em `TABELAS_RO` (ou na lista de excluídas do teste) e exige rodar o script de novo. Os dados de `clientes` (CNPJ e contatos de empresas) continuam legíveis. A saída de emergência `--casaos-native-motivo` (SEC-30) vale só para o `casaos`. Sem `--dev-ip` as duas contas saem e os arquivos de senha ficam (reaproveitados se o `--dev-ip` voltar).
@@ -234,7 +235,7 @@ Na API, `DB_TLS_CA` definido liga o TLS verificado com **TLS 1.3 mínimo** (TST-
 
 ### 3.6 Atualizar a imagem do MariaDB (digest, SEC-31)
 
-As imagens base são fixadas pelo digest do **índice multi-arch** (a tag sozinha pode ser republicada). A imagem do MariaDB aparece em **três** lugares, com a **mesma string** (testes conferem): `IMAGEM_BASE` no `deploy/mariadb-docker.sh`, `DB_CLIENT_IMAGE` no `Jenkinsfile` e `DB_CLIENT_IMAGE` no `deploy/seed-producao.sh` (mais as cópias de referência `IMG=` deste documento e do `docs/Instal_SSL.md`). O `GO_IMAGE` e o `NODE_IMAGE` do `Jenkinsfile` seguem o mesmo formato (`golang:<patch>-alpine@sha256:...` com a versão do `go.mod`; `node:<patch>-alpine@sha256:...` com a versão do `frontend/.nvmrc`, conferida por teste). Para eles basta trocar a string no `Jenkinsfile` (`docker buildx imagetools inspect node:22.23-alpine --format '{{.Manifest.Digest}}'`) e rodar `make test`; os passos 2, 4 e 5 abaixo são só do MariaDB.
+As imagens base são fixadas pelo digest do **índice multi-arch** (a tag sozinha pode ser republicada). A imagem do MariaDB aparece em **três** lugares, com a **mesma string** (testes conferem): `IMAGEM_BASE` no `deploy/mariadb-docker.sh`, `DB_CLIENT_IMAGE` no `Jenkinsfile` e `DB_CLIENT_IMAGE` no `deploy/seed-producao.sh` (mais as cópias de referência `IMG=` deste documento e do `docs/Instal_SSL.md`). O `GO_IMAGE` e o `NODE_IMAGE` do `Jenkinsfile` seguem o mesmo formato (`golang:<patch>-alpine@sha256:...` com a versão do `go.mod`; `node:<patch>-alpine@sha256:...` com a versão do `frontend/.nvmrc`, conferida por teste). Para eles basta trocar a string no `Jenkinsfile` (`docker buildx imagetools inspect node:26.13-alpine --format '{{.Manifest.Digest}}'`) e rodar `make test`; os passos 2, 4 e 5 abaixo são só do MariaDB.
 
 **SEC-47 (Dockerfiles):** `backend/Dockerfile` (`ARG GO_VERSION` + `ARG GO_DIGEST` = `GO_IMAGE`; distroless `nonroot@sha256:`), `frontend/Dockerfile` (`ARG NODE_VERSION` + `ARG NODE_DIGEST` = `NODE_IMAGE`) e `deploy/Dockerfile.caddy` (`caddy:<patch>-alpine@sha256:`) também ficam fixados; o `make deps-audit-imagens` resolve os `ARG` do `FROM` e avisa `FROM` sem digest. Com `tag@digest` o Docker usa só o digest: versão e digest mudam **juntos** (testes conferem a igualdade com o `Jenkinsfile`).
 
@@ -247,7 +248,7 @@ As imagens base são fixadas pelo digest do **índice multi-arch** (a tag sozinh
 3. `make test` (os testes de `tests/deploy` conferem o formato e a igualdade das strings).
 4. Depois do merge, no servidor (execução assistida): `sudo git -C /root/rotaperfumes pull --ff-only` e `sudo bash deploy/mariadb-docker.sh --recriar --backup-agora [--dev-ip ... (a mesma lista)]`. O `--backup-agora` grava o backup (seção 9) antes de remover o container; o banco fica fora do ar alguns segundos e os dados ficam no datadir. Sem `--recriar`, o script só avisa que o container usa uma imagem diferente.
 
-Histórico: **DEP-05 (Lote 39, 2026-11-14)** trocou os digests de `mariadb:11.4.13` (`5e73baf8…`) e `node:22.23.4-alpine` (`0e175475…`), rebuilds das mesmas tags.
+Histórico: **DEP-06 (Lote 40, 2026-11-14)** subiu para `golang:1.27.4-alpine` (`0a5f7fe7…`) e `node:26.13.1-alpine` (`6bd9ab43…`, LTS 26). **DEP-05 (Lote 39, 2026-11-14)** trocou os digests de `mariadb:11.4.13` (`5e73baf8…`) e `node:22.23.4-alpine` (`0e175475…`), rebuilds das mesmas tags.
 
 Só suba **patch** do 11.4 assim. Mudança de versão menor/maior é card próprio (backup, teste em banco descartável).
 
@@ -779,6 +780,8 @@ Falhou? A seção 10 (Troubleshooting) cobre os erros de cada estágio. O `CA do
 >
 > - **Não rode estes comandos no servidor:** o `openssl s_client` do próprio servidor nunca faz handshake, e o `make` fora da raiz de um checkout com o Makefile atual dá `Sem regra para processar o alvo 'db-check-env'`.
 > - **Para conferir o banco de produção:** use o **Passo 7** (no servidor, como root, pelo `admin_sql`).
+>
+> **SEC-59 (2026-11-14):** com `--dev-ip-ro 192.168.168.105` vale só a parte de **consultas** abaixo (`.env.producao.ro` com `casaos_ro` e `deploy/ca-producao.pem`); o `.env.producao` com `casaos` continua não aplicável.
 >
 > O texto abaixo fica só como **referência**, para o caso de algum dia o `--dev-ip` ser habilitado para a máquina do admin.
 

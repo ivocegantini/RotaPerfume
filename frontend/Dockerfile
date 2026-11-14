@@ -5,8 +5,8 @@
 # SEC-47: base fixada por digest (indice multi-arch). Com tag@digest o Docker
 # usa so o digest: NODE_VERSION e NODE_DIGEST mudam JUNTOS, iguais ao NODE_IMAGE
 # do Jenkinsfile (teste confere). "make deps-audit-imagens" avisa digest novo.
-ARG NODE_VERSION=22.23.4-alpine
-ARG NODE_DIGEST=sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202
+ARG NODE_VERSION=26.13.1-alpine
+ARG NODE_DIGEST=sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
 
 # ---------- deps ----------
 FROM node:${NODE_VERSION}@${NODE_DIGEST} AS deps

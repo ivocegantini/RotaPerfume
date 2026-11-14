@@ -12,6 +12,15 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Lote 40 de 2026-11-14: decisões do usuário sobre o Lote 39 (não commitado)
+> Testes: `make test` rc=0; `shellcheck` ok; frontend 1816 ok (Node 26 e 22); `next build`, `npm audit --omit=dev` e `govulncheck` sem achados.
+- DEP-06: Go 1.27.4 (`go.mod`, `golang:1.27.4-alpine`) e Node 26.13.1 LTS (`.nvmrc`, `engines`, `@types/node` 26); vitest com `--no-experimental-webstorage`.
+- SEC-59: `mariadb-docker.sh --dev-ip-ro IP` (porta + firewall, só `casaos_ro`, sem o `casaos` ALL); produção usa `--dev-ip-ro 192.168.168.105`. PII de `clientes` segue legível.
+- TST-26: cancelado pelo usuário (UTC já coberto pelo TST-23; o `test-integration` não roda em paralelo nem no Jenkins).
+- DOC-10: cancelado pelo usuário (sugestão de `CLAUDE.md` ignorada).
+- DEPLOY-09 (passos 1-2): teste de restauração com `--default-character-set=utf8mb4` (cliente da imagem em utf8mb3 recusava o emoji); `setup-linux.sh` instala o `docker-buildx`.
+- DEP-03: `npm audit fix --force` desfeito (rebaixou `eslint-config-next` para 15.5); `next` e `eslint-config-next` 16.4.6, lock refeito.
+
 ## Lote 39 de 2026-11-14: 8 cards concluídos (não commitado)
 > Testes: `make test` rc=0 (10529 PASS, 0 FAIL, 50 SKIP); `lint`, `shellcheck` ok; frontend 1816 ok. 🟣 SecBrain: aprovado com ressalvas, corrigidas no lote.
 - BACKUP-01: `deploy/backup-mariadb.sh` (dump conferido, 600/700, `flock`, retenção 14 d); container novo sobre dados exige backup recente ou `--sem-backup` (vai ao journal). Restauração real pendente (ver DEPLOY-09).

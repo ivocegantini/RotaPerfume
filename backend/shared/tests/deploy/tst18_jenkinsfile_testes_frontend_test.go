@@ -77,7 +77,7 @@ func TestTST18_NodeImageFixadaPorDigest(t *testing.T) {
 	// arquivos de IMAGENS_FIXADAS_EM (o Jenkinsfile é um deles).
 	refs := regexp.MustCompile(`[a-z0-9._/-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}`).FindAllString(jf, -1)
 	assert.Contains(t, refs, m[1], "visível para o deps-audit-imagens")
-	assert.Contains(t, jf, "node:22.23-alpine", "comentário SEC-31 explica como atualizar o node")
+	assert.Contains(t, jf, "node:26.13-alpine", "comentário SEC-31 explica como atualizar o node")
 }
 
 func TestTST18_EstagioTestesFrontend_Comandos(t *testing.T) {

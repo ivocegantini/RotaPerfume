@@ -608,7 +608,10 @@ func TestBACKUP01_RestauracaoReal_Docker(t *testing.T) {
 	require.NoError(t, err, "%s", out)
 
 	sqlRoot := func(banco, stdin string, args ...string) string {
-		a := append([]string{"exec", "-i", nome, "mariadb", "--defaults-extra-file=/run/rotaperfumes/root.cnf", "-N", "-B"}, args...)
+		// O cliente da imagem conecta em utf8mb3 por padrão: sem utf8mb4, o emoji
+		// (4 bytes) da amostra dá ERROR 1366. O backup-mariadb.sh já usa utf8mb4.
+		a := append([]string{"exec", "-i", nome, "mariadb", "--defaults-extra-file=/run/rotaperfumes/root.cnf",
+			"--default-character-set=utf8mb4", "-N", "-B"}, args...)
 		if banco != "" {
 			a = append(a, banco)
 		}

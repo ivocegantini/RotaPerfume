@@ -15,8 +15,8 @@
 # SEC-47: bases fixadas por digest (indice multi-arch). Com tag@digest o Docker
 # usa so o digest: GO_VERSION e GO_DIGEST mudam JUNTOS, iguais ao GO_IMAGE do
 # Jenkinsfile (teste confere). "make deps-audit-imagens" avisa digest novo.
-ARG GO_VERSION=1.26.11
-ARG GO_DIGEST=sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb
+ARG GO_VERSION=1.27.4
+ARG GO_DIGEST=sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf
 
 # ---------- build ----------
 FROM golang:${GO_VERSION}-alpine@${GO_DIGEST} AS build

@@ -8,51 +8,24 @@
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
 | DEPLOY-09 | MÉDIA | execução assistida | usuário + 🌸 DataBrain |
-| DEP-06 | BAIXA | pendente | 🟡 BackBrain |
-| SEC-59 | BAIXA | decisão do usuário | 🟣 → 🌸 |
-| TST-26 | BAIXA | pendente | 🔴 TestBrain + 🟣 |
-| DOC-10 | BAIXA | só o usuário edita | usuário |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
 
-## DEPLOY-09: aplicar o Lote 39 (BACKUP-01, DEP-05, SEC-47) — MÉDIA
+## DEPLOY-09: aplicar os Lotes 39 e 40 (BACKUP-01, DEP-05, DEP-06, SEC-47, SEC-59) — MÉDIA
 
 **Ação (execução assistida):**
+0. Uma vez, na máquina do build: `sudo apt install docker-buildx` (sem ele o `docker build` cai no legacy builder).
 1. Restauração real, numa máquina com Docker que não seja o servidor: `cd backend/shared && sudo -E env "PATH=$PATH" BACKUP01_DOCKER=1 go test -count=1 -run TestBACKUP01_RestauracaoReal_Docker ./tests/deploy/`.
-2. Build dos Dockerfiles (SEC-47): `docker build backend/`, `docker build frontend/`, `docker build -f deploy/Dockerfile.caddy deploy/`.
-3. No servidor, depois do push: `sudo git -C /root/rotaperfumes pull --ff-only && cd /root/rotaperfumes && sudo bash deploy/mariadb-docker.sh --recriar --backup-agora`; timer diário da §9 de `docs/deploy-servidor.md`.
-
----
-
-## DEP-06: patches novos do Go e do Node — BAIXA
-
-**Descrição:** `make deps-audit-imagens` mostra `golang:1.26-alpine` e `node:22.23-alpine` mais novos que os fixados.
-**Ação:** subir versão + digest juntos (`Jenkinsfile`, `Dockerfile`s, `go.mod`/`.nvmrc` se for o caso); `make test`.
-
----
-
-## SEC-59: `casaos_ro` na produção e PII de `clientes` — BAIXA
-
-**Decisão do usuário:** a produção roda sem `--dev-ip`, então a conta `_ro` não existe lá; ativar muda essa decisão (`--dev-ip 192.168.168.105`, rodar de novo após o seed).
-**Ação opcional:** views sem CNPJ/contatos de `clientes` para a conta `_ro`.
-
----
-
-## TST-26: fuso opt-in no `integracao.Abrir` e `test-integration` concorrente — BAIXA
-
-**Descrição:** a rodada inteira em UTC (TST-23) só foi feita com patch local; duas execuções simultâneas apagam o mesmo `rotaperfumes_teste`. A catraca TST-23 age por arquivo.
-**Ação:** gancho opt-in de fuso (revisado pelo 🟣, SEC-50) e trava/nome por execução no `make test-integration`.
-
----
-
-## DOC-10: `CLAUDE.md` com as versões e digests do Lote 39 — BAIXA
-
-**Sugestão (só o usuário edita):** na seção "Versões", citar `GO_VERSION`/`GO_DIGEST` do `backend/Dockerfile`, `NODE_DIGEST` do `frontend/Dockerfile` e `MARIADB_CHAVE_FINGERPRINT` em `scripts/versoes.conf` (mudam junto com a versão).
+2. Build dos Dockerfiles (SEC-47, bases Go 1.27.4/Node 26.13.1): `sudo docker build backend/`, `sudo docker build frontend/`, `sudo docker build -f deploy/Dockerfile.caddy deploy/`.
+3. No servidor, depois do push: `sudo git -C /root/rotaperfumes pull --ff-only && cd /root/rotaperfumes && sudo bash deploy/mariadb-docker.sh --recriar --backup-agora --dev-ip-ro 192.168.168.105`; timer diário da §9.
+4. SEC-59: `.env.producao.ro` (`casaos_ro`) + `deploy/ca-producao.pem` na 192.168.168.105, e teste `openssl s_client` impresso pelo script.
 
 ---
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 
 **Status (2026-11-14):** 0 altas; 8 moderadas do `minimatch` via `eslint` (só dev), correção só com `--force`.
-**Ação:** quando o upstream corrigir, atualizar ou usar `overrides`; validar `tsc`, `eslint`, vitest, `next build` e `npm audit`. Nunca `npm audit fix --force`.
+**Ação:** quando o upstream corrigir, atualizar ou usar `overrides`; validar `tsc`, `eslint`, vitest, `next build` e `npm audit`.
+**Também bloqueado:** `eslint` 10 (o 9 avisa "no longer supported"), até os plugins react/import/jsx-a11y aceitarem o 10.
+**Sem `--force`:** ele rebaixa o `eslint-config-next` 16.4 → 15.5 (fora da linha do `next` 16); o `typescript-eslint` mais novo (8.72.2) ainda é vulnerável.

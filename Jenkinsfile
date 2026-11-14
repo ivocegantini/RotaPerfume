@@ -52,16 +52,16 @@ pipeline {
         // SEC-31: imagens fixadas por digest (indice multi-arch) - a tag sozinha
         // pode ser republicada. Como atualizar:
         //   docker buildx imagetools inspect mariadb:11.4 --format '{{.Manifest.Digest}}'
-        //   (golang: idem com golang:1.26-alpine; versao do Go = go.mod)
-        //   (node: idem com node:22.23-alpine; versao do Node = frontend/.nvmrc,
-        //   a mesma linha 22 do NODE_VERSION do frontend/Dockerfile)
+        //   (golang: idem com golang:1.27-alpine; versao do Go = go.mod)
+        //   (node: idem com node:26.13-alpine; versao do Node = frontend/.nvmrc,
+        //   a mesma linha 26 do NODE_VERSION do frontend/Dockerfile)
         //   -> trocar "<tag com patch>@sha256:<digest>" aqui; o do mariadb TAMBEM
         //   no IMAGEM_BASE do deploy/mariadb-docker.sh (mesma string) -> make test
         //   -> sudo bash deploy/mariadb-docker.sh --recriar --backup-agora (BACKUP-01).
         // "make deps-audit-imagens" mostra se ha digest novo (so informa).
-        GO_IMAGE             = 'golang:1.26.11-alpine@sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb'
+        GO_IMAGE             = 'golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf'
         // TST-18: estagio "Testes Frontend" (npm ci + lint + vitest).
-        NODE_IMAGE           = 'node:22.23.4-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202'
+        NODE_IMAGE           = 'node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5'
         // Cliente do MariaDB 11.4 LTS (mesma imagem do servidor); a imagem 11.x
         // so tem o comando "mariadb" (sem o symlink "mysql").
         DB_CLIENT_IMAGE      = 'mariadb:11.4.13@sha256:5e73baf8179b29f115101bb102763a47a017361f3e9792daccba6646c3ab1532'
