@@ -138,7 +138,7 @@ Rode no servidor (via SSH ou no terminal local dele):
      sudo systemctl restart jenkins
      sudo -u jenkins docker ps          # deve listar sem "permission denied"
      ```
-   - **Em container (produção):** monte o socket `/var/run/docker.sock`, instale na imagem o `docker-ce-cli` e o `docker-compose-plugin` (≥ 2.17) e dê ao usuário do Jenkins acesso ao socket. Confira com `docker exec <container_jenkins> docker ps` e `docker exec <container_jenkins> docker compose version`. Os caminhos montados pelo pipeline (`/etc/mysql/ssl/ca.pem`) são resolvidos pelo daemon do **host**: o container do Jenkins não precisa enxergá-los.
+   - **Em container (produção):** monte o socket `/var/run/docker.sock`, instale na imagem o `docker-ce-cli` e o `docker-compose-plugin` (≥ 2.17) e dê ao usuário do Jenkins acesso ao socket. Confira com `docker exec <container_jenkins> docker ps` e `docker exec <container_jenkins> docker compose version`. **DEPLOY-09:** monte também o plugin buildx (≥ 0.17; sem ele o compose cai no builder `classic`, deprecated), ex. com o CLI do host: `/usr/libexec/docker/cli-plugins/docker-buildx:/usr/local/lib/docker/cli-plugins/docker-buildx:ro`; confira com `docker exec <container_jenkins> docker buildx version`. Os caminhos montados pelo pipeline (`/etc/mysql/ssl/ca.pem`) são resolvidos pelo daemon do **host**: o container do Jenkins não precisa enxergá-los.
 3. Confirme as ferramentas usadas pelo pipeline (no agente): `bash`, `curl`, `gzip`/`zcat`, `install` (coreutils) e `openssl`.
    ```bash
    which bash curl gzip zcat install openssl

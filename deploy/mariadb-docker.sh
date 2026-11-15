@@ -683,7 +683,8 @@ for u in "$DB_MAKE" "$DB_MAKE_RO"; do
   if $PUBLICAR && { [[ "$u" == "$DB_MAKE_RO" ]] || $TEM_MAKE; }; then
     senha_arquivo "$SEGREDOS_DIR/$u.senha"
   elif [[ -e "$SEGREDOS_DIR/$u.senha" ]]; then
-    info "Sem --dev-ip: conta $u removida; $SEGREDOS_DIR/$u.senha mantido (reaproveitado se --dev-ip voltar). Para descartar: shred -u."
+    if $PUBLICAR; then _motivo="So --dev-ip-ro (SEC-59)"; else _motivo="Sem --dev-ip"; fi
+    info "$_motivo: conta $u removida; $SEGREDOS_DIR/$u.senha mantido (reaproveitado se --dev-ip voltar). Para descartar: shred -u."
   fi
 done
 ROOT_SENHA=$(<"$SEGREDOS_DIR/root.senha")

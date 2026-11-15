@@ -36,6 +36,13 @@ func TestSEC59_DevIPRO_SoContaSomenteLeitura(t *testing.T) {
 	assert.NotContains(t, r.out, "DB_USUARIO=casaos\n")
 	assert.NotContains(t, r.out, "casaos.senha ")
 	assert.NotContains(t, r.out, senhaRO(e), "senha nunca na saída")
+
+	// casaos.senha de uma execução antiga com --dev-ip: mantido, com o motivo certo.
+	escrever(t, filepath.Join(e.dir, segredos, "casaos.senha"), strings.Repeat("A", 32), 0o600)
+	r = e.rodar("--dev-ip-ro", "192.168.168.105")
+	require.NoError(t, r.err, r.out)
+	assert.Contains(t, r.out, "So --dev-ip-ro (SEC-59): conta casaos removida;")
+	assert.NotContains(t, r.out, "Sem --dev-ip: conta casaos removida")
 }
 
 func TestSEC59_DevIPRO_Misturado(t *testing.T) {
