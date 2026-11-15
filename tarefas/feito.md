@@ -12,6 +12,10 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Lote 41 de 2026-11-15: DEPLOY-09 concluído
+- DEPLOY-09: Lotes 39/40 no servidor; timer diário de backup (03:15, 14 dias; 1º backup ok); chave da CA só no pendrive `BACKUP` (conferida por chave pública); `casaos_ro` + `deploy/ca-producao.pem` na .105 com TLS 1.3 (`usuarios` negado, ERROR 1142). 2ª cópia cifrada da chave dispensada pelo usuário neste servidor (fica no guia).
+- DEP-03 (parcial): patches tailwind 4.3.5, postcss 8.5.33, user-event 14.6.10; card segue aberto.
+
 ## Lote 40 de 2026-11-14: decisões do usuário sobre o Lote 39 (não commitado)
 > Testes: `make test` rc=0; `shellcheck` ok; frontend 1816 ok (Node 26 e 22); `next build`, `npm audit --omit=dev` e `govulncheck` sem achados.
 - DEP-06: Go 1.27.4 (`go.mod`, `golang:1.27.4-alpine`) e Node 26.13.1 LTS (`.nvmrc`, `engines`, `@types/node` 26); vitest com `--no-experimental-webstorage`.
