@@ -26,7 +26,7 @@ func newClienteTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
-var clienteColunasRegex = `cliente_id_origem, cnpj, razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
+var clienteColunasRegex = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
 
 func clienteRows() *sqlmock.Rows {
 	now := time.Now()

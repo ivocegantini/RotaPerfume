@@ -11,8 +11,9 @@ import (
 
 const arqClientes = "clientes.go"
 
-// clienteColunas: bairro é NULLable e vira "" (COALESCE).
-const clienteColunas = `cliente_id_origem, cnpj, razao_social, segmento, cidade, uf, COALESCE(bairro, ''), data_cadastro, ativo, created_at, updated_at`
+// clienteColunas: bairro e cnpj (NULL no cliente pessoa física da loja,
+// ECOM-05) são NULLable e viram "" (COALESCE).
+const clienteColunas = `cliente_id_origem, COALESCE(cnpj, ''), razao_social, segmento, cidade, uf, COALESCE(bairro, ''), data_cadastro, ativo, created_at, updated_at`
 
 // clienteNaCarteiraCond restringe à carteira ATIVA de um vendedor; o
 // vendedor_id vai sempre por placeholder.
@@ -172,4 +173,35 @@ func (r *Clientes) DefinirAtivo(ctx context.Context, id int64, ativo bool) error
 		return comercial.ErrClienteNaoEncontrado
 	}
 	return nil
+}
+
+// uqClientesCPF é o índice único de clientes.cpf (ECOM-05).
+const uqClientesCPF = "uq_clientes_cpf"
+
+// InserirClienteLoja grava o cliente pessoa física do autocadastro, ligado
+// ao login (ECOM-05): cnpj NULL, segmento "Loja Online", data de hoje. O
+// 1062 do CPF vira ErrCPFDuplicado sem o erro do driver (traz o CPF).
+func (r *Clientes) InserirClienteLoja(ctx context.Context, usuarioID int64, c *comercial.ClienteLoja) (int64, error) {
+	const q = `
+		INSERT INTO clientes (cnpj, cpf, razao_social, segmento, cidade, uf, bairro, endereco, numero, complemento, cep, data_cadastro, ativo, usuario_id)
+		VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), 1, ?)`
+	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir cliente loja", q,
+		c.CPF, c.Nome, comercial.SegmentoLojaOnline, c.Cidade, c.UF, nuloSeVazio(c.Bairro), c.Endereco, c.Numero,
+		nuloSeVazio(c.Complemento), nuloSeVazio(c.CEP), usuarioID)
+	if db.ChaveDuplicada(err, uqClientesCPF) {
+		return 0, comercial.ErrCPFDuplicado
+	}
+	if err != nil {
+		return 0, err
+	}
+	vlog.Printf(arqClientes, "Clientes.InserirClienteLoja", "INSERT clientes id=%d usuario_id=%d", id, usuarioID)
+	return id, nil
+}
+
+// nuloSeVazio grava NULL para o campo opcional vazio (ECOM-09).
+func nuloSeVazio(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }

@@ -68,7 +68,8 @@ func (c *Casos) Login(ctx context.Context, cmd ComandoLogin) (s *SessaoEmitida, 
 	}
 	c.d.Limites.Login.RegistrarSucesso(chaveIP)
 	c.d.Limites.Login.RegistrarSucesso(chaveConta)
-	return c.abrirSessao(ctx, u, cmd.Senha, cmd.Origem)
+	c.rehashSeNecessario(ctx, u, cmd.Senha)
+	return c.abrirSessao(ctx, u, cmd.Origem)
 }
 
 // credencial busca o usuário e confere senha e ativo. A senha é verificada
@@ -95,13 +96,17 @@ func (c *Casos) credencial(ctx context.Context, email, mascarado string, senha i
 		log.Printf("[auth] login: senha incorreta para: %s", mascarado)
 		return nil, identidade.ErrCredenciaisInvalidas
 	}
+	// ECOM-03: só depois da senha certa (não revela a conta a terceiros).
+	if err := c.exigirEmailConfirmado(ctx, u); err != nil {
+		return nil, err
+	}
 	return u, nil
 }
 
-// abrirSessao migra o hash se preciso, emite o JWT e o refresh e marca o
-// último login (os dois últimos passos não derrubam o login).
-func (c *Casos) abrirSessao(ctx context.Context, u *identidade.Usuario, senha identidade.Senha, o Origem) (*SessaoEmitida, error) {
-	c.rehashSeNecessario(ctx, u, senha)
+// abrirSessao emite o JWT e o refresh e marca o último login (os dois
+// últimos passos não derrubam o login). O rehash da senha fica com o login
+// por senha (o login com Google não tem senha, ECOM-02).
+func (c *Casos) abrirSessao(ctx context.Context, u *identidade.Usuario, o Origem) (*SessaoEmitida, error) {
 	acesso, err := c.d.Emissor.Emitir(u.ID, u.Role)
 	if err != nil {
 		log.Printf("[auth] login: GenerateJWT: %v", err)

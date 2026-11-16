@@ -24,6 +24,9 @@ const (
 	StatusSimulado   = "simulado"
 	StatusResetado   = "resetado"
 	StatusFalhaEmail = "falha_email"
+	// StatusPuladoEmailPendente (ECOM-08): conta da loja sem e-mail
+	// confirmado não tem a senha redefinida.
+	StatusPuladoEmailPendente = "pulado_email_pendente"
 )
 
 // ItemResetMassa é o resultado de um usuário no reset em massa.
@@ -53,6 +56,15 @@ func (c *Casos) ResetarSenhasAtivos(ctx context.Context, simular bool) (itens []
 	for i := range ativos {
 		u := &ativos[i]
 		item := ItemResetMassa{ID: u.ID, Email: u.Email, Role: u.Role.String(), Status: StatusSimulado}
+		pendente, err := c.emailPendente(ctx, u, "[usuarios] reset em massa")
+		if err != nil {
+			return itens, fmt.Errorf("reset em massa: usuario_id=%d: %w", u.ID, err)
+		}
+		if pendente {
+			item.Status = StatusPuladoEmailPendente
+			itens = append(itens, item)
+			continue
+		}
 		if simular {
 			itens = append(itens, item)
 			continue

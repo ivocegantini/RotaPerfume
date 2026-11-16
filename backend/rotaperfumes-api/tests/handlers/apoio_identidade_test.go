@@ -37,6 +37,7 @@ type identidadeTeste struct {
 	casos   *identidadeapp.Casos
 	captcha *captchaTrocavel
 	alerta  *alertaTrocavel
+	email   *fakeEmailService // ECOM-03: links de confirmação enviados
 }
 
 // novaIdentidadeTeste monta os casos de uso com captcha (aprova token não
@@ -44,8 +45,9 @@ type identidadeTeste struct {
 func novaIdentidadeTeste(db *sql.DB, cfg *config.Config) *identidadeTeste {
 	c := &captchaTrocavel{v: &fakeCaptchaVerifier{}}
 	a := &alertaTrocavel{}
-	casos := bootstrap.NovaIdentidade(db, cfg, bootstrap.ExtIdentidade{Captcha: c, Publicador: a, Email: &fakeEmailService{}})
-	return &identidadeTeste{AuthHandler: bootstrap.NovoIdentidadeHTTP(casos, cfg).Auth, casos: casos, captcha: c, alerta: a}
+	e := &fakeEmailService{}
+	casos := bootstrap.NovaIdentidade(db, cfg, bootstrap.ExtIdentidade{Captcha: c, Publicador: a, Email: e})
+	return &identidadeTeste{AuthHandler: bootstrap.NovoIdentidadeHTTP(casos, cfg).Auth, casos: casos, captcha: c, alerta: a, email: e}
 }
 
 // captchaTrocavel é o identidadeapp.VerificadorCaptcha do teste.

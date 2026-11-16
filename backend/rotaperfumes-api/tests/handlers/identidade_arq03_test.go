@@ -109,7 +109,8 @@ func TestARQ03_ContratoJSON_ListUsuarios_ByteAByte(t *testing.T) {
 	require.NoError(t, json.NewEncoder(&b).Encode(map[string]any{
 		"success": true,
 		"data": []map[string]any{{"id": int64(2), "id_vendedor": (*int64)(nil), "vendedor_nome": "", "email": "ana@test.com",
-			"role": "normal", "ativo": true, "nome": "Ana", "created_at": criado, "ultimo_login_at": (*time.Time)(nil)}},
+			"role": "normal", "ativo": true, "nome": "Ana", "created_at": criado, "ultimo_login_at": (*time.Time)(nil),
+			"status": "ativo"}}, // ECOM-07: campo aditivo
 		"pagination": map[string]any{"page": 1, "limit": 20, "total": 1, "pages": 1},
 	}))
 	assert.Equal(t, b.String(), string(readBody(t, resp)))

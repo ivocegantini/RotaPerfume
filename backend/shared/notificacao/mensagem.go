@@ -20,6 +20,27 @@ const assuntoAlertaSeguranca = "Alerta de segurança — RotaPerfumes"
 // assuntoSenhaInicial é o assunto do e-mail com a senha gerada.
 const assuntoSenhaInicial = "Sua senha de acesso — RotaPerfumes"
 
+// assuntoConfirmacaoEmail é o assunto do link de confirmação (ECOM-03).
+const assuntoConfirmacaoEmail = "Confirme seu e-mail — RotaPerfumes"
+
+// MensagemConfirmacaoEmail é o e-mail com o link de confirmação do
+// autocadastro da loja (ECOM-03). Nome saneado; o link carrega o token e
+// nunca vai para log.
+func MensagemConfirmacaoEmail(nomeUsuario, link string) Mensagem {
+	nome := removerControles(nomeUsuario)
+	if nome == "" {
+		nome = "cliente"
+	}
+	return Mensagem{
+		Assunto: assuntoConfirmacaoEmail,
+		Corpo: "Olá, " + nome + ".\r\n\r\n" +
+			"Recebemos o seu cadastro na loja RotaPerfumes. Para ativar a conta, confirme o seu e-mail abrindo o link abaixo:\r\n\r\n" +
+			"    " + removerControles(link) + "\r\n\r\n" +
+			"O link vale por 24 horas e só pode ser usado uma vez.\r\n\r\n" +
+			"Se você não fez esse cadastro, ignore este e-mail.\r\n",
+	}
+}
+
 // maxUserAgentAlerta é o tamanho máximo (em runes) do User-Agent no alerta.
 const maxUserAgentAlerta = 120
 

@@ -7,9 +7,21 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
+| DEPLOY-10 | ALTA | migrações 27, 28/29, 30 e 31 + `APP_URL` e `GOOGLE_CLIENT_ID` na produção antes do deploy | 🌸 DataBrain |
+| ECOM-06 | MÉDIA | pendente | 🟡 BackBrain / 🟢 FrontBrain |
+| SEC-60 | MÉDIA | decisão do usuário | 🟣 SecBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
+
+## DEPLOY-10: migrações 27 e 28/29 (loja) na produção — ALTA
+**Ação:** CasaOS :3307 já aplicado (27, 28/29). Na produção: `make db-fix-role-usuario`, `make db-fix-confirmacao-email` `make db-fix-clientes-loja` e `make db-fix-clientes-numero`, com `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>`, **antes** de subir a API do ECOM-01. Google: criar o Client ID com a origem https de produção, pôr `GOOGLE_CLIENT_ID` no `api.env` e no build do frontend (compose já lê; falta o parâmetro no `Jenkinsfile`/`setup-servidor.sh`) (sem ela, o cadastro falha no INSERT).
+
+## ECOM-06: cliente pessoa física no CRM e pedidos da loja — MÉDIA
+**Ação:** a edição de cliente no admin ainda exige CNPJ (um cliente da loja não salva por lá); mostrar CPF/endereço e permitir editar PF. Para o checkout: pedidos exigem vendedor e canal (`App/Telefone/Visita/WhatsApp`) → criar vendedor "Loja Online" e canal `Loja`.
+
+## SEC-60: PII do cliente da loja na conta `casaos_ro` — MÉDIA
+**Ação:** `clientes` está em `TABELAS_RO` e agora guarda CPF e endereço de pessoas físicas. Decidir se a `casaos_ro` perde o SELECT em `clientes` (ou ganha uma view sem `cpf`/`endereco`/`cep`).
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 

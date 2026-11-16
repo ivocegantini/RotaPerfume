@@ -29,6 +29,7 @@ interface UserModalProps {
 const ROLE_OPTIONS = [
   { value: "admin", label: "Administrador" },
   { value: "normal", label: "Usuario Padrao" },
+  { value: "usuario", label: "Cliente da Loja" }, // ECOM-01: sem vendedor
 ];
 
 export function UserModal({

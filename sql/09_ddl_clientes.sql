@@ -44,6 +44,8 @@
 --     caixa. Isso é aceitável e intencional: o Backend normaliza para
 --     MAIÚSCULAS antes de gravar/consultar, então o banco nunca deve conter
 --     minúsculas. Não trocar para utf8mb4_bin sem rever essa premissa.
+--   - ECOM-05 (2026-11-16): cliente da loja (pessoa física): cnpj NULL + cpf,
+--     endereco, cep e usuario_id (login dono). Bancos existentes: sql/30.
 --   - `ativo` vira TINYINT(1) (0/1), convertido de 'S'/'N' do CSV.
 --   - `data_cadastro` vira DATE. O CSV mistura formatos YYYY-MM-DD e
 --     DD/MM/YYYY — o importador Go normaliza ambos antes do INSERT.
@@ -60,22 +62,32 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `clientes` (
     `cliente_id_origem` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'PK — corresponde 1:1 ao cliente_id do CSV de origem (dados/crm/clientes.csv), sem desacoplamento',
-    `cnpj` CHAR(14) NOT NULL COMMENT 'CNPJ normalizado: 14 caracteres, sem máscara, em maiúsculas; 12 primeiras posições em [0-9A-Z] e 2 DVs numéricos (NEG-02)',
+    `cnpj` CHAR(14) NULL DEFAULT NULL COMMENT 'CNPJ normalizado (pessoa jurídica): 14 caracteres, sem máscara, maiúsculas (NEG-02); NULL = pessoa física (cpf)',
+    `cpf` CHAR(11) NULL DEFAULT NULL COMMENT 'CPF (pessoa física, só dígitos); NULL = pessoa jurídica (ECOM-05)',
     `razao_social` VARCHAR(255) NOT NULL COMMENT 'Razão social do cliente',
     `segmento` VARCHAR(80) NOT NULL COMMENT 'Segmento de atuação (ex: Perfumaria, E-commerce)',
     `cidade` VARCHAR(120) NOT NULL COMMENT 'Cidade do cliente',
     `uf` CHAR(2) NOT NULL COMMENT 'UF do estado',
     `bairro` VARCHAR(120) NULL COMMENT 'Bairro do cliente',
+    `endereco` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Logradouro (rua, avenida...; ECOM-05/09)',
+    `numero` VARCHAR(20) NULL DEFAULT NULL COMMENT 'Número do endereço ("s/n" aceito, ECOM-09)',
+    `complemento` VARCHAR(120) NULL DEFAULT NULL COMMENT 'Complemento do endereço (opcional, ECOM-09)',
+    `cep` CHAR(8) NULL DEFAULT NULL COMMENT 'CEP (só dígitos, ECOM-05)',
     `data_cadastro` DATE NOT NULL COMMENT 'Data de cadastro do cliente no CRM de origem',
     `ativo` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '0 = inativo, 1 = ativo (origem: N/S)',
+    `usuario_id` BIGINT NULL DEFAULT NULL COMMENT 'Login da loja dono deste cliente (ECOM-05); NULL = cliente do CRM',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação do registro',
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de última atualização',
     PRIMARY KEY (`cliente_id_origem`),
     UNIQUE KEY `uq_clientes_cnpj` (`cnpj`),
+    UNIQUE KEY `uq_clientes_cpf` (`cpf`),
+    UNIQUE KEY `uq_clientes_usuario` (`usuario_id`),
     KEY `idx_clientes_uf` (`uf`),
     KEY `idx_clientes_segmento` (`segmento`),
     KEY `idx_clientes_ativo` (`ativo`),
-    KEY `idx_clientes_razao_social` (`razao_social`)
+    KEY `idx_clientes_razao_social` (`razao_social`),
+    CONSTRAINT `fk_clientes_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT `chk_clientes_documento` CHECK (`cnpj` IS NOT NULL OR `cpf` IS NOT NULL)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tabela de clientes do CRM';
 
 SET FOREIGN_KEY_CHECKS = 1;

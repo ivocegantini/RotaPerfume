@@ -85,7 +85,7 @@ readonly BACKUP_MAX_HORAS=24
 BACKUP_SCRIPT="$(dirname -- "$0")/backup-mariadb.sh"
 # SEC-51: casaos_ro so le as tabelas de negocio (lista conferida contra a DDL
 # do sql/ordem-ddl.txt por teste). Fora: usuarios (hash de senha, e-mail),
-# refresh_tokens e senha_historico. Tabela nova = entra aqui ou na lista do teste.
+# refresh_tokens, senha_historico e confirmacoes_email (tokens, ECOM-03). Tabela nova = entra aqui ou na lista do teste.
 readonly TABELAS_RO=(vendedores clientes produtos pedidos itens_pedido pagamentos carteiras oportunidades visitas estoque)
 readonly RO_MAX_CONEXOES=5
 readonly RO_MAX_STATEMENT_TIME=30

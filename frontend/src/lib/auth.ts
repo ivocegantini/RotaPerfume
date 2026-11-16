@@ -1,4 +1,4 @@
-import { User } from "./types";
+import { User, UserRole } from "./types";
 import { vlog } from "./vlog";
 
 // ============================================
@@ -87,6 +87,19 @@ export function clearUser(): void {
 
 export function isAdmin(): boolean {
   return getUser()?.role === "admin";
+}
+
+// ECOM-01: tela inicial por papel. O cliente da loja ("usuario") vai para a
+// vitrine; admin para o dashboard; a equipe "normal" para pagamentos.
+export function rotaInicial(role: UserRole | undefined | null = getUser()?.role): string {
+  vlog(F, "rotaInicial", "escolhendo tela inicial, papel:", role);
+  if (role === "admin") return "/dashboard";
+  if (role === "usuario") return "/loja";
+  return "/pagamentos";
+}
+
+export function isUsuarioLoja(): boolean {
+  return getUser()?.role === "usuario";
 }
 
 export function isAuthenticated(): boolean {

@@ -6,4 +6,6 @@ package identidade
 const (
 	AcaoCaptchaLogin      = "login"
 	AcaoCaptchaResetSenha = "reset-senha"
+	AcaoCaptchaCadastro   = "cadastro"             // ECOM-01
+	AcaoCaptchaReenvio    = "reenviar-confirmacao" // ECOM-03
 )

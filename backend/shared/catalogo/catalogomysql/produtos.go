@@ -59,6 +59,10 @@ func whereProduto(f catalogo.FiltroProduto) (string, []any) {
 		conds = append(conds, "marca = ?")
 		args = append(args, f.Marca)
 	}
+	if f.NotaOlfativa != "" {
+		conds = append(conds, "nota_olfativa = ?")
+		args = append(args, f.NotaOlfativa)
+	}
 	if f.Ativo != nil {
 		conds = append(conds, "ativo = ?")
 		args = append(args, *f.Ativo)
@@ -226,4 +230,34 @@ func scanProduto(s linha) (*catalogo.Produto, error) {
 		p.DataLancamento = &dataLancamento.Time
 	}
 	return &p, nil
+}
+
+// OpcoesFiltroLoja lê os valores distintos de categoria, marca e nota
+// olfativa dos produtos ativos (ECOM-04). As colunas vêm de uma lista fixa,
+// nunca do cliente.
+func (r *Produtos) OpcoesFiltroLoja(ctx context.Context) (catalogo.OpcoesFiltroLoja, error) {
+	var o catalogo.OpcoesFiltroLoja
+	for _, alvo := range []struct {
+		coluna string
+		dest   *[]string
+	}{{"categoria", &o.Categorias}, {"marca", &o.Marcas}, {"nota_olfativa", &o.NotasOlfativas}} {
+		q := "SELECT DISTINCT " + alvo.coluna + " FROM produtos WHERE ativo = 1 AND " + alvo.coluna +
+			" IS NOT NULL AND " + alvo.coluna + " <> '' ORDER BY " + alvo.coluna
+		vals, err := db.Consultar(ctx, r.q, "catalogomysql: opções da loja ("+alvo.coluna+")", q, nil, scanTexto)
+		if err != nil {
+			return catalogo.OpcoesFiltroLoja{}, err
+		}
+		*alvo.dest = vals
+	}
+	vlog.Printf(arqProdutos, "Produtos.OpcoesFiltroLoja", "SELECT DISTINCT categorias=%d marcas=%d notas=%d",
+		len(o.Categorias), len(o.Marcas), len(o.NotasOlfativas))
+	return o, nil
+}
+
+func scanTexto(l db.Linha) (*string, error) {
+	var v string
+	if err := l.Scan(&v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }

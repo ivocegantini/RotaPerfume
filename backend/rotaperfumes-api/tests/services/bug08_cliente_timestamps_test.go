@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const reGetClienteByID = `SELECT ` + `cliente_id_origem, cnpj, razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at` + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`
+const reGetClienteByID = `SELECT ` + `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at` + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`
 
 func clienteGravadoRows(id int64, criado time.Time) *sqlmock.Rows {
 	return sqlmock.NewRows([]string{

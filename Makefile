@@ -1,4 +1,4 @@
-.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test test-all lint shellcheck \
+.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-role-usuario db-revert-role-usuario db-fix-confirmacao-email db-revert-confirmacao-email db-fix-clientes-loja db-revert-clientes-loja db-fix-clientes-numero db-revert-clientes-numero db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test test-all lint shellcheck \
 	build build-api run-api dev-api stop-api \
 	test-api cover-api test-shared cover-shared arch-check cover-combinada gen-hash fix-hash \
 	frontend-deps \
@@ -342,6 +342,31 @@ db-fix-produtos-imagem: db-guard-producao db-check-env ## Adiciona produtos.imag
 
 db-revert-produtos-imagem: db-guard-producao db-check-env ## Reverte db-fix-produtos-imagem (remove CHECK, UNIQUE e coluna; perde os vinculos produto->imagem, arquivos ficam orfaos)
 	$(DB_CLI) $(DB_NAME) < sql/26_revert_produtos_imagem.sql
+
+db-fix-role-usuario: db-guard-producao db-check-env ## Adiciona 'usuario' ao ENUM usuarios.role (ECOM-01, cliente da loja; nao destrutivo, idempotente)
+	$(DB_CLI) $(DB_NAME) < sql/27_alter_usuarios_role_usuario.sql
+
+db-revert-role-usuario: db-guard-producao db-check-env ## Reverte db-fix-role-usuario (aborta se houver usuario com role 'usuario')
+	$(DB_CLI) $(DB_NAME) < sql/27_revert_usuarios_role_usuario.sql
+
+db-fix-confirmacao-email: db-guard-producao db-check-env ## Cria confirmacoes_email + usuarios.email_confirmacao_pendente (ECOM-03; nao destrutivo, idempotente)
+	$(DB_CLI) $(DB_NAME) < sql/28_ddl_confirmacoes_email.sql
+	$(DB_CLI) $(DB_NAME) < sql/29_alter_usuarios_email_confirmacao.sql
+
+db-revert-confirmacao-email: db-guard-producao db-check-env ## Reverte db-fix-confirmacao-email (apaga a tabela e a coluna; contas pendentes passam a entrar)
+	$(DB_CLI) $(DB_NAME) < sql/29_revert_usuarios_email_confirmacao.sql
+
+db-fix-clientes-loja: db-guard-producao db-check-env ## ECOM-05: clientes aceita pessoa fisica (cnpj NULL, cpf, endereco, cep, usuario_id; nao destrutivo, idempotente)
+	$(DB_CLI) $(DB_NAME) < sql/30_alter_clientes_loja.sql
+
+db-revert-clientes-loja: db-guard-producao db-check-env ## Reverte db-fix-clientes-loja (aborta se houver cliente pessoa fisica)
+	$(DB_CLI) $(DB_NAME) < sql/30_revert_clientes_loja.sql
+
+db-fix-clientes-numero: db-guard-producao db-check-env ## ECOM-09: clientes.numero e clientes.complemento (endereco vira logradouro; nao destrutivo, idempotente)
+	$(DB_CLI) $(DB_NAME) < sql/31_alter_clientes_numero_complemento.sql
+
+db-revert-clientes-numero: db-guard-producao db-check-env ## Reverte db-fix-clientes-numero (perde numero e complemento gravados)
+	$(DB_CLI) $(DB_NAME) < sql/31_revert_clientes_numero_complemento.sql
 
 # IMG-01: gera um PNG por produto (nome na diagonal) pelo mesmo caso de uso do
 # upload, no PRODUTO_IMAGENS_DIR (padrão backend/rotaperfumes-api/data/produtos-imagens).

@@ -39,6 +39,7 @@ const (
 	politicaPublic politicaRota = iota + 1
 	politicaAuthenticated
 	politicaAdminOnly
+	politicaAnyRole // ECOM-01: inclui o "usuario" da loja
 )
 
 func (p politicaRota) String() string {
@@ -49,6 +50,8 @@ func (p politicaRota) String() string {
 		return "Authenticated"
 	case politicaAdminOnly:
 		return "AdminOnly"
+	case politicaAnyRole:
+		return "AnyRole"
 	}
 	return "INDEFINIDA"
 }
@@ -62,6 +65,8 @@ func politicaDe(p httpx.Policy) politicaRota {
 		return politicaAuthenticated
 	case httpx.AdminOnly:
 		return politicaAdminOnly
+	case httpx.AnyRole:
+		return politicaAnyRole
 	}
 	return 0
 }
@@ -98,8 +103,16 @@ var matrizRotas = []rotaMatriz{
 	{"POST /api/auth/login", politicaPublic, p("/api/auth/login"), false},
 	{"POST /api/auth/refresh", politicaPublic, p("/api/auth/refresh"), false},
 	{"POST /api/auth/logout", politicaPublic, p("/api/auth/logout"), false},
-	{"POST /api/auth/reset-password", politicaAuthenticated, p("/api/auth/reset-password"), true},
-	{"GET /api/auth/me", politicaAuthenticated, p("/api/auth/me"), true},
+	{"POST /api/auth/cadastro", politicaPublic, p("/api/auth/cadastro"), false},
+	{"POST /api/auth/google", politicaPublic, p("/api/auth/google"), false},                             // ECOM-02
+	{"POST /api/auth/google/cadastro", politicaPublic, p("/api/auth/google/cadastro"), false},           // ECOM-02
+	{"POST /api/auth/confirmar-email", politicaPublic, p("/api/auth/confirmar-email"), false},           // ECOM-03
+	{"POST /api/auth/reenviar-confirmacao", politicaPublic, p("/api/auth/reenviar-confirmacao"), false}, // ECOM-03
+	{"POST /api/auth/reset-password", politicaAnyRole, p("/api/auth/reset-password"), true},
+	{"GET /api/auth/me", politicaAnyRole, p("/api/auth/me"), true},
+	// Loja (ECOM-01)
+	{"GET /api/loja/produtos", politicaAnyRole, p("/api/loja/produtos"), false},
+	{"GET /api/loja/filtros", politicaAnyRole, p("/api/loja/filtros"), false}, // ECOM-04
 	// Usuários / admin
 	{"GET /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
 	{"POST /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
@@ -254,7 +267,9 @@ func casosDaMatriz(filtro func(politicaRota) bool) []casoMatriz {
 	return out
 }
 
-func protegida(p politicaRota) bool { return p == politicaAuthenticated || p == politicaAdminOnly }
+func protegida(p politicaRota) bool {
+	return p == politicaAuthenticated || p == politicaAdminOnly || p == politicaAnyRole
+}
 
 // assertSecurityHeaders confere os headers do SecurityHeadersMiddleware que
 // independem do host (HSTS fica de fora: depende de r.Host).
@@ -311,12 +326,12 @@ func TestARQ00_Matriz_CobreTodasAsRotasDeRoutesGo(t *testing.T) {
 	assert.Empty(t, faltando, "rotas registradas no router SEM política na matriz ARQ-00 — adicione-as a matrizRotas")
 	assert.Empty(t, sobrando, "rotas na matriz ARQ-00 que NÃO estão mais no router — remova-as ou corrija o padrão")
 	assert.Empty(t, divergentes, "política registrada no router diverge da matriz ARQ-00")
-	assert.Len(t, registradas, 64, "a API registra 64 padrões (5 Public, 36 Authenticated, 23 AdminOnly)")
+	assert.Len(t, registradas, 71, "a API registra 71 padrões (10 Public, 34 Authenticated, 23 AdminOnly, 4 AnyRole)")
 	porPolitica := map[politicaRota]int{}
 	for _, rt := range registradas {
 		porPolitica[politicaDe(rt.Policy)]++
 	}
-	assert.Equal(t, map[politicaRota]int{politicaPublic: 5, politicaAuthenticated: 36, politicaAdminOnly: 23}, porPolitica,
+	assert.Equal(t, map[politicaRota]int{politicaPublic: 10, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 4}, porPolitica,
 		"contagem por política registrada no router")
 }
 
@@ -325,7 +340,7 @@ func TestARQ00_Matriz_Sanidade(t *testing.T) {
 	for _, r := range matrizRotas {
 		assert.False(t, vistos[r.padrao], "padrão duplicado na matriz: %q", r.padrao)
 		vistos[r.padrao] = true
-		assert.Contains(t, []politicaRota{politicaPublic, politicaAuthenticated, politicaAdminOnly}, r.politica,
+		assert.Contains(t, []politicaRota{politicaPublic, politicaAuthenticated, politicaAdminOnly, politicaAnyRole}, r.politica,
 			"%q sem política válida", r.padrao)
 		assert.NotEmpty(t, r.paths, "%q sem path de exemplo", r.padrao)
 		metodo, caminho, ok := strings.Cut(r.padrao, " ")
@@ -341,7 +356,7 @@ func TestARQ00_Matriz_Sanidade(t *testing.T) {
 		}
 	}
 	sort.Strings(publicas)
-	assert.Equal(t, []string{"GET /api/public/produtos/imagens/{arquivo}", "GET /health", "POST /api/auth/login", "POST /api/auth/logout", "POST /api/auth/refresh"}, publicas)
+	assert.Equal(t, []string{"GET /api/public/produtos/imagens/{arquivo}", "GET /health", "POST /api/auth/cadastro", "POST /api/auth/confirmar-email", "POST /api/auth/google", "POST /api/auth/google/cadastro", "POST /api/auth/login", "POST /api/auth/logout", "POST /api/auth/reenviar-confirmacao", "POST /api/auth/refresh"}, publicas)
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +448,7 @@ func TestARQ00_RotaAdminOnly_Admin_PassaMiddleware(t *testing.T) {
 // Authenticated com usuário normal ativo → passa o middleware (consulta o
 // checker 1x). O handler falha no banco sem expectativas; o corpo não é validado.
 func TestARQ00_RotaAuthenticated_UsuarioNormal_PassaMiddleware(t *testing.T) {
-	for _, c := range casosDaMatriz(func(p politicaRota) bool { return p == politicaAuthenticated }) {
+	for _, c := range casosDaMatriz(func(p politicaRota) bool { return p == politicaAuthenticated || p == politicaAnyRole }) {
 		t.Run(c.nome, func(t *testing.T) {
 			calls := 0
 			h, _ := arq00Router(t, fakeUserStatusChecker{calls: &calls})
@@ -442,6 +457,41 @@ func TestARQ00_RotaAuthenticated_UsuarioNormal_PassaMiddleware(t *testing.T) {
 			assert.NotEqual(t, http.StatusUnauthorized, w.Code, "body: %s", w.Body.String())
 			assert.NotContains(t, w.Body.String(), msgAdminRestrito)
 			assert.Equal(t, 1, calls, "rota protegida com token válido deve consultar o checker")
+		})
+	}
+}
+
+// ECOM-01: o "usuario" da loja (role do BANCO) é barrado com 403 em toda
+// rota interna (Authenticated e AdminOnly), mesmo com token "normal", sem
+// chegar ao handler.
+func TestARQ00_RotaInterna_UsuarioLoja_403(t *testing.T) {
+	interna := func(p politicaRota) bool { return p == politicaAuthenticated || p == politicaAdminOnly }
+	for _, c := range casosDaMatriz(interna) {
+		t.Run(c.nome, func(t *testing.T) {
+			calls := 0
+			h, mock := arq00Router(t, fakeUserStatusChecker{calls: &calls,
+				status: map[int64]identidade.StatusAcesso{3: {Ativo: true, Role: "usuario"}}})
+			w := arq00Serve(h, c.method, c.path, token(t, 3, "normal"), "")
+
+			assert.Equal(t, http.StatusForbidden, w.Code)
+			assert.Contains(t, w.Body.String(), "acesso restrito à equipe interna")
+			assert.Equal(t, 1, calls)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+// ECOM-01: o "usuario" da loja passa nas rotas AnyRole (me, troca de senha,
+// vitrine).
+func TestARQ00_RotaAnyRole_UsuarioLoja_PassaMiddleware(t *testing.T) {
+	for _, c := range casosDaMatriz(func(p politicaRota) bool { return p == politicaAnyRole }) {
+		t.Run(c.nome, func(t *testing.T) {
+			h, _ := arq00Router(t, fakeUserStatusChecker{
+				status: map[int64]identidade.StatusAcesso{3: {Ativo: true, Role: "usuario"}}})
+			w := arq00Serve(h, c.method, c.path, token(t, 3, "usuario"), "")
+
+			assert.NotEqual(t, http.StatusUnauthorized, w.Code, "body: %s", w.Body.String())
+			assert.NotEqual(t, http.StatusForbidden, w.Code, "body: %s", w.Body.String())
 		})
 	}
 }

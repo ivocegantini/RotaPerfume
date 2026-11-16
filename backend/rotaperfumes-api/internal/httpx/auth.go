@@ -21,6 +21,7 @@ const (
 	msgUsuarioInativo   = "usuário inativo"
 	msgSessaoEncerrada  = "sessão encerrada — faça login novamente"
 	msgSoAdmin          = "acesso restrito a administradores"
+	msgSoEquipeInterna  = "acesso restrito à equipe interna"
 )
 
 // msgTrocaSenhaObrigatoria é o 403 de quem ainda precisa trocar a senha
@@ -53,7 +54,9 @@ type ConsultaStatus interface {
 //     (todos os papéis), depois dos 401/500 acima e antes do AdminOnly; só
 //     as rotas com Rota.LiberaTrocaSenhaPendente passam;
 //   - I-05: AuthZ pelo role do BANCO; só "admin" exato passa em AdminOnly;
-//     role desconhecido é restrito, com log (R-a).
+//     role desconhecido é restrito, com log (R-a);
+//   - ECOM-01: o role "usuario" (loja) só passa em AnyRole; em
+//     Authenticated/AdminOnly é 403 msgSoEquipeInterna.
 //
 // O Principal só nasce aqui (O5), depois de tudo aprovado, e vai para o
 // contexto com chave de tipo não exportado (O4).
@@ -83,7 +86,7 @@ func (a *Autenticador) ComCookieSeguro(seguro bool) *Autenticador {
 
 // Exigir envolve next com a autenticação da política. Public não passa por
 // aqui (rota pública não consulta o banco); qualquer valor fora de
-// {Authenticated, AdminOnly} é bug: panic na montagem (O2). Usuário com
+// {Authenticated, AdminOnly, AnyRole} é bug: panic na montagem (O2). Usuário com
 // troca de senha pendente é barrado com 403 (SEC-23).
 func (a *Autenticador) Exigir(p Policy, next http.Handler) http.Handler {
 	return a.exigir(p, next, false)
@@ -99,15 +102,26 @@ func (a *Autenticador) ExigirLiberandoTrocaPendente(p Policy, next http.Handler)
 func (a *Autenticador) exigir(p Policy, next http.Handler, liberaTroca bool) http.Handler {
 	switch p {
 	case Authenticated:
-		return a.autenticar(next, false, liberaTroca)
+		return a.autenticar(next, nivelInterno, liberaTroca)
 	case AdminOnly:
-		return a.autenticar(next, true, liberaTroca)
+		return a.autenticar(next, nivelAdmin, liberaTroca)
+	case AnyRole:
+		return a.autenticar(next, nivelQualquer, liberaTroca)
 	default:
 		panic("httpx: Exigir com política inválida: " + p.String())
 	}
 }
 
-func (a *Autenticador) autenticar(next http.Handler, exigeAdmin, liberaTroca bool) http.Handler {
+// nivel é o papel mínimo exigido pela política.
+type nivel uint8
+
+const (
+	nivelQualquer nivel = iota // AnyRole
+	nivelInterno               // Authenticated: barra o "usuario" da loja
+	nivelAdmin                 // AdminOnly
+)
+
+func (a *Autenticador) autenticar(next http.Handler, n nivel, liberaTroca bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, msg := a.validarToken(r)
 		if msg != "" {
@@ -124,7 +138,12 @@ func (a *Autenticador) autenticar(next http.Handler, exigeAdmin, liberaTroca boo
 			JSON(w, http.StatusForbidden, nil, msgTrocaSenhaObrigatoria)
 			return
 		}
-		if exigeAdmin && !role.EhAdmin() {
+		if n != nivelQualquer && role.EhUsuarioLoja() {
+			log.Printf("[auth] acesso negado: user_id=%d role=usuario em rota interna %s %s", claims.UserID, r.Method, kernel.SanearRota(r.URL.Path))
+			JSON(w, http.StatusForbidden, nil, msgSoEquipeInterna)
+			return
+		}
+		if n == nivelAdmin && !role.EhAdmin() {
 			JSON(w, http.StatusForbidden, nil, msgSoAdmin)
 			return
 		}

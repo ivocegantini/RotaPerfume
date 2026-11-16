@@ -171,6 +171,10 @@ As tabelas de backup da migração 19 (seção 19) não têm FK e ficam fora do 
 | 23 | `23_alter_refresh_tokens_reuso_detectado_em.sql` | Adiciona `refresh_tokens.reuso_detectado_em` (SEC-12, idempotente) | `db-fix-reuso-detectado` | Sim: `23_revert_...`, `db-revert-reuso-detectado` (perde as marcas de reuso) |
 | 24 | `24_alter_pagamentos_taxa_pct_check.sql` | Cria o CHECK `chk_pagamentos_taxa_pct` (0 a 30) em `pagamentos` (SEC-27, idempotente; aborta sem alterar dados se houver linha fora da faixa) | `db-fix-taxa-pct-check` | Sim: `24_revert_...`, `db-revert-taxa-pct-check` (só remove o CHECK) |
 | 26 | `26_alter_produtos_imagem.sql` | Adiciona `produtos.imagem` (VARCHAR(41) NULL), o UNIQUE `uk_produtos_imagem` e o CHECK `chk_produtos_imagem` (IMG-01, Lote 26, idempotente; linhas existentes ficam NULL) | `db-fix-produtos-imagem` | Sim: `26_revert_...`, `db-revert-produtos-imagem` (remove CHECK, UNIQUE e coluna; os arquivos em disco ficam órfãos) |
+| 27 | `27_alter_usuarios_role_usuario.sql` | Adiciona `'usuario'` ao ENUM `usuarios.role` (cliente da loja, ECOM-01; não altera dados, idempotente) | `db-fix-role-usuario` | Sim: `27_revert_...`, `db-revert-role-usuario` (aborta se houver usuário `usuario`) |
+| 28/29 | `28_ddl_confirmacoes_email.sql` + `29_alter_usuarios_email_confirmacao.sql` | Tabela `confirmacoes_email` (só o SHA-256 do token, uso único, 24h) e `usuarios.email_confirmacao_pendente` (padrão 0; só o autocadastro grava 1) (ECOM-03, idempotente) | `db-fix-confirmacao-email` | Sim: `29_revert_...`, `db-revert-confirmacao-email` (contas pendentes passam a entrar) |
+| 30 | `30_alter_clientes_loja.sql` | `clientes` aceita pessoa física da loja: `cnpj` NULL, `cpf` (UNIQUE), `endereco`, `cep`, `usuario_id` (UNIQUE, FK usuarios SET NULL) e CHECK `chk_clientes_documento` (cnpj ou cpf) (ECOM-05, idempotente, não altera linhas) | `db-fix-clientes-loja` | Sim: `30_revert_...`, `db-revert-clientes-loja` (aborta se houver cliente sem CNPJ) |
+| 31 | `31_alter_clientes_numero_complemento.sql` | `clientes.numero` e `clientes.complemento`; `endereco` passa a ser o logradouro e o CEP fica opcional no cadastro da loja (ECOM-09, idempotente, não altera linhas) | `db-fix-clientes-numero` | Sim: `31_revert_...`, `db-revert-clientes-numero` (perde número e complemento) |
 
 - As migrações de alteração (08, 13, 18 a 24 e 26) **não** fazem parte do `db-up`/`db-seed`/`db-reset`. Servem para bancos criados antes da mudança. Desde o DB-01 (Lote 12), **todos** os DDLs base nascem com o resultado delas, inclusive o 17 (sem `estoque.origem`).
 - Todos os alvos que chamam o cliente `mariadb` (`db-create`, `db-down`, `db-fix-*`, `db-revert-*`; `db-up`/`db-seed` herdam via `db-create`; `db-reset`/`db-rebuild` chamam `db-down` e `db-seed` por sub-make, BUG-27) dependem de `db-check-env` e exigem `DB_USUARIO`/`DB_SENHA` no `.env` (SEC-11, seção 23) e o `mariadb` (MariaDB ≥ 11.4) no `PATH` (DB-03). O `Makefile` passa `--local-infile=0` (SEC-28). Os cabeçalhos dos scripts ensinam a execução manual com `MYSQL_PWD="$DB_SENHA" mariadb -u $DB_USUARIO -h ...`, sem `-p` no argv.
@@ -213,7 +217,7 @@ Vendedores do CRM. Criada em `01_ddl_usuarios.sql` para servir de destino à FK 
 
 ## 6. Tabela `usuarios`
 
-Usuários de login do sistema, com papel (`admin`/`normal`) e vínculo opcional a um vendedor.
+Usuários de login do sistema, com papel (`admin`/`normal`/`usuario`) e vínculo opcional a um vendedor.
 
 | Campo | Tipo | Nulo | Default | Descrição |
 | --- | --- | --- | --- | --- |
@@ -221,10 +225,11 @@ Usuários de login do sistema, com papel (`admin`/`normal`) e vínculo opcional 
 | `nome` | VARCHAR(120) | não | - | Nome completo. |
 | `email` | VARCHAR(120) | não | - | E-mail de login. **Único** (`uk_usuarios_email`). A API grava em minúsculas e sem espaços nas pontas. |
 | `password_hash` | VARCHAR(255) | não | - | Hash Argon2id com pepper, formato PHC `$argon2id$v=19$m=..,t=..,p=..$salt$hash` (SEC-13); hashes bcrypt antigos (`$2a$`/`$2b$`) ainda são aceitos e migram no próximo login. Os seeds gravam um placeholder que o `resetpassword` troca. |
-| `role` | ENUM('admin','normal') | não | 'normal' | Papel. `admin` acessa as rotas de administração. |
+| `role` | ENUM('admin','normal','usuario') | não | 'normal' | Papel. `admin` acessa as rotas de administração; `usuario` é o cliente da loja (ECOM-01): só vê `/loja`, recebe 403 nas rotas internas e nunca tem vendedor. |
 | `id_vendedor` | BIGINT | sim | NULL | FK `fk_usuarios_vendedor` → `vendedores.id` (`ON DELETE SET NULL`, `ON UPDATE CASCADE`). Define o escopo de dados do usuário `normal`. |
 | `ativo` | TINYINT(1) | não | 1 | 1 = ativo, 0 = inativo (exclusão lógica). |
 | `deve_trocar_senha` | TINYINT(1) | não | 0 | 1 = deve trocar a senha no próximo login (senha gerada pelo sistema). Migração 08. |
+| `email_confirmacao_pendente` | TINYINT(1) | não | 0 | 1 = autocadastro da loja aguardando o link de confirmação (ECOM-03): o login do `usuario` responde 403. Contas criadas pelo admin ficam 0. |
 | `tokens_validos_desde` | DATETIME | sim | NULL | Corte de sessão. Migração 22, seção 6.1. |
 | `created_at`, `updated_at` | TIMESTAMP | não | CURRENT_TIMESTAMP | Controle. |
 | `ultimo_login_at` | TIMESTAMP | sim | NULL | Data do último login. |

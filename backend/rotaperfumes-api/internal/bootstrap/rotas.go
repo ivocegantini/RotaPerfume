@@ -23,7 +23,7 @@ func HandlerHTTP(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) h
 	)
 }
 
-// NovoRouter registra as 64 rotas da API com método e política obrigatórios.
+// NovoRouter registra as 71 rotas da API com método e política obrigatórios.
 // Rotas() do router devolvido é a fonte da matriz ARQ-00.
 func NovoRouter(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) *httpx.Router {
 	r := httpx.NovoRouter(httpx.NovoAutenticador(identidadecrypto.NovoJWT(cfg), checker).ComCookieSeguro(cfg.CookieSecure))
@@ -43,6 +43,7 @@ const (
 	publica = httpx.Public
 	autent  = httpx.Authenticated
 	admin   = httpx.AdminOnly
+	todos   = httpx.AnyRole // ECOM-01: inclui o "usuario" da loja
 )
 
 // rotas é a tabela declarativa. Os 13 padrões que antes não fixavam método
@@ -62,6 +63,7 @@ func rotas(h Handlers) []httpx.Rota {
 		fVisita = "visita_handler.go"
 		fEstq   = "estoque_handler.go"
 		fImg    = "imagem_handler.go"
+		fLoja   = "loja_handler.go"
 	)
 	return []httpx.Rota{
 		// Autenticação (login/refresh/logout públicos; refresh e logout leem o
@@ -70,8 +72,13 @@ func rotas(h Handlers) []httpx.Rota {
 		{Metodo: post, Padrao: "/api/auth/login", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.Login", Handler: h.Auth.Login},
 		{Metodo: post, Padrao: "/api/auth/refresh", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.Refresh", Handler: h.Auth.Refresh},
 		{Metodo: post, Padrao: "/api/auth/logout", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.Logout", Handler: h.Auth.Logout},
-		{Metodo: post, Padrao: "/api/auth/reset-password", Policy: autent, Arquivo: fAuth, Funcao: "AuthHandler.ResetPassword", Handler: h.Auth.ResetPassword, LiberaTrocaSenhaPendente: true},
-		{Metodo: get, Padrao: "/api/auth/me", Policy: autent, Arquivo: fAuth, Funcao: "AuthHandler.Me", Handler: h.Auth.Me, LiberaTrocaSenhaPendente: true},
+		{Metodo: post, Padrao: "/api/auth/cadastro", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.Cadastro", Handler: h.Auth.Cadastro},
+		{Metodo: post, Padrao: "/api/auth/google", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.Google", Handler: h.Auth.Google},
+		{Metodo: post, Padrao: "/api/auth/google/cadastro", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.GoogleCadastro", Handler: h.Auth.GoogleCadastro},
+		{Metodo: post, Padrao: "/api/auth/confirmar-email", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.ConfirmarEmail", Handler: h.Auth.ConfirmarEmail},
+		{Metodo: post, Padrao: "/api/auth/reenviar-confirmacao", Policy: publica, Arquivo: fAuth, Funcao: "AuthHandler.ReenviarConfirmacao", Handler: h.Auth.ReenviarConfirmacao},
+		{Metodo: post, Padrao: "/api/auth/reset-password", Policy: todos, Arquivo: fAuth, Funcao: "AuthHandler.ResetPassword", Handler: h.Auth.ResetPassword, LiberaTrocaSenhaPendente: true},
+		{Metodo: get, Padrao: "/api/auth/me", Policy: todos, Arquivo: fAuth, Funcao: "AuthHandler.Me", Handler: h.Auth.Me, LiberaTrocaSenhaPendente: true},
 
 		// Usuários (admin).
 		{Metodo: get, Padrao: "/api/usuarios", Policy: admin, Arquivo: fUser, Funcao: "UsuarioHandler.ListUsuarios", Handler: h.Usuario.ListUsuarios},
@@ -116,6 +123,11 @@ func rotas(h Handlers) []httpx.Rota {
 		{Metodo: get, Padrao: "/api/produtos/{id}", Policy: autent, Arquivo: fProd, Funcao: "ProdutoHandler.GetProduto", Handler: h.Produto.GetProduto},
 		{Metodo: put, Padrao: "/api/produtos/{id}", Policy: admin, Arquivo: fProd, Funcao: "ProdutoHandler.UpdateProduto", Handler: h.Produto.UpdateProduto},
 		{Metodo: patch, Padrao: "/api/produtos/{id}/inativar", Policy: admin, Arquivo: fProd, Funcao: "ProdutoHandler.ToggleAtivoProduto", Handler: h.Produto.ToggleAtivoProduto},
+
+		// Loja (ECOM-01): vitrine para qualquer usuário logado, só ativos e
+		// sem custo.
+		{Metodo: get, Padrao: "/api/loja/produtos", Policy: todos, Arquivo: fLoja, Funcao: "ProdutoHandler.ListProdutosLoja", Handler: h.Produto.ListProdutosLoja},
+		{Metodo: get, Padrao: "/api/loja/filtros", Policy: todos, Arquivo: fLoja, Funcao: "ProdutoHandler.OpcoesFiltroLoja", Handler: h.Produto.OpcoesFiltroLoja},
 
 		// Imagem do produto (IMG-01): upload/remoção admin; leitura pública
 		// (aprovada pelo SecBrain), por handler próprio sem FileServer.

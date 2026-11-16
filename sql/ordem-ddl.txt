@@ -5,6 +5,8 @@
 01_ddl_usuarios.sql
 06_ddl_refresh_tokens.sql
 07_ddl_senha_historico.sql
+# confirmacoes_email depende de usuarios (ECOM-03)
+28_ddl_confirmacoes_email.sql
 09_ddl_clientes.sql
 10_ddl_produtos.sql
 # pedidos depende de clientes + vendedores

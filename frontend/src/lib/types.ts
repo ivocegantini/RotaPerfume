@@ -25,7 +25,9 @@ export interface SenhaHistoricoResponse {
   pages: number;
 }
 
-export type UserRole = "admin" | "normal";
+// ECOM-01: "usuario" e o cliente da loja (so ve /loja; o backend barra as
+// rotas internas com 403).
+export type UserRole = "admin" | "normal" | "usuario";
 
 export interface User {
   id: number;
@@ -37,7 +39,12 @@ export interface User {
   updated_at?: string;
   id_vendedor?: number | null;
   vendedor_nome?: string | null;
+  // ECOM-07: so na listagem do admin. pendente_email = autocadastro que ainda
+  // nao confirmou o e-mail (login bloqueado).
+  status?: StatusUsuario;
 }
+
+export type StatusUsuario = "ativo" | "inativo" | "pendente_email";
 
 // Resposta de GET /api/auth/me. `vendedor_desligado` e `trocar_senha` so
 // existem em memoria (session.ts): nunca sao gravados no localStorage
@@ -116,6 +123,78 @@ export interface LoginRequest {
   email: string;
   password: string;
   captchaToken?: string;
+}
+
+// ECOM-01: POST /api/auth/cadastro (o role nunca vai no corpo).
+export interface CadastroRequest {
+  nome: string;
+  email: string;
+  password: string;
+  captchaToken?: string;
+  // ECOM-05/09: cliente pessoa fisica criado junto com o login. endereco =
+  // logradouro; cep, bairro e complemento podem ficar vazios.
+  cpf: string;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cep: string;
+  cidade: string;
+  uf: string;
+}
+
+// ECOM-03: resposta do cadastro (conta pendente, SEM sessao).
+export interface CadastroResponse {
+  email: string;
+  email_enviado: boolean;
+  mensagem: string;
+}
+
+// ECOM-01: item de GET /api/loja/produtos (sem custo nem dados internos).
+export interface ProdutoLoja {
+  id: number;
+  sku: string;
+  descricao: string;
+  categoria: string;
+  marca: string;
+  nota_olfativa: string;
+  preco: number;
+  unidade: string;
+  imagem_url: string | null;
+}
+
+// ECOM-04: GET /api/loja/filtros (valores dos produtos ativos).
+export interface OpcoesFiltroLoja {
+  categorias: string[];
+  marcas: string[];
+  notas_olfativas: string[];
+}
+
+// ECOM-04: filtros exatos da vitrine ("" = sem filtro).
+export interface FiltrosLoja {
+  categoria?: string;
+  marca?: string;
+  nota_olfativa?: string;
+}
+
+// ECOM-02: POST /api/auth/google sem conta para o e-mail do Google.
+export interface GoogleCadastroNecessario {
+  cadastro_necessario: true;
+  email: string;
+  nome: string;
+}
+
+// ECOM-02: corpo de POST /api/auth/google/cadastro.
+export interface GoogleCadastroRequest {
+  credential: string;
+  cpf: string;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cep: string;
+  cidade: string;
+  uf: string;
 }
 
 export interface LoginResponse {

@@ -30,6 +30,17 @@ func CamposOrdenacaoProduto() []CampoProduto {
 	}
 }
 
+// CamposOrdenacaoLoja é a whitelist da vitrine (ECOM-01): sem custo, ativo
+// nem datas internas, para não vazar informação pela ordem.
+func CamposOrdenacaoLoja() []CampoProduto {
+	return []CampoProduto{OrdemProdutoDescricao, OrdemProdutoCategoria, OrdemProdutoMarca, OrdemProdutoPrecoTabela}
+}
+
+// OrdenacaoLojaPadrao é "descricao ASC".
+func OrdenacaoLojaPadrao() kernel.Ordenacao[CampoProduto] {
+	return kernel.NovaOrdenacao(OrdemProdutoDescricao, kernel.Asc)
+}
+
 // OrdenacaoProdutoPadrao é "id ASC" (comportamento de sempre).
 func OrdenacaoProdutoPadrao() kernel.Ordenacao[CampoProduto] {
 	return kernel.NovaOrdenacao(OrdemProdutoID, kernel.Asc)

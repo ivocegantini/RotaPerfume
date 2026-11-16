@@ -12,6 +12,20 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-16: LEGAL-01 páginas legais (não commitado)
+- LEGAL-01: `frontend/public/politica-de-privacidade.html` (LGPD) e `termos-de-servico.html` (CDC), HTML estático com texto genérico. Falta trocar `[e-mail de contato]` e revisão jurídica.
+
+## Lote 42 de 2026-11-16: ECOM-01 início do e-commerce (não commitado)
+> Testes: `make test` rc=0; `make lint` ok; frontend 1840 ok; `next build` ok (`/cadastro`, `/loja`).
+- ECOM-09: endereço pelo CEP (ViaCEP no navegador, só o CEP sai; preenche rua/bairro/cidade/UF, tudo editável); CEP opcional (endereço sem CEP); rua, número ("s/n") e complemento separados; bairro gravado (migração 31: `numero`, `complemento`). Vale no cadastro normal e no com Google. Frontend 1891 ok.
+- ECOM-02: "Entrar/Criar conta com Google" (Google Identity Services): ID token validado no backend (RS256/JWKS, iss, aud, exp, email_verified; `adapters/googleid`); só cliente da loja entra pelo Google (pendente vira confirmada); sem conta, o cadastro abre preenchido pedindo CPF/endereço; conta nasce confirmada, sem senha utilizável. `GOOGLE_CLIENT_ID`/`NEXT_PUBLIC_GOOGLE_CLIENT_ID` (vazio = desligado). Frontend 1879 ok.
+- ECOM-08: troca e reset de senha bloqueados com o e-mail pendente: própria troca e reset do admin → 409 sem gravar; reset em massa pula a conta (`pulado_email_pendente`, contado no resumo da CLI); botão "Resetar" desabilitado no admin. Só o role `usuario` consulta. Frontend 1873 ok.
+- ECOM-07: status `pendente_email` na listagem do admin (badge e filtro; consulta só quando a página tem cliente da loja); só grandes provedores no cadastro (`CADASTRO_EMAIL_DOMINIOS` no `.env`, padrão embutido, domínio exato); UF pelo nome do estado. Login pendente segue bloqueado e o link é de uso único (já do ECOM-03). Login 199 e cliente 3070 apagados a pedido. Frontend 1872 ok.
+- ECOM-05: o cadastro da loja cria o cliente pessoa física ligado ao login (migração 30: `cnpj` NULL, `cpf` UNIQUE, `endereco`, `cep`, `usuario_id`), na mesma tx; CPF validado (DV) no front e no back; CPF repetido → 409 neutro com rollback. SELECT do CRM com `COALESCE(cnpj,'')`. Frontend 1869 ok.
+- ECOM-03: confirmação de e-mail do autocadastro: conta nasce pendente (migrações 28/29), link de uso único com token no `#fragmento` (24h, só o hash no banco), login do `usuario` pendente → 403 só com a senha certa; `confirmar-email` e `reenviar-confirmacao` públicos (captcha, rate limit, resposta neutra); `APP_URL`; tela `/confirmar-email`. Conta criada pelo admin não muda. Frontend 1854 ok.
+- ECOM-04: filtros da vitrine por categoria, marca e nota olfativa (`?nota_olfativa=` e `GET /api/loja/filtros`, AnyRole, distintos dos ativos); selects + "Limpar filtros" na `/loja`. Frontend 1842 ok.
+- ECOM-01: role `usuario` (migração 27); política `AnyRole` (me, troca de senha, vitrine) e 403 do `usuario` em toda rota interna; `POST /api/auth/cadastro` (captcha `cadastro`, 5/IP em 10 min, e-mail repetido 409 neutro); `GET /api/loja/produtos` (só ativos, sem custo); telas `/cadastro` e `/loja`; login do `usuario` → `/loja`.
+
 ## Lote 41 de 2026-11-15: DEPLOY-09 concluído
 - DEPLOY-09: Lotes 39/40 no servidor; timer diário de backup (03:15, 14 dias; 1º backup ok); chave da CA só no pendrive `BACKUP` (conferida por chave pública); `casaos_ro` + `deploy/ca-producao.pem` na .105 com TLS 1.3 (`usuarios` negado, ERROR 1142). 2ª cópia cifrada da chave dispensada pelo usuário neste servidor (fica no guia).
 - DEP-03 (parcial): patches tailwind 4.3.5, postcss 8.5.33, user-event 14.6.10; card segue aberto.

@@ -13,7 +13,7 @@ import (
 )
 
 // clienteColunasRegex reflete a constante clienteColunas do repositório.
-const clienteColunasRegex = `cliente_id_origem, cnpj, razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
+const clienteColunasRegex = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
 
 func clienteRowsForHandler() *sqlmock.Rows {
 	now := time.Now()

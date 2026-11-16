@@ -262,7 +262,7 @@ func TestCreateUsuario_ValidacaoNegocio(t *testing.T) {
 				p["role"] = "superadmin"
 				return p
 			},
-			wantMsg: "role deve ser 'admin' ou 'normal'",
+			wantMsg: "role deve ser 'admin', 'normal' ou 'usuario'",
 		},
 	}
 
@@ -487,7 +487,7 @@ func TestUpdateUsuario_ValidacaoNegocio(t *testing.T) {
 				p["role"] = "superadmin"
 				return p
 			},
-			wantMsg: "role deve ser 'admin' ou 'normal'",
+			wantMsg: "role deve ser 'admin', 'normal' ou 'usuario'",
 		},
 	}
 

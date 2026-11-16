@@ -11,6 +11,9 @@ type Role string
 const (
 	RoleAdmin  Role = "admin"
 	RoleNormal Role = "normal"
+	// RoleUsuario é o cliente do e-commerce (ECOM-01): só vê a loja e a
+	// própria sessão; nunca passa numa rota interna (httpx.Authenticated).
+	RoleUsuario Role = "usuario"
 )
 
 // RoleDoBanco embrulha o valor da coluna usuarios.role sem normalizar.
@@ -23,7 +26,10 @@ func (r Role) String() string { return string(r) }
 func (r Role) EhAdmin() bool { return r == RoleAdmin }
 
 // Conhecido informa se o valor é um dos papéis do sistema.
-func (r Role) Conhecido() bool { return r == RoleAdmin || r == RoleNormal }
+func (r Role) Conhecido() bool { return r == RoleAdmin || r == RoleNormal || r == RoleUsuario }
+
+// EhUsuarioLoja é verdadeiro só para "usuario" exato (ECOM-01).
+func (r Role) EhUsuarioLoja() bool { return r == RoleUsuario }
 
 // Principal é o usuário autenticado de uma requisição, com o role CONFERIDO
 // no banco.

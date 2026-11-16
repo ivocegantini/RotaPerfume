@@ -58,10 +58,32 @@ var (
 	ErrAcessoRestritoAdmin   = kernel.NovoErro(kernel.KindProibido, "acesso restrito a administradores")
 	ErrNomeObrigatorio       = kernel.NovoErro(kernel.KindInvalido, "nome é obrigatório")
 	ErrEmailObrigatorio      = kernel.NovoErro(kernel.KindInvalido, "email é obrigatório")
-	ErrRoleInvalido          = kernel.NovoErro(kernel.KindInvalido, "role deve ser 'admin' ou 'normal'")
+	ErrRoleInvalido          = kernel.NovoErro(kernel.KindInvalido, "role deve ser 'admin', 'normal' ou 'usuario'")
 	ErrVendedorInexistente   = kernel.NovoErro(kernel.KindInvalido, "vendedor não encontrado")
 	ErrEmailDuplicado        = kernel.NovoErro(kernel.KindConflito, "email já cadastrado")
 	ErrUsuarioAlvoInvalido   = kernel.NovoErro(kernel.KindInvalido, "usuario_id é obrigatório e deve ser > 0")
 	ErrHistoricoSemUsuarioID = kernel.NovoErro(kernel.KindInvalido, "usuario_id é obrigatório na URL")
 	ErrHistoricoUsuarioID    = kernel.NovoErro(kernel.KindInvalido, "usuario_id inválido")
+
+	// Cadastro público da loja (ECOM-01).
+	ErrUsuarioLojaComVendedor = kernel.NovoErro(kernel.KindInvalido, "usuário da loja não pode ter vendedor vinculado")
+	ErrNomeMuitoLongo         = kernel.NovoErro(kernel.KindInvalido, "nome deve ter no máximo 120 caracteres")
+	ErrEmailInvalido          = kernel.NovoErro(kernel.KindInvalido, "email inválido")
+	// ErrProvedorEmailNaoPermitido (ECOM-07): só grandes provedores
+	// (CADASTRO_EMAIL_DOMINIOS) no autocadastro.
+	ErrProvedorEmailNaoPermitido = kernel.NovoErro(kernel.KindInvalido, "use um email de um provedor conhecido (ex.: Gmail, Outlook, Hotmail, Yahoo, iCloud)")
+	// ErrCadastroIndisponivel: e-mail já usado. Mensagem neutra (não confirma
+	// a conta); captcha + rate limit seguram a enumeração.
+	ErrCadastroIndisponivel = kernel.NovoErro(kernel.KindConflito, "não foi possível concluir o cadastro com estes dados (email ou CPF já cadastrado)")
+
+	// Confirmação de e-mail do autocadastro (ECOM-03). ErrEmailNaoConfirmado
+	// só sai com a senha certa (não revela conta a quem não a conhece).
+	ErrEmailNaoConfirmado  = kernel.NovoErro(kernel.KindProibido, "email não confirmado: abra o link que enviamos para o seu email")
+	ErrConfirmacaoInvalida = kernel.NovoErro(kernel.KindInvalido, "link de confirmação inválido ou expirado")
+	// ErrTrocaSenhaEmailPendente (ECOM-08): troca/reset de senha recusada
+	// enquanto o e-mail do autocadastro não foi confirmado (409).
+	ErrTrocaSenhaEmailPendente = kernel.NovoErro(kernel.KindConflito, "troca de senha bloqueada: email pendente de confirmação")
+	// ErrConfirmacaoIndisponivel: processo montado sem as portas do ECOM-03
+	// (fail-closed: sem elas nem cria conta nem libera login de "usuario").
+	ErrConfirmacaoIndisponivel = kernel.NovoErro(kernel.KindInterno, "erro interno")
 )

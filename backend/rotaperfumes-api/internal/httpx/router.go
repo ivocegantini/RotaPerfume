@@ -19,8 +19,13 @@ type Policy uint8
 const (
 	policyInvalida Policy = iota
 	Public
+	// Authenticated é a equipe interna (admin e normal): o role "usuario"
+	// (cliente da loja, ECOM-01) recebe 403.
 	Authenticated
 	AdminOnly
+	// AnyRole aceita qualquer usuário autenticado, inclusive o "usuario" da
+	// loja (ECOM-01): só a sessão (me, troca de senha) e a loja.
+	AnyRole
 )
 
 // String devolve o nome da política (usado em mensagens e na matriz ARQ-00).
@@ -32,6 +37,8 @@ func (p Policy) String() string {
 		return "Authenticated"
 	case AdminOnly:
 		return "AdminOnly"
+	case AnyRole:
+		return "AnyRole"
 	default:
 		return "Invalida"
 	}
@@ -84,7 +91,7 @@ func NovoRouter(auth *Autenticador) *Router {
 // panic na montagem (no startup e nos testes), nunca em runtime (O2).
 func (r *Router) Handle(rt Rota) {
 	switch rt.Policy {
-	case Public, Authenticated, AdminOnly:
+	case Public, Authenticated, AdminOnly, AnyRole:
 	default:
 		panic("httpx: rota " + rt.Padrao + " com política inválida")
 	}
