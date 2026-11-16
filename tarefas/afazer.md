@@ -10,6 +10,7 @@
 | DEPLOY-10 | ALTA | migrações 27, 28/29, 30 e 31 + `APP_URL` e `GOOGLE_CLIENT_ID` na produção antes do deploy | 🌸 DataBrain |
 | ECOM-06 | MÉDIA | pendente | 🟡 BackBrain / 🟢 FrontBrain |
 | SEC-60 | MÉDIA | decisão do usuário | 🟣 SecBrain |
+| SEC-76 | ALTA | Redis do cache sem senha na LAN | 🟣 SecBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
@@ -22,6 +23,9 @@
 
 ## SEC-60: PII do cliente da loja na conta `casaos_ro` — MÉDIA
 **Ação:** `clientes` está em `TABELAS_RO` e agora guarda CPF e endereço de pessoas físicas. Decidir se a `casaos_ro` perde o SELECT em `clientes` (ou ganha uma view sem `cpf`/`endereco`/`cep`).
+
+## SEC-76: Redis do cache (CACHE-01) sem senha — ALTA
+**Ação:** o `192.168.168.106:48110` aceita comandos sem AUTH; qualquer host da LAN pode envenenar a vitrine ou apagar chaves. Ligar `requirepass`/ACL (usuário só com GET/SET/INCR em `rotaperfumes*`), pôr `REDIS_PASSWORD` no `.env`/`api.env` e restringir a porta no firewall.
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 

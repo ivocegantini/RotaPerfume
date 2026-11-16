@@ -82,6 +82,10 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 - **SEC-57** A porta com espaço passa a ser recusada nos dois lados, com a mensagem "porta inválida", inclusive com CONFIRMO_PRODUCAO. Antes, o Makefile dizia que era o banco de produção.
 - **TST-25** make test-integration recria e apaga o banco rotaperfumes_teste, nunca o DB_NAME.
 
+## Cache (CACHE-01)
+
+- Redis `REDIS_URL=redis://192.168.168.106:48110/0` só para as leituras públicas da loja (vitrine, filtros, imagens); chave `CACHE_APPNAME:area:vN:hash`, dev `rotaperfumes-dev`, produção `rotaperfumes`. Fail-open. Detalhes em `docs/cache-redis.md`.
+
 ## Instalação do ambiente
 
 - **Scripts (SETUP-01):** `scripts/setup-linux.sh` (Debian/Ubuntu e derivados, via apt; em outras distros só confere) e `scripts/setup-windows.ps1` (PowerShell 5.1+/7, via winget). Pelo make: `make setup-check` (só verifica, sai com erro se faltar algo) e `make setup` (instala o que falta; idempotente). Opções: `--check`/`-Check`, `--deps`/`-Deps` (`go mod download` + `make frontend-deps`), `--go-dir`/`-GoDir`, `--go-sistema` (Linux, `/usr/local/go` com sudo), `--sem-sudo`; ver `--help`. Pelo make: `make setup SETUP_ARGS="--deps"`.

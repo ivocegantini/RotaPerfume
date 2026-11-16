@@ -12,6 +12,9 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-16: CACHE-01 cache Redis do e-commerce
+- CACHE-01: cache na API (Redis `192.168.168.106:48110`, cliente RESP próprio, sem dependência nova) das áreas `vitrine`, `filtros` e `imagem_produto`; chave `appname:area:vN:hash`, versão por área (INCR na escrita do produto/imagem e na subida); fail-open; `X-Cache`. `make test` rc=0; teste real MISS→HIT ok. Doc: `docs/cache-redis.md`.
+
 ## Avulso de 2026-11-16: LEGAL-01 páginas legais (não commitado)
 - LEGAL-01: `frontend/public/politica-de-privacidade.html` (LGPD) e `termos-de-servico.html` (CDC), HTML estático com texto genérico. Falta trocar `[e-mail de contato]` e revisão jurídica.
 

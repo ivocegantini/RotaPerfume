@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"github.com/rotaperfumes/rotaperfumes-api/internal/identidadehttp"
 	"github.com/rotaperfumes/rotaperfumes-api/internal/vendashttp"
 	"github.com/rotaperfumes/shared/adapters/ratelimit"
+	"github.com/rotaperfumes/shared/adapters/rediscache"
+	"github.com/rotaperfumes/shared/cache"
 	"github.com/rotaperfumes/shared/catalogo/catalogoapp"
 	"github.com/rotaperfumes/shared/catalogo/catalogofs"
 	"github.com/rotaperfumes/shared/catalogo/catalogoimagem"
@@ -57,6 +60,11 @@ func NovosHandlersCom(pool *sql.DB, cfg *config.Config, identidade *identidadeap
 	cat := NovoCatalogoHTTPCom(NovoCatalogo(pool, ArmazenamentoDoConfig(cfg)), cfg.CORSAllowedOrigins)
 	// ECOM-10: vitrine pública com limite por IP (vitrine + filtros somados).
 	cat.Produto.ComLimiteLoja(ratelimit.Nova(lojaMaxPorMinuto, time.Minute, time.Minute), cfg.TrustProxyHeaders)
+	// CACHE-01: cache Redis das áreas da loja (REDIS_URL vazio = desligado).
+	if c := NovoCache(cfg); c != nil {
+		cat.Produto.ComCache(c)
+		cat.ImagemPublica.ComCache(c)
+	}
 	comercialCasos := NovoComercial(pool)
 	com := NovoComercialHTTP(comercialCasos)
 	escopo := comercialCasos.Escopo() // a mesma regra de escopo para Vendas e para o Dashboard
@@ -144,4 +152,32 @@ func AbrirArmazenamentoImagens(dir string) (*catalogofs.Armazenamento, error) {
 	}
 	log.Printf("[server] imagens de produto em %s", dir)
 	return a, nil
+}
+
+// NovoCache monta o cache das áreas da loja (CACHE-01) a partir do config:
+// nil se REDIS_URL estiver vazio. Na subida, PING (só informa; o cache é
+// fail-open) e nova versão de todas as áreas, para um deploy nunca servir
+// JSON no formato antigo.
+func NovoCache(cfg *config.Config) *cache.Cache {
+	if !cfg.Redis.Ligado {
+		log.Printf("[cache] REDIS_URL vazio: cache desligado")
+		return nil
+	}
+	cli := rediscache.Novo(rediscache.Opcoes{Endereco: cfg.Redis.Endereco, Usuario: cfg.Redis.Usuario, Senha: cfg.Redis.Senha, DB: cfg.Redis.DB})
+	c, err := cache.Novo(cfg.CacheAppName, cli)
+	if err != nil {
+		log.Fatalf("[cache] %v", err)
+	}
+	if cfg.Redis.Senha == "" {
+		log.Printf("[cache] AVISO: Redis %s sem REDIS_PASSWORD (defina requirepass/ACL no servidor)", cfg.Redis.Endereco)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := cli.Ping(ctx); err != nil {
+		log.Printf("[cache] Redis %s indisponível na subida (a API segue sem cache até ele voltar): %v", cfg.Redis.Endereco, err)
+		return c
+	}
+	c.Invalidar(ctx, cache.TodasAsAreas()...)
+	log.Printf("[cache] ligado: Redis %s db=%d appname=%s áreas=%v", cfg.Redis.Endereco, cfg.Redis.DB, cfg.CacheAppName, cache.TodasAsAreas())
+	return c
 }

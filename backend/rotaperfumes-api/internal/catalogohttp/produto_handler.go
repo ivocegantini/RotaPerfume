@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rotaperfumes/rotaperfumes-api/internal/httpx"
+	"github.com/rotaperfumes/shared/cache"
 	"github.com/rotaperfumes/shared/catalogo/catalogoapp"
 	"github.com/rotaperfumes/shared/kernel"
 )
@@ -21,6 +22,8 @@ type ProdutoHandler struct {
 	// conta); nil = sem limite (testes).
 	limiteLoja   limitadorLoja
 	confiarProxy bool
+	// cache (CACHE-01) guarda vitrine, filtros e imagens; nil = desligado.
+	cache *cache.Cache
 }
 
 // NovoProdutoHandler exige os casos de uso (nil: panic na montagem).
@@ -87,6 +90,7 @@ func (h *ProdutoHandler) CreateProduto(w http.ResponseWriter, r *http.Request) {
 		httpx.ResponderErro(w, tag, err)
 		return
 	}
+	h.invalidar(r, cache.AreaVitrine, cache.AreaFiltros) // CACHE-01
 	log.Printf("[produtos] criado: id=%d por usuario_id=%d role=%s", p.ID, principal.UserID(), principal.Role())
 	httpx.JSON(w, http.StatusCreated, produtoParaResposta(*p), "")
 }
@@ -113,6 +117,7 @@ func (h *ProdutoHandler) UpdateProduto(w http.ResponseWriter, r *http.Request) {
 		httpx.ResponderErro(w, tag, err)
 		return
 	}
+	h.invalidar(r, cache.AreaVitrine, cache.AreaFiltros) // CACHE-01
 	log.Printf("[produtos] atualizado: id=%d por usuario_id=%d role=%s", id, principal.UserID(), principal.Role())
 	httpx.JSON(w, http.StatusOK, produtoParaResposta(*p), "")
 }
@@ -140,6 +145,7 @@ func (h *ProdutoHandler) ToggleAtivoProduto(w http.ResponseWriter, r *http.Reque
 		httpx.ResponderErro(w, tag, err)
 		return
 	}
+	h.invalidar(r, cache.AreaVitrine, cache.AreaFiltros) // CACHE-01
 	log.Printf("[produtos] ativo=%t: id=%d por usuario_id=%d role=%s", p.Ativo, id, principal.UserID(), principal.Role())
 	httpx.JSON(w, http.StatusOK, produtoParaResposta(*p), "")
 }

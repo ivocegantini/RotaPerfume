@@ -1,12 +1,15 @@
 package catalogohttp
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/rotaperfumes/rotaperfumes-api/internal/httpx"
+	"github.com/rotaperfumes/shared/cache"
 	"github.com/rotaperfumes/shared/catalogo"
 	"github.com/rotaperfumes/shared/kernel"
 )
@@ -82,12 +85,24 @@ func (h *ProdutoHandler) ListProdutosLoja(w http.ResponseWriter, r *http.Request
 		Busca:        busca,
 		Ordenacao:    httpx.OrdenacaoDaQuery(r, catalogo.CamposOrdenacaoLoja(), catalogo.OrdenacaoLojaPadrao()),
 	}
-	res, err := h.casos.ListarProdutos(r.Context(), filtro, httpx.PaginaDaQuery(r))
-	if err != nil {
-		httpx.ResponderErro(w, tag, err)
+	pagina := httpx.PaginaDaQuery(r)
+	gerar := func(w http.ResponseWriter) {
+		res, err := h.casos.ListarProdutos(r.Context(), filtro, pagina)
+		if err != nil {
+			httpx.ResponderErro(w, tag, err)
+			return
+		}
+		httpx.JSONPaginadoCom(w, res, produtoParaLoja)
+	}
+	// CACHE-01: a busca livre (?q) não entra no cache (variações sem fim
+	// encheriam o Redis); a variante usa só os parâmetros já normalizados.
+	if busca != "" {
+		gerar(w)
 		return
 	}
-	httpx.JSONPaginadoCom(w, res, produtoParaLoja)
+	variante := cache.Variante(strconv.Itoa(pagina.Numero()), strconv.Itoa(pagina.Limite()),
+		filtro.Categoria, filtro.Marca, filtro.NotaOlfativa, fmt.Sprintf("%v", filtro.Ordenacao))
+	httpx.ServirComCache(w, r, h.cache, cache.AreaVitrine, variante, gerar)
 }
 
 // opcoesLojaResposta são as opções dos filtros da vitrine (ECOM-04); listas
@@ -111,12 +126,25 @@ func (h *ProdutoHandler) OpcoesFiltroLoja(w http.ResponseWriter, r *http.Request
 	if !h.dentroDoLimite(w, r, "[loja] OpcoesFiltroLoja") {
 		return
 	}
-	o, err := h.casos.OpcoesFiltroLoja(r.Context())
-	if err != nil {
-		httpx.ResponderErro(w, "[loja] OpcoesFiltroLoja", err)
-		return
-	}
-	httpx.JSON(w, http.StatusOK, opcoesLojaResposta{
-		Categorias: naoNulo(o.Categorias), Marcas: naoNulo(o.Marcas), NotasOlfativas: naoNulo(o.NotasOlfativas),
-	}, "")
+	httpx.ServirComCache(w, r, h.cache, cache.AreaFiltros, "", func(w http.ResponseWriter) {
+		o, err := h.casos.OpcoesFiltroLoja(r.Context())
+		if err != nil {
+			httpx.ResponderErro(w, "[loja] OpcoesFiltroLoja", err)
+			return
+		}
+		httpx.JSON(w, http.StatusOK, opcoesLojaResposta{
+			Categorias: naoNulo(o.Categorias), Marcas: naoNulo(o.Marcas), NotasOlfativas: naoNulo(o.NotasOlfativas),
+		}, "")
+	})
+}
+
+// ComCache liga o cache Redis das áreas da loja (CACHE-01); nil desliga.
+func (h *ProdutoHandler) ComCache(c *cache.Cache) *ProdutoHandler {
+	h.cache = c
+	return h
+}
+
+// invalidar sobe a versão das áreas após uma escrita bem-sucedida.
+func (h *ProdutoHandler) invalidar(r *http.Request, areas ...cache.Area) {
+	h.cache.Invalidar(r.Context(), areas...)
 }

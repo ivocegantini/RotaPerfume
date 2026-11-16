@@ -1,14 +1,17 @@
 package catalogohttp
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"time"
 
 	"github.com/rotaperfumes/rotaperfumes-api/internal/httpx"
+	"github.com/rotaperfumes/shared/cache"
 	"github.com/rotaperfumes/shared/catalogo"
 	"github.com/rotaperfumes/shared/catalogo/catalogoapp"
 )
@@ -62,6 +65,7 @@ func (h *ProdutoHandler) EnviarImagem(w http.ResponseWriter, r *http.Request) {
 		httpx.ResponderErro(w, tag, err) // 413 pelo KindMuitoGrande (CHORE-10)
 		return
 	}
+	h.invalidar(r, cache.AreaVitrine, cache.AreaImagemProduto) // CACHE-01
 	log.Printf("[produtos] imagem definida: id=%d arquivo=%s bytes_recebidos=%d por usuario_id=%d role=%s", id, p.Imagem, len(dados), principal.UserID(), principal.Role())
 	httpx.JSON(w, http.StatusOK, produtoParaResposta(*p), "")
 }
@@ -84,6 +88,7 @@ func (h *ProdutoHandler) RemoverImagem(w http.ResponseWriter, r *http.Request) {
 		httpx.ResponderErro(w, tag, err)
 		return
 	}
+	h.invalidar(r, cache.AreaVitrine, cache.AreaImagemProduto) // CACHE-01
 	log.Printf("[produtos] imagem zerada: id=%d por usuario_id=%d role=%s", id, principal.UserID(), principal.Role())
 	httpx.JSON(w, http.StatusOK, produtoParaResposta(*p), "")
 }
@@ -169,7 +174,16 @@ func erroDeLeitura(err, padrao error) error {
 // (rota pública, sem auth nem cookies). Não usa http.FileServer: o nome é
 // conferido pelo regex, o Content-Type vem do mapa fixo e o arquivo sai por
 // http.ServeContent (HEAD, Range e If-Modified-Since).
-type ImagemPublicaHandler struct{ casos *catalogoapp.Casos }
+type ImagemPublicaHandler struct {
+	casos *catalogoapp.Casos
+	cache *cache.Cache // CACHE-01; nil = desligado
+}
+
+// ComCache liga o cache Redis da área imagem_produto (CACHE-01).
+func (h *ImagemPublicaHandler) ComCache(c *cache.Cache) *ImagemPublicaHandler {
+	h.cache = c
+	return h
+}
 
 // NovoImagemPublicaHandler exige os casos de uso (nil: panic na montagem).
 func NovoImagemPublicaHandler(c *catalogoapp.Casos) *ImagemPublicaHandler {
@@ -187,16 +201,47 @@ func (h *ImagemPublicaHandler) Servir(w http.ResponseWriter, r *http.Request) {
 		httpx.ResponderErro(w, "[produtos] ServirImagem", catalogo.ErrImagemNaoEncontrada)
 		return
 	}
+	// CACHE-01: só nomes válidos (uuid.ext) chegam à chave, e por hash.
+	cacheavel := h.cache != nil && catalogo.NomeImagemValido(nome)
+	var chave string
+	if cacheavel {
+		e, ch, ok := h.cache.Ler(r.Context(), cache.AreaImagemProduto, cache.Variante(nome))
+		if ok {
+			w.Header().Set(httpx.CabecalhoCache, "HIT")
+			servirImagem(w, r, tipo, e.Modificado, bytes.NewReader(e.Corpo))
+			return
+		}
+		chave = ch
+		w.Header().Set(httpx.CabecalhoCache, "MISS")
+	}
 	f, modificado, err := h.casos.AbrirImagemProduto(nome)
 	if err != nil {
 		httpx.ResponderErro(w, "[produtos] ServirImagem", catalogo.ErrImagemNaoEncontrada)
 		return
 	}
 	defer f.Close()
+	if d, _ := cache.DefinicaoDe(cache.AreaImagemProduto); chave != "" {
+		corpo, err := io.ReadAll(io.LimitReader(f, int64(d.MaxBytes)+1))
+		if err == nil && len(corpo) <= d.MaxBytes {
+			h.cache.Gravar(r.Context(), chave, cache.AreaImagemProduto, cache.Entrada{ContentType: tipo, Modificado: modificado, Corpo: corpo})
+			servirImagem(w, r, tipo, modificado, bytes.NewReader(corpo))
+			return
+		}
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			httpx.ResponderErro(w, "[produtos] ServirImagem", catalogo.ErrImagemNaoEncontrada)
+			return
+		}
+	}
+	servirImagem(w, r, tipo, modificado, f)
+}
+
+// servirImagem escreve os cabeçalhos da imagem pública e o conteúdo
+// (ServeContent trata Range, HEAD e If-Modified-Since).
+func servirImagem(w http.ResponseWriter, r *http.Request, tipo string, modificado time.Time, conteudo io.ReadSeeker) {
 	hd := w.Header()
 	hd.Set("Content-Type", tipo)
 	hd.Set("Cache-Control", "public, max-age=31536000, immutable")
 	hd.Set("Cross-Origin-Resource-Policy", "same-site")
 	hd.Set("Content-Disposition", "inline")
-	http.ServeContent(w, r, "", modificado, f)
+	http.ServeContent(w, r, "", modificado, conteudo)
 }
