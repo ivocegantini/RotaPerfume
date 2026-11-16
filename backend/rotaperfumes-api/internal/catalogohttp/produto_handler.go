@@ -17,6 +17,10 @@ type ProdutoHandler struct {
 	// origensUpload são as origens (além do próprio host) aceitas no
 	// upload de imagem quando o request traz Origin (D2).
 	origensUpload []string
+	// limiteLoja (ECOM-10) limita por IP a vitrine pública (toda requisição
+	// conta); nil = sem limite (testes).
+	limiteLoja   limitadorLoja
+	confiarProxy bool
 }
 
 // NovoProdutoHandler exige os casos de uso (nil: panic na montagem).

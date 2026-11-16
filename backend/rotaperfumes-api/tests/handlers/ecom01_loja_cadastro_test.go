@@ -7,11 +7,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-sql-driver/mysql"
+
+	"github.com/rotaperfumes/rotaperfumes-api/internal/bootstrap"
+	"github.com/rotaperfumes/shared/adapters/ratelimit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -441,4 +445,47 @@ func TestECOM09_Cadastro_SemCEP_GravaNulo(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ECOM-10: a vitrine é pública (página inicial): sem token responde 200.
+func TestECOM10_Vitrine_SemLogin_200(t *testing.T) {
+	server, db, mock := setupTestServer(t)
+	defer server.Close()
+	defer db.Close()
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE ativo = \?`).WithArgs(true).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(`FROM produtos WHERE ativo = \? ORDER BY descricao ASC`).WithArgs(true, 20, 0).
+		WillReturnRows(produtoRowsForHandler())
+	resp, err := http.Get(server.URL + "/api/loja/produtos")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.NotContains(t, string(readBody(t, resp)), "custo")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ECOM-10: acima do limite por IP, 429 com Retry-After e sem consultar o banco.
+func TestECOM10_Vitrine_LimitePorIP_429(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+	h := bootstrap.NovoCatalogoHTTPCom(bootstrap.NovoCatalogo(db, nil), nil).Produto.
+		ComLimiteLoja(ratelimit.Nova(2, time.Minute, time.Minute), false)
+	for i := 0; i < 2; i++ {
+		mock.ExpectQuery(`SELECT COUNT`).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(0))
+		mock.ExpectQuery(`FROM produtos`).WillReturnRows(sqlmock.NewRows(produtoColunasHeaderForHandler()))
+	}
+	chamar := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/loja/produtos", nil)
+		req.RemoteAddr = "203.0.113.7:5000"
+		w := httptest.NewRecorder()
+		h.ListProdutosLoja(w, req)
+		return w
+	}
+	assert.Equal(t, http.StatusOK, chamar().Code)
+	assert.Equal(t, http.StatusOK, chamar().Code)
+	w := chamar()
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+	assert.NotEmpty(t, w.Header().Get("Retry-After"))
+	assert.NoError(t, mock.ExpectationsWereMet(), "a 3ª não chega ao banco")
 }

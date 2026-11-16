@@ -129,7 +129,7 @@ describe("LoginPage - sessao existente", () => {
   it.each<[User["role"], string]>([
     ["admin", "/dashboard"],
     ["normal", "/pagamentos"],
-    ["usuario", "/loja"], // ECOM-01
+    ["usuario", "/"], // ECOM-01/10
   ])("usuario %s ja logado vai para %s", async (role, destino) => {
     localStorage.setItem("auth_user", JSON.stringify(usuario(role)));
     render(<LoginPage />);
@@ -167,7 +167,7 @@ describe("LoginPage - login com sucesso", () => {
     ["troca de senha obrigatoria", { trocar_senha: true }, "admin", "/trocar-senha"],
     ["admin", { trocar_senha: false }, "admin", "/dashboard"],
     ["usuario padrao", {}, "normal", "/pagamentos"],
-    ["cliente da loja (ECOM-01)", {}, "usuario", "/loja"],
+    ["cliente da loja (ECOM-01/10)", {}, "usuario", "/"],
   ])("%s -> %s", async (_n, extra, role, destino) => {
     apiLoginMock.mockResolvedValue({ token: "t", user: usuario(role), ...extra });
     render(<LoginPage />);

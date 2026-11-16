@@ -17,6 +17,7 @@
 
 ## Lote 42 de 2026-11-16: ECOM-01 início do e-commerce (não commitado)
 > Testes: `make test` rc=0; `make lint` ok; frontend 1840 ok; `next build` ok (`/cadastro`, `/loja`).
+- ECOM-10: a página inicial (`/`) é a vitrine pública: `GET /api/loja/produtos` e `/api/loja/filtros` viraram Public (só ativos, sem custo, 300 req/min por IP → 429); topo com Entrar/Criar conta ou Olá/Sair (Painel para a equipe), sem mismatch de hydration; `/loja` mostra a mesma vitrine; o cliente da loja volta para `/`. Frontend 1893 ok.
 - ECOM-09: endereço pelo CEP (ViaCEP no navegador, só o CEP sai; preenche rua/bairro/cidade/UF, tudo editável); CEP opcional (endereço sem CEP); rua, número ("s/n") e complemento separados; bairro gravado (migração 31: `numero`, `complemento`). Vale no cadastro normal e no com Google. Frontend 1891 ok.
 - ECOM-02: "Entrar/Criar conta com Google" (Google Identity Services): ID token validado no backend (RS256/JWKS, iss, aud, exp, email_verified; `adapters/googleid`); só cliente da loja entra pelo Google (pendente vira confirmada); sem conta, o cadastro abre preenchido pedindo CPF/endereço; conta nasce confirmada, sem senha utilizável. `GOOGLE_CLIENT_ID`/`NEXT_PUBLIC_GOOGLE_CLIENT_ID` (vazio = desligado). Frontend 1879 ok.
 - ECOM-08: troca e reset de senha bloqueados com o e-mail pendente: própria troca e reset do admin → 409 sem gravar; reset em massa pula a conta (`pulado_email_pendente`, contado no resumo da CLI); botão "Resetar" desabilitado no admin. Só o role `usuario` consulta. Frontend 1873 ok.

@@ -6,12 +6,14 @@ package bootstrap
 import (
 	"database/sql"
 	"log"
+	"time"
 
 	"github.com/rotaperfumes/rotaperfumes-api/internal/analyticshttp"
 	"github.com/rotaperfumes/rotaperfumes-api/internal/catalogohttp"
 	"github.com/rotaperfumes/rotaperfumes-api/internal/comercialhttp"
 	"github.com/rotaperfumes/rotaperfumes-api/internal/identidadehttp"
 	"github.com/rotaperfumes/rotaperfumes-api/internal/vendashttp"
+	"github.com/rotaperfumes/shared/adapters/ratelimit"
 	"github.com/rotaperfumes/shared/catalogo/catalogoapp"
 	"github.com/rotaperfumes/shared/catalogo/catalogofs"
 	"github.com/rotaperfumes/shared/catalogo/catalogoimagem"
@@ -42,6 +44,9 @@ type Handlers struct {
 
 // NovosHandlers cria os handlers sobre o pool, com a Identidade padrão
 // (Turnstile real, sem assinante de evento) e o e-mail informado.
+// lojaMaxPorMinuto é o limite por IP da vitrine pública (ECOM-10).
+const lojaMaxPorMinuto = 300
+
 func NovosHandlers(pool *sql.DB, cfg *config.Config, email identidadeapp.EnviadorSenhaInicial) Handlers {
 	return NovosHandlersCom(pool, cfg, NovaIdentidade(pool, cfg, extPadrao(cfg, email)))
 }
@@ -50,6 +55,8 @@ func NovosHandlers(pool *sql.DB, cfg *config.Config, email identidadeapp.Enviado
 // montados (produção: Montar; testes: captcha e publicador falsos).
 func NovosHandlersCom(pool *sql.DB, cfg *config.Config, identidade *identidadeapp.Casos) Handlers {
 	cat := NovoCatalogoHTTPCom(NovoCatalogo(pool, ArmazenamentoDoConfig(cfg)), cfg.CORSAllowedOrigins)
+	// ECOM-10: vitrine pública com limite por IP (vitrine + filtros somados).
+	cat.Produto.ComLimiteLoja(ratelimit.Nova(lojaMaxPorMinuto, time.Minute, time.Minute), cfg.TrustProxyHeaders)
 	comercialCasos := NovoComercial(pool)
 	com := NovoComercialHTTP(comercialCasos)
 	escopo := comercialCasos.Escopo() // a mesma regra de escopo para Vendas e para o Dashboard

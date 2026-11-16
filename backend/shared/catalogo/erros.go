@@ -43,3 +43,6 @@ var (
 	// ErrEstoqueDuplicado (CHORE-06): 1062 em uk_estoque_data_sku no INSERT, 409.
 	ErrEstoqueDuplicado = kernel.NovoErro(kernel.KindConflito, "registro de estoque já cadastrado para este sku nesta data")
 )
+
+// ErrMuitasRequisicoesLoja (ECOM-10): vitrine pública acima do limite por IP.
+var ErrMuitasRequisicoesLoja = kernel.NovoErro(kernel.KindBloqueado, "muitas requisições — tente novamente em instantes")

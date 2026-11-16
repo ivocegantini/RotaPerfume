@@ -4,11 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProdutoLoja } from "@/lib/types";
 
-vi.mock("@/components/layout/ProtectedRoute", () => ({
-  ProtectedRoute: ({ children, area }: { children: React.ReactNode; area?: string }) => (
-    <div data-area={area}>{children}</div>
-  ),
-}));
 const listarMock = vi.fn();
 const opcoesMock = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -31,9 +26,8 @@ beforeEach(() => {
 });
 
 describe("LojaPage", () => {
-  it("protege como area da loja e lista os produtos com preco", async () => {
-    const { container } = render(<LojaPage />);
-    expect(container.querySelector("[data-area='loja']")).not.toBeNull();
+  it("vitrine publica (ECOM-10): lista os produtos com preco, sem exigir login", async () => {
+    render(<LojaPage />);
     expect(await screen.findByText("Perfume Azul")).toBeInTheDocument();
     expect(screen.getByText(/99,90/)).toBeInTheDocument();
     expect(listarMock).toHaveBeenCalledWith(1, 24, "", "descricao", "asc", SEM_FILTRO);

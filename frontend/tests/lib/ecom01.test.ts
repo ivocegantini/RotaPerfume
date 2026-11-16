@@ -7,7 +7,7 @@ describe("rotaInicial", () => {
   it.each([
     ["admin", "/dashboard"],
     ["normal", "/pagamentos"],
-    ["usuario", "/loja"],
+    ["usuario", "/"],
   ] as const)("%s -> %s", (role, destino) => expect(rotaInicial(role)).toBe(destino));
 });
 

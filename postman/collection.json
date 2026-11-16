@@ -6002,7 +6002,7 @@
       "name": "Loja (ECOM-01)",
       "item": [
         {
-          "name": "Vitrine — Opções dos Filtros (ECOM-04)",
+          "name": "Vitrine — Opções dos Filtros (pública, ECOM-04/10)",
           "event": [
             {
               "listen": "test",
@@ -6021,15 +6021,15 @@
             }
           ],
           "request": {
-            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "auth": {"type": "noauth"},
             "method": "GET",
             "header": [],
             "url": {"raw": "{{base_url}}/api/loja/filtros", "host": ["{{base_url}}"], "path": ["api", "loja", "filtros"]},
-            "description": "AnyRole. Categorias, marcas e notas olfativas distintas dos produtos ativos, em ordem alfabética."
+            "description": "Pública (ECOM-10). Categorias, marcas e notas olfativas distintas dos produtos ativos, em ordem alfabética."
           }
         },
         {
-          "name": "Vitrine — Listar Produtos (qualquer usuário logado)",
+          "name": "Vitrine — Listar Produtos (pública, ECOM-10)",
           "event": [
             {
               "listen": "test",
@@ -6046,16 +6046,7 @@
             }
           ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
+            "auth": {"type": "noauth"},
             "method": "GET",
             "header": [],
             "url": {
@@ -6102,7 +6093,7 @@
                 }
               ]
             },
-            "description": "Política AnyRole: aceita o `usuario` da loja e a equipe. Só produtos ativos (`?ativo` é ignorado); resposta sem custo, ativo e timestamps; preço em `preco`."
+            "description": "Pública desde o ECOM-10 (página inicial), com limite de 300 req/min por IP (429). Só produtos ativos (`?ativo` é ignorado); resposta sem custo, ativo e timestamps; preço em `preco`."
           }
         }
       ]
