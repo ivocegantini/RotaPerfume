@@ -48,6 +48,16 @@ type Deps struct {
 	Publicador   Publicador
 	Email        EnviadorSenhaInicial
 	Vendedores   Vendedores
+	// Confirmação de e-mail do autocadastro (ECOM-03). Opcionais na
+	// montagem; sem elas o cadastro e o login de "usuario" falham fechado.
+	Confirmacoes     ConfirmacoesEmail
+	TxConfirmacao    TransactorCadastro
+	EmailConfirmacao EnviadorConfirmacaoEmail
+	// ClientesLoja valida o cliente criado junto com o login (ECOM-05).
+	ClientesLoja ClientesLoja
+	// Google valida o ID token do login/cadastro com Google (ECOM-02).
+	// Opcional: sem ele as rotas do Google respondem "não configurado".
+	Google VerificadorGoogle
 	// Relogio é a fonte de "agora" (expiração, janela de graça, cortes).
 	Relogio func() time.Time
 }
@@ -57,6 +67,12 @@ type Deps struct {
 type Opcoes struct {
 	JanelaSupressaoReuso time.Duration
 	RetencaoRefresh      time.Duration
+	// URLApp é a URL pública do frontend, base do link de confirmação
+	// (ECOM-03). Vem da config (APP_URL), nunca do request.
+	URLApp string
+	// DominiosEmailCadastro são os provedores aceitos no autocadastro
+	// (CADASTRO_EMAIL_DOMINIOS, ECOM-07). Vazio: cadastro recusado (fail-closed).
+	DominiosEmailCadastro []string
 }
 
 // Casos agrupa os casos de uso do contexto (um método por caso de uso).
@@ -76,6 +92,12 @@ func Novo(d Deps, o Opcoes) *Casos {
 	}
 	if d.Relogio == nil {
 		panic("identidadeapp: Novo exige o relógio")
+	}
+	if d.Limites.Cadastro == nil {
+		d.Limites.Cadastro = d.Limites.Login
+	}
+	if d.Limites.Confirmacao == nil {
+		d.Limites.Confirmacao = d.Limites.Login
 	}
 	if o.JanelaSupressaoReuso <= 0 {
 		o.JanelaSupressaoReuso = JanelaSupressaoReusoPadrao

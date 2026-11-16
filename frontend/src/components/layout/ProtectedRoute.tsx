@@ -11,9 +11,14 @@ const F = "ProtectedRoute.tsx";
 interface ProtectedRouteProps {
   children: ReactNode;
   requireAdmin?: boolean;
+  /**
+   * ECOM-01: "interna" (padrao) e a area da equipe: o cliente da loja
+   * ("usuario") vai para /loja. "loja" aceita qualquer papel.
+   */
+  area?: "interna" | "loja";
 }
 
-export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireAdmin = false, area = "interna" }: ProtectedRouteProps) {
   vlog(F, "ProtectedRoute", "obtendo router");
   const router = useRouter();
   // Se a sessao em memoria ja foi validada por /me (navegacao client-side
@@ -23,7 +28,12 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     vlog(F, "ProtectedRoute.func", "lendo usuário da sessão em memória");
     const u = getSessionUser();
     // SEC-23: troca de senha pendente nunca renderiza de imediato.
-    return !!u && u.trocar_senha !== true && (!requireAdmin || u.role === "admin");
+    return (
+      !!u &&
+      u.trocar_senha !== true &&
+      (!requireAdmin || u.role === "admin") &&
+      (area === "loja" || u.role !== "usuario")
+    );
   });
 
   vlog(F, "ProtectedRoute", "registrando efeito de validação da sessão");
@@ -64,6 +74,15 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
           setAuthorized(false);
           vlog(F, "ProtectedRoute.validate", "redirecionando para /trocar-senha");
           router.replace("/trocar-senha");
+          return;
+        }
+
+        // ECOM-01: o cliente da loja nunca renderiza a area interna (o
+        // backend ja responde 403 nas APIs internas).
+        if (area === "interna" && freshUser.role === "usuario") {
+          vlog(F, "ProtectedRoute.validate", "usuario da loja na area interna: redirecionando para /loja");
+          setAuthorized(false);
+          router.replace("/loja");
           return;
         }
 
@@ -122,7 +141,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
       vlog(F, "ProtectedRoute.useEffect", "cleanup: removendo listener de focus");
       window.removeEventListener("focus", onFocus);
     };
-  }, [router, requireAdmin]);
+  }, [router, requireAdmin, area]);
 
   vlog(F, "ProtectedRoute", "verificando se está autorizado:", authorized);
   if (!authorized) {

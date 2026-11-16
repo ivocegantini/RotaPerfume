@@ -56,9 +56,13 @@ export interface TurnstileHandle {
 // (login -> "login", troca de senha -> "reset-senha"), entao um token emitido
 // numa tela nao serve na outra. Os valores precisam bater com as constantes
 // AcaoCaptchaLogin/AcaoCaptchaResetSenha do backend.
-export type TurnstileAction = "login" | "reset-senha";
+export type TurnstileAction = "login" | "reset-senha" | "cadastro" | "reenviar-confirmacao";
 export const TURNSTILE_ACTION_LOGIN: TurnstileAction = "login";
 export const TURNSTILE_ACTION_RESET_SENHA: TurnstileAction = "reset-senha";
+// ECOM-01: autocadastro da loja (AcaoCaptchaCadastro no backend).
+export const TURNSTILE_ACTION_CADASTRO: TurnstileAction = "cadastro";
+// ECOM-03: reenvio do link de confirmacao (AcaoCaptchaReenvio no backend).
+export const TURNSTILE_ACTION_REENVIO: TurnstileAction = "reenviar-confirmacao";
 
 interface TurnstileProps {
   /** Action enviada ao Turnstile (obrigatoria, conferida pelo backend). */

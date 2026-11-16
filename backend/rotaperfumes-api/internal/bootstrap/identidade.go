@@ -10,6 +10,7 @@ import (
 
 	"github.com/rotaperfumes/rotaperfumes-api/internal/httpx"
 	"github.com/rotaperfumes/rotaperfumes-api/internal/identidadehttp"
+	"github.com/rotaperfumes/shared/adapters/googleid"
 	"github.com/rotaperfumes/shared/adapters/ratelimit"
 	"github.com/rotaperfumes/shared/adapters/turnstile"
 	"github.com/rotaperfumes/shared/comercial/comercialmysql"
@@ -32,6 +33,14 @@ const (
 	resetMaxFalhas   = 10
 	resetJanela      = 5 * time.Minute
 	resetBloqueio    = 10 * time.Minute
+	// ECOM-01: autocadastro, toda tentativa conta (5 por IP a cada 10 min).
+	cadastroMax      = 5
+	cadastroJanela   = 10 * time.Minute
+	cadastroBloqueio = 30 * time.Minute
+	// ECOM-03: links de confirmação inválidos por IP.
+	confirmacaoMaxFalhas = 10
+	confirmacaoJanela    = 10 * time.Minute
+	confirmacaoBloqueio  = 30 * time.Minute
 )
 
 // ExtIdentidade são as dependências externas do contexto que variam entre
@@ -70,17 +79,34 @@ func NovaIdentidade(pool *sql.DB, cfg *config.Config, ext ExtIdentidade) *identi
 		Senhas:  identidadecrypto.GeradorSenha{},
 		Captcha: ext.Captcha,
 		Limites: identidadeapp.Limites{
-			Login:   ratelimit.Nova(loginMaxFalhas, loginJanela, loginBloqueio),
-			Refresh: ratelimit.Nova(refreshMaxFalhas, refreshJanela, refreshBloqueio),
-			Reset:   ratelimit.Nova(resetMaxFalhas, resetJanela, resetBloqueio),
+			Login:       ratelimit.Nova(loginMaxFalhas, loginJanela, loginBloqueio),
+			Refresh:     ratelimit.Nova(refreshMaxFalhas, refreshJanela, refreshBloqueio),
+			Reset:       ratelimit.Nova(resetMaxFalhas, resetJanela, resetBloqueio),
+			Cadastro:    ratelimit.Nova(cadastroMax, cadastroJanela, cadastroBloqueio),
+			Confirmacao: ratelimit.Nova(confirmacaoMaxFalhas, confirmacaoJanela, confirmacaoBloqueio),
 		},
 		Publicador: ext.Publicador,
 		Email:      ext.Email,
 		Vendedores: vendedoresParaIdentidade{vendedores: comercialmysql.NovoVendedores(pool)},
-		Relogio:    time.Now,
+		// ECOM-03: confirmação de e-mail do autocadastro.
+		Confirmacoes: identidademysql.NovoConfirmacoesEmail(pool),
+		TxConfirmacao: db.NewTransactor(pool, func(q db.Querier) identidadeapp.TxCadastro {
+			return identidadeapp.TxCadastro{
+				Usuarios:     identidademysql.NovoUsuarios(q),
+				Confirmacoes: identidademysql.NovoConfirmacoesEmail(q),
+				Clientes:     clientesLojaParaIdentidade{clientes: comercialmysql.NovoClientes(q)}, // ECOM-05
+			}
+		}),
+		EmailConfirmacao: emailConfirmacao(ext.Email),
+		ClientesLoja:     clientesLojaParaIdentidade{clientes: comercialmysql.NovoClientes(pool)},
+		Google:           verificadorGoogle(cfg),
+		Relogio:          time.Now,
 	}, identidadeapp.Opcoes{
 		JanelaSupressaoReuso: cfg.RefreshReuseSuppressWindow,
 		RetencaoRefresh:      cfg.RefreshTokenRetencao,
+		URLApp:               cfg.AppURL,
+		// ECOM-07: só grandes provedores no autocadastro.
+		DominiosEmailCadastro: cfg.CadastroEmailDominios,
 	})
 }
 
@@ -152,4 +178,24 @@ func NovoIdentidadeHTTP(c *identidadeapp.Casos, cfg *config.Config) IdentidadeHT
 // caso de uso StatusParaAutenticacao.
 func NovoVerificadorStatus(pool *sql.DB) httpx.ConsultaStatus {
 	return identidademysql.NovoUsuarios(pool)
+}
+
+// emailConfirmacao extrai o envio do link de confirmação (ECOM-03) do envio
+// de e-mail do processo (SMTP e Noop satisfazem); sem ele, nil (o cadastro
+// falha fechado).
+func emailConfirmacao(e identidadeapp.EnviadorSenhaInicial) identidadeapp.EnviadorConfirmacaoEmail {
+	if ec, ok := e.(identidadeapp.EnviadorConfirmacaoEmail); ok {
+		return ec
+	}
+	return nil
+}
+
+// verificadorGoogle liga o "Entrar com Google" (ECOM-02) quando há
+// GOOGLE_CLIENT_ID; sem ele, nil (as rotas respondem "não configurado").
+func verificadorGoogle(cfg *config.Config) identidadeapp.VerificadorGoogle {
+	if cfg.GoogleClientID == "" {
+		log.Printf("[server] login com Google desligado (GOOGLE_CLIENT_ID ausente)")
+		return nil
+	}
+	return googleid.Novo(cfg.GoogleClientID)
 }

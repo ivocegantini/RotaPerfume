@@ -19,10 +19,48 @@ type Usuario struct {
 	DeveTrocarSenha bool
 	IDVendedor      *int64
 	// VendedorNome vem do LEFT JOIN com vendedores (só leitura).
-	VendedorNome  *string
+	VendedorNome *string
+	// EmailPendente (ECOM-07): autocadastro aguardando o link do e-mail. Só
+	// é preenchido pela listagem do admin (consulta própria em lote).
+	EmailPendente bool
 	CriadoEm      time.Time
 	AtualizadoEm  time.Time
 	UltimoLoginEm *time.Time
+}
+
+// Status do usuário (ECOM-07): inativo prevalece; ativo com e-mail ainda
+// não confirmado é "pendente_email" (o login é recusado).
+const (
+	StatusAtivo         = "ativo"
+	StatusInativo       = "inativo"
+	StatusPendenteEmail = "pendente_email"
+)
+
+// Status devolve o status exibido ao admin.
+func (u *Usuario) Status() string {
+	switch {
+	case !u.Ativo:
+		return StatusInativo
+	case u.EmailPendente:
+		return StatusPendenteEmail
+	default:
+		return StatusAtivo
+	}
+}
+
+// ProvedorEmailPermitido (ECOM-07): o domínio do e-mail (já normalizado)
+// precisa estar na lista de provedores aceitos no autocadastro.
+func ProvedorEmailPermitido(email string, dominios []string) bool {
+	_, dominio, ok := strings.Cut(email, "@")
+	if !ok {
+		return false
+	}
+	for _, d := range dominios {
+		if dominio == d {
+			return true
+		}
+	}
+	return false
 }
 
 // EhAdmin é verdadeiro só para role "admin" exato (I-05).
@@ -91,6 +129,9 @@ func validarNomeERole(d DadosUsuario, depoisDoNome func() error) (UsuarioValidad
 	if !v.Role.Conhecido() {
 		return UsuarioValidado{}, ErrRoleInvalido
 	}
+	if v.Role.EhUsuarioLoja() && v.IDVendedor != nil {
+		return UsuarioValidado{}, ErrUsuarioLojaComVendedor
+	}
 	return v, nil
 }
 
@@ -106,6 +147,59 @@ func NovoUsuario(v UsuarioValidado, hash HashSenha) *Usuario {
 		DeveTrocarSenha: true,
 		IDVendedor:      v.IDVendedor,
 	}
+}
+
+// Limites do cadastro público (colunas VARCHAR(120) de usuarios).
+const (
+	NomeMaxRunes  = 120
+	EmailMaxRunes = 120
+)
+
+// ValidarCadastroLoja valida o autocadastro do cliente da loja (ECOM-01):
+// nome, e-mail com formato mínimo (local@dominio.tld, sem espaços) e senha
+// forte. O role é sempre "usuario", nunca vem do cliente.
+func ValidarCadastroLoja(nome, email string, senha Senha) (UsuarioValidado, error) {
+	v := UsuarioValidado{
+		Nome:  strings.TrimSpace(nome),
+		Email: strings.ToLower(strings.TrimSpace(email)),
+		Role:  kernel.RoleUsuario,
+	}
+	switch {
+	case v.Nome == "":
+		return UsuarioValidado{}, ErrNomeObrigatorio
+	case len([]rune(v.Nome)) > NomeMaxRunes:
+		return UsuarioValidado{}, ErrNomeMuitoLongo
+	case v.Email == "":
+		return UsuarioValidado{}, ErrEmailObrigatorio
+	case !emailPlausivel(v.Email):
+		return UsuarioValidado{}, ErrEmailInvalido
+	}
+	if err := ValidarForca(senha); err != nil {
+		return UsuarioValidado{}, err
+	}
+	return v, nil
+}
+
+// emailPlausivel: um @, parte local e domínio com ponto, sem espaço nem
+// controle, até EmailMaxRunes. Não substitui a confirmação por e-mail.
+func emailPlausivel(e string) bool {
+	if len([]rune(e)) > EmailMaxRunes || strings.Count(e, "@") != 1 {
+		return false
+	}
+	for _, r := range e {
+		if r <= ' ' || r == 0x7f {
+			return false
+		}
+	}
+	local, dominio, _ := strings.Cut(e, "@")
+	i := strings.LastIndex(dominio, ".")
+	return local != "" && i > 0 && i < len(dominio)-1 && !strings.Contains(dominio, "..")
+}
+
+// NovoUsuarioLoja monta o cliente da loja: ativo, sem troca obrigatória (a
+// senha foi escolhida por ele) e sem vendedor.
+func NovoUsuarioLoja(v UsuarioValidado, hash HashSenha) *Usuario {
+	return &Usuario{Nome: v.Nome, Email: v.Email, Role: kernel.RoleUsuario, Hash: hash, Ativo: true}
 }
 
 // StatusAcesso é o recorte do usuário consultado a cada request protegido

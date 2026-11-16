@@ -22,6 +22,14 @@ func (Noop) EnviarSenhaInicial(_ context.Context, destinatario, _, _ string) err
 	return nil
 }
 
+// EnviarConfirmacaoEmail não envia: registra o envio pulado (sem o link,
+// que carrega o token) e devolve ErrSMTPNaoConfigurado, para o cadastro
+// responder email_enviado=false (ECOM-03).
+func (Noop) EnviarConfirmacaoEmail(_ context.Context, destinatario, _, _ string) error {
+	log.Printf("[email] confirmação de email pulada: SMTP não configurado — destinatario=%s", vlog.MaskEmail(destinatario))
+	return notificacao.ErrSMTPNaoConfigurado
+}
+
 // EnviarAlertaReusoToken não envia: registra o alerta pulado (sem o e-mail do
 // usuário) e devolve notificacao.ErrSMTPNaoConfigurado, para o notificador
 // não registrar o alerta como "enviado" (LOG-01).

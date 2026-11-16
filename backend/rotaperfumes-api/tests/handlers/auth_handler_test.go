@@ -27,6 +27,13 @@ import (
 // de rede reais, apenas registra que foi chamado.
 type fakeEmailService struct {
 	chamadas int
+	// links: os links de confirmação enviados (ECOM-03).
+	links []string
+}
+
+func (f *fakeEmailService) EnviarConfirmacaoEmail(_ context.Context, _, _, link string) error {
+	f.links = append(f.links, link)
+	return nil
 }
 
 func (f *fakeEmailService) EnviarSenhaInicial(ctx context.Context, destinatario, nomeUsuario, senha string) error {
@@ -81,7 +88,10 @@ func testCfg() *config.Config {
 		JWTSecret: "test-secret-auth-handler-com-pelo-menos-32-bytes",
 		JWTIssuer: "rotaperfumes-test",
 		JWTTTL:    24 * time.Hour,
-		HashSenha: config.HashSenha{Pepper: "pepper-de-teste-com-pelo-menos-32-bytes", MemoriaKiB: 64, Iteracoes: 1, Paralelismo: 1}, // Argon2id mínimo para acelerar os testes
+		AppURL:    "http://app.teste", // ECOM-03: base do link de confirmação
+		// ECOM-07: provedores aceitos no autocadastro dos testes.
+		CadastroEmailDominios: []string{"loja.com", "gmail.com"},
+		HashSenha:             config.HashSenha{Pepper: "pepper-de-teste-com-pelo-menos-32-bytes", MemoriaKiB: 64, Iteracoes: 1, Paralelismo: 1}, // Argon2id mínimo para acelerar os testes
 	}
 }
 

@@ -125,6 +125,29 @@ type Config struct {
 	// diretório de execução); sempre absoluto e limpo depois do Load. Vazio,
 	// "/" ou dentro de frontend/public derrubam a subida.
 	ProdutoImagensDir string
+
+	// AppURL é a URL pública do frontend (APP_URL), base do link de
+	// confirmação de e-mail (ECOM-03). Ausente: a primeira origem de
+	// CORSAllowedOrigins. Nunca derivada do request (Host/Origin).
+	AppURL string
+
+	// CadastroEmailDominios são os provedores de e-mail aceitos no
+	// autocadastro da loja (CADASTRO_EMAIL_DOMINIOS, ECOM-07), em minúsculas.
+	// Ausente: DominiosEmailPadrao.
+	CadastroEmailDominios []string
+
+	// GoogleClientID (GOOGLE_CLIENT_ID, ECOM-02) é o Client ID OAuth do
+	// "Entrar com Google" (audiência do ID token). Vazio: login com Google
+	// desligado.
+	GoogleClientID string
+}
+
+// DominiosEmailPadrao são os grandes provedores aceitos quando
+// CADASTRO_EMAIL_DOMINIOS não está definido (ECOM-07).
+var DominiosEmailPadrao = []string{
+	"gmail.com", "googlemail.com", "outlook.com", "outlook.com.br", "hotmail.com", "hotmail.com.br",
+	"live.com", "msn.com", "yahoo.com", "yahoo.com.br", "icloud.com", "me.com",
+	"uol.com.br", "bol.com.br", "terra.com.br", "proton.me", "protonmail.com",
 }
 
 // HashSenha são os parâmetros do hash de senha (SEC-13): Argon2id sobre o
@@ -294,6 +317,18 @@ func load(exigirDB bool) (*Config, error) {
 
 	vlog.Printf("config.go", "load", "lendo PRODUTO_IMAGENS_DIR e verificando erro")
 	if cfg.ProdutoImagensDir, err = parseProdutoImagensDir(); err != nil {
+		return nil, err
+	}
+
+	vlog.Printf("config.go", "load", "lendo CADASTRO_EMAIL_DOMINIOS e verificando erro")
+	if cfg.CadastroEmailDominios, err = parseDominiosEmail(os.Getenv("CADASTRO_EMAIL_DOMINIOS")); err != nil {
+		return nil, err
+	}
+
+	cfg.GoogleClientID = strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+
+	vlog.Printf("config.go", "load", "lendo APP_URL e verificando erro")
+	if cfg.AppURL, err = parseAppURL(os.Getenv("APP_URL"), cfg.CORSAllowedOrigins, cfg.CookieSecure); err != nil {
 		return nil, err
 	}
 
@@ -683,4 +718,67 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// ErrAppURL: APP_URL que não é uma URL http(s) absoluta simples, ou http com
+// COOKIE_SECURE=true (ECOM-03).
+var ErrAppURL = errors.New("config: APP_URL inválida (use http(s)://host[:porta][/caminho], sem usuário, query ou fragmento; https quando COOKIE_SECURE=true)")
+
+// parseAppURL valida APP_URL; vazia cai na primeira origem do CORS (já
+// validada). Devolve sem barra final.
+func parseAppURL(bruto string, origens []string, cookieSeguro bool) (string, error) {
+	v := strings.TrimSpace(bruto)
+	if v == "" {
+		if len(origens) == 0 {
+			return "", nil
+		}
+		return strings.TrimRight(origens[0], "/"), nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
+		(u.Scheme != "https" && u.Scheme != "http") || (cookieSeguro && u.Scheme != "https") {
+		return "", ErrAppURL
+	}
+	return strings.TrimRight(v, "/"), nil
+}
+
+// ErrDominiosEmail: CADASTRO_EMAIL_DOMINIOS com item que não é um domínio
+// simples (letras, dígitos, hífen e pontos, com ao menos um ponto).
+var ErrDominiosEmail = errors.New("config: CADASTRO_EMAIL_DOMINIOS inválido (lista de domínios separados por vírgula, ex.: gmail.com,outlook.com)")
+
+// parseDominiosEmail lê a lista (vírgulas, sem diferenciar maiúsculas, sem
+// "@" inicial); ausente ou só espaços usa DominiosEmailPadrao.
+func parseDominiosEmail(bruto string) ([]string, error) {
+	if strings.TrimSpace(bruto) == "" {
+		return slices.Clone(DominiosEmailPadrao), nil
+	}
+	var out []string
+	for _, item := range strings.Split(bruto, ",") {
+		d := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(item)), "@")
+		if d == "" {
+			continue
+		}
+		if !dominioSimples(d) {
+			return nil, ErrDominiosEmail
+		}
+		if !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	if len(out) == 0 {
+		return nil, ErrDominiosEmail
+	}
+	return out, nil
+}
+
+func dominioSimples(d string) bool {
+	if !strings.Contains(d, ".") || strings.HasPrefix(d, ".") || strings.HasSuffix(d, ".") || strings.Contains(d, "..") {
+		return false
+	}
+	for _, r := range d {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '.') {
+			return false
+		}
+	}
+	return true
 }

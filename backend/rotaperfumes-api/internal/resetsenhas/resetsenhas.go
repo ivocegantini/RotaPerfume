@@ -120,6 +120,7 @@ func Imprimir(out io.Writer, itens []identidadeapp.ItemResetMassa) {
 		fmt.Fprintf(out, "%-5d %-45s %-7s %s\n", it.ID, vlog.MaskEmail(it.Email), it.Role, it.Status)
 		cont[it.Status]++
 	}
-	fmt.Fprintf(out, "Total: %d | resetados: %d | simulados: %d | falha de e-mail: %d\n",
-		len(itens), cont[identidadeapp.StatusResetado], cont[identidadeapp.StatusSimulado], cont[identidadeapp.StatusFalhaEmail])
+	fmt.Fprintf(out, "Total: %d | resetados: %d | simulados: %d | falha de e-mail: %d | pulados (e-mail pendente): %d\n",
+		len(itens), cont[identidadeapp.StatusResetado], cont[identidadeapp.StatusSimulado], cont[identidadeapp.StatusFalhaEmail],
+		cont[identidadeapp.StatusPuladoEmailPendente])
 }

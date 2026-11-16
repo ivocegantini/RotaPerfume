@@ -122,7 +122,7 @@
               "    pm.response.to.have.status(200);",
               "});",
               "pm.test('Resposta contém user com role', function() {",
-              "    pm.expect(jsonData.data.user.role).to.be.oneOf(['admin', 'normal']);",
+              "    pm.expect(jsonData.data.user.role).to.be.oneOf(['admin', 'normal', 'usuario']);",
               "});",
               "pm.test('Contém access_token', function() {",
               "    pm.expect(jsonData.data.access_token).to.be.a('string').and.to.not.be.empty;",
@@ -287,6 +287,200 @@
           "body": "{\n  \"success\": false,\n  \"error\": \"email e senha são obrigatórios\"\n}"
         }
       ]
+    },
+    {
+      "name": "Cadastro — Cliente da Loja (público, ECOM-01)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201 (ou 409 se o e-mail já existe)', function() {",
+              "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+              "});",
+              "if (pm.response.code === 201) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.test('Conta pendente, sem sessão (ECOM-03)', function() {",
+              "        pm.expect(jsonData.data).to.have.property('email_enviado');",
+              "        pm.expect(jsonData.data).to.not.have.property('user');",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"nome\": \"Cliente Teste\",\n    \"email\": \"cliente.teste@exemplo.com\",\n    \"password\": \"Loja#2026ok\",\n    \"cpf\": \"529.982.247-25\",\n    \"cep\": \"01001-000\",\n    \"endereco\": \"Praça da Sé\",\n    \"numero\": \"10\",\n    \"complemento\": \"\",\n    \"bairro\": \"Sé\",\n    \"cidade\": \"São Paulo\",\n    \"uf\": \"SP\",\n    \"captchaToken\": \"TESTING_TOKEN\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/cadastro",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "cadastro"]
+        },
+        "description": "Autocadastro do cliente da loja (role `usuario`, nunca vem do body). ECOM-05: cria também o cliente pessoa física (CPF com DV, endereço, CEP, cidade, UF; segmento `Loja Online`) ligado ao login, na mesma transação; CPF ou e-mail repetido → 409 neutro. ECOM-07: só e-mails de provedores em `CADASTRO_EMAIL_DOMINIOS` (senão 400). Captcha Turnstile (action `cadastro`) + 5 tentativas por IP a cada 10 min.\n\n201 cria a conta com o e-mail PENDENTE e envia o link de confirmação (ECOM-03): sem sessão; o login responde 403 até confirmar. E-mail repetido: 409 com mensagem neutra. Senha: 8+ caracteres e 3 de 4 classes."
+      }
+    },
+    {
+      "name": "Entrar com Google (público, ECOM-02)",
+      "event": [],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"credential\": \"<ID token do Google Identity Services>\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/google",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "google"
+          ]
+        },
+        "description": "Valida o ID token (RS256/JWKS do Google, iss, aud = GOOGLE_CLIENT_ID, exp, email_verified). Conta da loja: 200 com a resposta do login e cookies (pendente vira confirmada). Sem conta: 200 `{cadastro_necessario, email, nome}`. Admin/equipe: 403. Sem GOOGLE_CLIENT_ID: 403 \"não está configurado\"."
+      }
+    },
+    {
+      "name": "Criar Conta com Google (público, ECOM-02)",
+      "event": [],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"credential\": \"<ID token do Google>\",\n    \"cpf\": \"529.982.247-25\",\n    \"cep\": \"01001-000\",\n    \"endereco\": \"Praça da Sé\",\n    \"numero\": \"10\",\n    \"complemento\": \"\",\n    \"bairro\": \"Sé\",\n    \"cidade\": \"São Paulo\",\n    \"uf\": \"SP\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/google/cadastro",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "google",
+            "cadastro"
+          ]
+        },
+        "description": "Cria o cliente da loja com nome e e-mail do Google (já confirmado, sem link) + cliente pessoa física; abre a sessão → 201. Vale a lista CADASTRO_EMAIL_DOMINIOS; e-mail/CPF repetido → 409 neutro."
+      }
+    },
+    {
+      "name": "Confirmar E-mail (público, ECOM-03)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 ou 400', function() { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"token\": \"<token do link: parte depois de #token=>\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/confirmar-email",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "confirmar-email"
+          ]
+        },
+        "description": "Confirma o e-mail do autocadastro. O token vem do link enviado por e-mail (no fragmento `#token=`). 200 libera o login; link inválido, já usado ou expirado (24h) → 400. Links inválidos contam no rate limit por IP."
+      }
+    },
+    {
+      "name": "Reenviar Confirmação de E-mail (público, ECOM-03)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 (neutro)', function() { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"cliente.teste@exemplo.com\",\n    \"captchaToken\": \"TESTING_TOKEN\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/reenviar-confirmacao",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "reenviar-confirmacao"
+          ]
+        },
+        "description": "Gera um novo link (invalida os anteriores) para conta da loja ainda pendente. Resposta sempre 200 neutra (não revela se o e-mail tem conta). Captcha action `reenviar-confirmacao`."
+      }
     },
     {
       "name": "Login — Vendedor (primeiro acesso)",
@@ -5801,6 +5995,115 @@
               "body": "{\n  \"success\": false,\n  \"error\": \"acesso restrito a administradores\"\n}"
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Loja (ECOM-01)",
+      "item": [
+        {
+          "name": "Vitrine — Opções dos Filtros (ECOM-04)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "var d = pm.response.json().data;",
+                  "pm.test('Listas de filtros', function() {",
+                  "    pm.expect(d.categorias).to.be.an('array');",
+                  "    pm.expect(d.marcas).to.be.an('array');",
+                  "    pm.expect(d.notas_olfativas).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{base_url}}/api/loja/filtros", "host": ["{{base_url}}"], "path": ["api", "loja", "filtros"]},
+            "description": "AnyRole. Categorias, marcas e notas olfativas distintas dos produtos ativos, em ordem alfabética."
+          }
+        },
+        {
+          "name": "Vitrine — Listar Produtos (qualquer usuário logado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Sem custo na vitrine', function() {",
+                  "    jsonData.data.forEach(function(p) { pm.expect(p).to.not.have.property('custo_unitario'); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/loja/produtos?page=1&limit=24&q=&categoria=&marca=&nota_olfativa=&order_by=preco_tabela&order_dir=asc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "loja", "produtos"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "24"
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Busca em descrição ou SKU"
+                },
+                {
+                  "key": "categoria",
+                  "value": "",
+                  "description": "Valor exato (ver /api/loja/filtros)"
+                },
+                {
+                  "key": "marca",
+                  "value": "",
+                  "description": "Valor exato"
+                },
+                {
+                  "key": "nota_olfativa",
+                  "value": "",
+                  "description": "Valor exato (ECOM-04)"
+                },
+                {
+                  "key": "order_by",
+                  "value": "preco_tabela",
+                  "description": "descricao (padrão), categoria, marca, preco_tabela"
+                },
+                {
+                  "key": "order_dir",
+                  "value": "asc"
+                }
+              ]
+            },
+            "description": "Política AnyRole: aceita o `usuario` da loja e a equipe. Só produtos ativos (`?ativo` é ignorado); resposta sem custo, ativo e timestamps; preço em `preco`."
+          }
         }
       ]
     },

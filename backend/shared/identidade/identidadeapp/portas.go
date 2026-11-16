@@ -154,9 +154,80 @@ type Limitador interface {
 	RegistrarSucesso(chave string)
 }
 
-// Limites são os três limitadores, singletons por processo (I-14).
+// Limites são os limitadores, singletons por processo (I-14). Cadastro
+// (ECOM-01) conta TODA tentativa de autocadastro por IP; nil usa o Login.
 type Limites struct {
 	Login, Refresh, Reset Limitador
+	Cadastro              Limitador
+	// Confirmacao (ECOM-03) conta links inválidos por IP; nil usa o Login.
+	Confirmacao Limitador
+}
+
+// ConfirmacoesEmail são as leituras da confirmação de e-mail (ECOM-03).
+type ConfirmacoesEmail interface {
+	// EmailPendente: usuarios.email_confirmacao_pendente (inexistente:
+	// identidade.ErrUsuarioNaoEncontrado).
+	EmailPendente(ctx context.Context, usuarioID int64) (bool, error)
+	// PorHash: identidade.ErrConfirmacaoInvalida se o hash não existir.
+	PorHash(ctx context.Context, hash string) (*identidade.ConfirmacaoEmail, error)
+	// PendentesEntre devolve, dos ids informados, os com e-mail pendente
+	// (ECOM-07, status na listagem do admin).
+	PendentesEntre(ctx context.Context, ids []int64) (map[int64]bool, error)
+}
+
+// RepoConfirmacaoTx são as escritas da confirmação, sempre dentro de tx.
+type RepoConfirmacaoTx interface {
+	Inserir(ctx context.Context, c *identidade.ConfirmacaoEmail) error
+	// InvalidarDoUsuario marca usados os links ainda abertos (reenvio).
+	InvalidarDoUsuario(ctx context.Context, usuarioID int64, quando time.Time) error
+	// MarcarUsada é condicional (usado_em IS NULL): sem linha afetada,
+	// identidade.ErrConfirmacaoInvalida (duplo clique concorrente).
+	MarcarUsada(ctx context.Context, id int64, quando time.Time) error
+	DefinirPendente(ctx context.Context, usuarioID int64, pendente bool) error
+}
+
+// TxCadastro liga usuário e confirmação na mesma tx (ECOM-03): a conta
+// nunca existe sem a marca de pendente e o link.
+type TxCadastro struct {
+	Usuarios interface {
+		Inserir(ctx context.Context, u *identidade.Usuario) error
+	}
+	Confirmacoes RepoConfirmacaoTx
+	// Clientes cria o cliente (contexto Comercial) do login da loja na mesma
+	// tx (ECOM-05). CPF repetido: identidade.ErrCadastroIndisponivel.
+	Clientes interface {
+		CriarClienteLoja(ctx context.Context, usuarioID int64, nome string, d DadosClienteLoja) error
+	}
+}
+
+// DadosClienteLoja são os dados do cliente pessoa física pedidos no
+// autocadastro (ECOM-05), como digitados.
+type DadosClienteLoja struct {
+	CPF, Endereco, Numero, Complemento, Bairro, CEP, Cidade, UF string
+}
+
+// ClientesLoja valida os dados do cliente da loja antes de gravar (porta
+// para o contexto Comercial, ligada no bootstrap).
+type ClientesLoja interface {
+	ValidarClienteLoja(nome string, d DadosClienteLoja) error
+}
+
+// TransactorCadastro é o UoW do cadastro, da confirmação e do reenvio.
+type TransactorCadastro interface {
+	WithTx(ctx context.Context, fn func(TxCadastro) error) error
+}
+
+// VerificadorGoogle valida o ID token do Google (ECOM-02; adapters/googleid
+// satisfaz). Token inválido: identidade.ErrGoogleTokenInvalido; sem Client
+// ID: identidade.ErrGoogleIndisponivel.
+type VerificadorGoogle interface {
+	Verificar(ctx context.Context, idToken string) (identidade.PerfilGoogle, error)
+}
+
+// EnviadorConfirmacaoEmail envia o link de confirmação (ECOM-03). O link
+// carrega o token: nunca é logado.
+type EnviadorConfirmacaoEmail interface {
+	EnviarConfirmacaoEmail(ctx context.Context, destinatario, nomeUsuario, link string) error
 }
 
 // Publicador entrega o evento de reuso aos assinantes (Observer, §5.12).

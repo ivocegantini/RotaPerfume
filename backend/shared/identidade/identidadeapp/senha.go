@@ -58,6 +58,10 @@ func (c *Casos) TrocarSenha(ctx context.Context, p kernel.Principal, cmd Comando
 	if err != nil {
 		return erroLeituraUsuario("[auth] reset-password: GetByID", err)
 	}
+	// ECOM-08: antes de conferir a senha atual (não gasta o rate limit).
+	if err := c.bloquearTrocaSeEmailPendente(ctx, u, "[auth] reset-password"); err != nil {
+		return err
+	}
 	if err := c.validarNovaSenha(ctx, u, cmd, chave); err != nil {
 		return err
 	}
@@ -259,6 +263,10 @@ func (c *Casos) senhaGeradaPara(ctx context.Context, id int64) (*identidade.Usua
 	alvo, err := c.d.Usuarios.PorID(ctx, id)
 	if err != nil {
 		return nil, identidade.Senha{}, identidade.HashSenha{}, erroLeituraUsuario("[usuarios] AdminResetPassword", err)
+	}
+	// ECOM-08: reset (admin e em massa) recusado com o e-mail pendente.
+	if err := c.bloquearTrocaSeEmailPendente(ctx, alvo, "[usuarios] admin reset"); err != nil {
+		return nil, identidade.Senha{}, identidade.HashSenha{}, err
 	}
 	var senha identidade.Senha
 	var hash identidade.HashSenha

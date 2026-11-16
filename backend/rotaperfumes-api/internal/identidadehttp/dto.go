@@ -40,6 +40,44 @@ type (
 	adminResetRequest struct {
 		UsuarioID int64 `json:"usuario_id"`
 	}
+	// cadastroRequest é o autocadastro da loja (ECOM-01); não aceita role.
+	// googleRequest (ECOM-02): credential = ID token do Google Identity Services.
+	googleRequest struct {
+		Credential string `json:"credential"`
+	}
+	googleCadastroRequest struct {
+		Credential  string `json:"credential"`
+		CPF         string `json:"cpf"`
+		Endereco    string `json:"endereco"`
+		Numero      string `json:"numero"`
+		Complemento string `json:"complemento"`
+		Bairro      string `json:"bairro"`
+		CEP         string `json:"cep"`
+		Cidade      string `json:"cidade"`
+		UF          string `json:"uf"`
+	}
+	confirmarEmailRequest struct {
+		Token string `json:"token"`
+	}
+	reenviarConfirmacaoRequest struct {
+		Email        string `json:"email"`
+		CaptchaToken string `json:"captchaToken"`
+	}
+	cadastroRequest struct {
+		Nome         string `json:"nome"`
+		Email        string `json:"email"`
+		Password     string `json:"password"`
+		CaptchaToken string `json:"captchaToken"`
+		// Cliente pessoa física criado junto (ECOM-05).
+		CPF         string `json:"cpf"`
+		Endereco    string `json:"endereco"` // logradouro (ECOM-09)
+		Numero      string `json:"numero"`
+		Complemento string `json:"complemento"`
+		Bairro      string `json:"bairro"`
+		CEP         string `json:"cep"` // opcional (ECOM-09)
+		Cidade      string `json:"cidade"`
+		UF          string `json:"uf"`
+	}
 )
 
 // Respostas. Campos em ordem alfabética: o JSON sai byte a byte igual ao
@@ -65,6 +103,19 @@ type (
 	mensagemResposta struct {
 		Mensagem string `json:"mensagem"`
 	}
+	// googleCadastroNecessario (ECOM-02): sem conta para o e-mail do Google;
+	// o frontend completa o cadastro com nome e e-mail já preenchidos.
+	googleCadastroNecessario struct {
+		CadastroNecessario bool   `json:"cadastro_necessario"`
+		Email              string `json:"email"`
+		Nome               string `json:"nome"`
+	}
+	// cadastroResposta (ECOM-03): conta criada pendente, sem sessão.
+	cadastroResposta struct {
+		Email        string `json:"email"`
+		EmailEnviado bool   `json:"email_enviado"`
+		Mensagem     string `json:"mensagem"`
+	}
 	meResposta struct {
 		Ativo             bool       `json:"ativo"`
 		CreatedAt         time.Time  `json:"created_at"`
@@ -79,13 +130,15 @@ type (
 	}
 	// usuarioListagem é o item de GET /api/usuarios (sem updated_at).
 	usuarioListagem struct {
-		Ativo         bool       `json:"ativo"`
-		CreatedAt     time.Time  `json:"created_at"`
-		Email         string     `json:"email"`
-		ID            int64      `json:"id"`
-		IDVendedor    *int64     `json:"id_vendedor"`
-		Nome          string     `json:"nome"`
-		Role          string     `json:"role"`
+		Ativo      bool      `json:"ativo"`
+		CreatedAt  time.Time `json:"created_at"`
+		Email      string    `json:"email"`
+		ID         int64     `json:"id"`
+		IDVendedor *int64    `json:"id_vendedor"`
+		Nome       string    `json:"nome"`
+		Role       string    `json:"role"`
+		// Status (ECOM-07): ativo | inativo | pendente_email.
+		Status        string     `json:"status"`
 		UltimoLoginAt *time.Time `json:"ultimo_login_at"`
 		VendedorNome  string     `json:"vendedor_nome"`
 	}
@@ -158,7 +211,7 @@ func novoMeResposta(u *identidade.Usuario, desligado bool) meResposta {
 func novoUsuarioListagem(u identidade.Usuario) usuarioListagem {
 	return usuarioListagem{
 		Ativo: u.Ativo, CreatedAt: u.CriadoEm, Email: u.Email, ID: u.ID, IDVendedor: u.IDVendedor,
-		Nome: u.Nome, Role: u.Role.String(), UltimoLoginAt: u.UltimoLoginEm, VendedorNome: textoOuVazio(u.VendedorNome),
+		Nome: u.Nome, Role: u.Role.String(), Status: u.Status(), UltimoLoginAt: u.UltimoLoginEm, VendedorNome: textoOuVazio(u.VendedorNome),
 	}
 }
 

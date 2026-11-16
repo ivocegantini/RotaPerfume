@@ -24,7 +24,7 @@ import {
   apiToggleUserStatus,
   apiAdminResetPassword,
 } from "@/lib/api";
-import { User, UserRole } from "@/lib/types";
+import { StatusUsuario, User, UserRole } from "@/lib/types";
 import { vlog } from "@/lib/vlog";
 import { TOGGLE_BLOQUEIO_MS, useBloqueioToggle } from "@/lib/useBloqueioToggle";
 
@@ -42,12 +42,26 @@ const ROLE_FILTER_OPTIONS: { value: "" | UserRole; label: string }[] = [
   { value: "", label: "Todos os perfis" },
   { value: "admin", label: "Administrador" },
   { value: "normal", label: "Usuario Padrao" },
+  { value: "usuario", label: "Cliente da Loja" },
 ];
 
-const STATUS_OPTIONS: { value: "" | "ativo" | "inativo"; label: string }[] = [
+// ECOM-07: status vindo da API (ativo | inativo | pendente_email); sem o
+// campo, deriva de ativo.
+function statusDoUsuario(u: User): StatusUsuario {
+  return u.status ?? (u.ativo ? "ativo" : "inativo");
+}
+
+const ROTULO_STATUS: Record<StatusUsuario, string> = {
+  ativo: "Ativo",
+  inativo: "Inativo",
+  pendente_email: "Pendente de e-mail",
+};
+
+const STATUS_OPTIONS: { value: "" | StatusUsuario; label: string }[] = [
   { value: "", label: "Todos os status" },
   { value: "ativo", label: "Ativo" },
   { value: "inativo", label: "Inativo" },
+  { value: "pendente_email", label: "Pendente de e-mail" },
 ];
 
 const VENDEDOR_FILTER_OPTIONS: { value: "" | "sim" | "nao"; label: string }[] = [
@@ -64,6 +78,7 @@ const LIMIT_OPTIONS = [
 ];
 
 function roleLabel(role: UserRole): string {
+  if (role === "usuario") return "Cliente da Loja"; // ECOM-01
   return role === "admin" ? "Administrador" : "Usuario Padrao";
 }
 
@@ -87,7 +102,7 @@ function UsuariosPageContent() {
   vlog(FILE, "UsuariosPageContent", "inicializando estado do filtro de perfil");
   const [roleFilter, setRoleFilter] = useState<"" | UserRole>("");
   vlog(FILE, "UsuariosPageContent", "inicializando estado do filtro de status");
-  const [statusFilter, setStatusFilter] = useState<"" | "ativo" | "inativo">("");
+  const [statusFilter, setStatusFilter] = useState<"" | StatusUsuario>("");
   vlog(FILE, "UsuariosPageContent", "inicializando estado do filtro de vinculo a vendedor");
   const [vendedorFilter, setVendedorFilter] = useState<"" | "sim" | "nao">("");
   vlog(FILE, "UsuariosPageContent", "inicializando estado da coluna de ordenacao");
@@ -272,10 +287,8 @@ function UsuariosPageContent() {
     }
     vlog(FILE, "UsuariosPageContent.filtered", "verificando filtro de status (status=%s)", statusFilter);
     if (statusFilter) {
-      vlog(FILE, "UsuariosPageContent.filtered", "calculando status desejado");
-      const wantAtivo = statusFilter === "ativo";
-      vlog(FILE, "UsuariosPageContent.filtered", "filtrando por status (ativo=%s)", wantAtivo);
-      list = list.filter((u) => u.ativo === wantAtivo);
+      vlog(FILE, "UsuariosPageContent.filtered", "filtrando por status (%s)", statusFilter);
+      list = list.filter((u) => statusDoUsuario(u) === statusFilter);
     }
     vlog(FILE, "UsuariosPageContent.filtered", "verificando filtro de vinculo a vendedor (vinculo=%s)", vendedorFilter);
     if (vendedorFilter) {
@@ -532,18 +545,20 @@ function UsuariosPageContent() {
           className={[
             "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-colors",
             "disabled:cursor-not-allowed disabled:opacity-60",
-            u.ativo
-              ? "bg-green-100 text-green-700 hover:bg-green-200"
-              : "bg-red-100 text-red-700 hover:bg-red-200",
+            {
+              ativo: "bg-green-100 text-green-700 hover:bg-green-200",
+              inativo: "bg-red-100 text-red-700 hover:bg-red-200",
+              pendente_email: "bg-amber-100 text-amber-800 hover:bg-amber-200",
+            }[statusDoUsuario(u)],
           ].join(" ")}
         >
           <span
             className={[
               "h-2 w-2 rounded-full",
-              u.ativo ? "bg-green-500" : "bg-red-500",
+              { ativo: "bg-green-500", inativo: "bg-red-500", pendente_email: "bg-amber-500" }[statusDoUsuario(u)],
             ].join(" ")}
           />
-          {u.ativo ? "Ativo" : "Inativo"}
+          {ROTULO_STATUS[statusDoUsuario(u)]}
         </button>
       ),
     },
@@ -568,7 +583,12 @@ function UsuariosPageContent() {
             loading={
               action.type === "reset" && action.userId === u.id
             }
-            disabled={action.type !== null}
+            disabled={action.type !== null || statusDoUsuario(u) === "pendente_email"}
+            title={
+              statusDoUsuario(u) === "pendente_email"
+                ? "Bloqueado: o usuario ainda nao confirmou o email (ECOM-08)"
+                : undefined
+            }
             onClick={() => handleResetPassword(u)}
           >
             Resetar
@@ -658,7 +678,7 @@ function UsuariosPageContent() {
                   options={STATUS_OPTIONS}
                   value={statusFilter}
                   onChange={(e) =>
-                    setStatusFilter(e.target.value as "" | "ativo" | "inativo")
+                    setStatusFilter(e.target.value as "" | StatusUsuario)
                   }
                 />
               </div>

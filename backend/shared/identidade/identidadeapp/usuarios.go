@@ -19,7 +19,34 @@ func (c *Casos) ListarUsuarios(ctx context.Context, p kernel.Principal, o kernel
 	if err := exigirAdmin(p); err != nil {
 		return kernel.Resultado[identidade.Usuario]{}, err
 	}
-	return c.d.Usuarios.Listar(ctx, o, pg)
+	r, err = c.d.Usuarios.Listar(ctx, o, pg)
+	if err != nil {
+		return r, err
+	}
+	return r, c.marcarPendentes(ctx, r.Itens)
+}
+
+// marcarPendentes preenche EmailPendente dos clientes da loja da página
+// (ECOM-07). Só consulta quando há "usuario" na página: os papéis criados
+// pelo admin nunca ficam pendentes.
+func (c *Casos) marcarPendentes(ctx context.Context, itens []identidade.Usuario) error {
+	var ids []int64
+	for _, u := range itens {
+		if u.Role.EhUsuarioLoja() {
+			ids = append(ids, u.ID)
+		}
+	}
+	if len(ids) == 0 || c.d.Confirmacoes == nil {
+		return nil
+	}
+	pendentes, err := c.d.Confirmacoes.PendentesEntre(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("identidadeapp: listar usuários: pendentes: %w", err)
+	}
+	for i := range itens {
+		itens[i].EmailPendente = pendentes[itens[i].ID]
+	}
+	return nil
 }
 
 // CriarUsuario cria o usuário com senha aleatória enviada por e-mail (nunca

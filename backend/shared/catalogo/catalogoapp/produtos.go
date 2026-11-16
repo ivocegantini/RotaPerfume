@@ -76,3 +76,13 @@ func (c *Casos) AlternarAtivoProduto(ctx context.Context, id int64, ativo *bool)
 	vlog.Printf(arqProdutos, "Catalogo.AlternarAtivoProduto", "decisão ativo=%t id=%d", p.Ativo, id)
 	return p, nil
 }
+
+// OpcoesFiltroLoja devolve as opções dos filtros da vitrine (ECOM-04).
+func (c *Casos) OpcoesFiltroLoja(ctx context.Context) (o catalogo.OpcoesFiltroLoja, err error) {
+	defer vlog.Trace(arqProdutos, "Catalogo.OpcoesFiltroLoja", "")(&err)
+	repo, ok := c.produtos.(OpcoesLoja)
+	if !ok {
+		return catalogo.OpcoesFiltroLoja{}, errors.New("catalogoapp: repositório sem opções de filtro da loja")
+	}
+	return repo.OpcoesFiltroLoja(ctx)
+}

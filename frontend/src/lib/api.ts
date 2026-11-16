@@ -1,4 +1,11 @@
 import {
+  CadastroRequest,
+  GoogleCadastroNecessario,
+  GoogleCadastroRequest,
+  CadastroResponse,
+  FiltrosLoja,
+  OpcoesFiltroLoja,
+  ProdutoLoja,
   LoginRequest,
   LoginResponse,
   User,
@@ -84,7 +91,7 @@ export interface ListUsersResponse {
 // (ex. https://host:8443/api) e os endpoints ja comecam com "/api/...".
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080").replace(/\/+$/, "");
 
-interface Paginado<L extends unknown[]> {
+export interface Paginado<L extends unknown[]> {
   data: L;
   page: number;
   limit: number;
@@ -149,6 +156,87 @@ export async function apiLogin(
     body: JSON.stringify(body),
     noRefresh: true,
   });
+}
+
+// ECOM-01/03: autocadastro do cliente da loja. Cria o role "usuario" com o
+// e-mail pendente e envia o link de confirmacao; NAO abre sessao.
+// ECOM-05: o corpo leva tambem o cliente pessoa fisica (CPF, endereco, CEP,
+// cidade, UF), criado junto com o login.
+export async function apiCadastro(body: CadastroRequest): Promise<CadastroResponse> {
+  vlog(F, "apiCadastro", "enviando cadastro (credenciais e CPF não logados)");
+  return fetchWithAuth<CadastroResponse>("/api/auth/cadastro", {
+    method: "POST",
+    body: JSON.stringify(body),
+    noRefresh: true,
+  });
+}
+
+// ECOM-02: POST /api/auth/google — com conta da loja abre a sessao (resposta
+// do login); sem conta, devolve cadastro_necessario com nome e e-mail.
+export async function apiGoogle(credential: string): Promise<LoginResponse | GoogleCadastroNecessario> {
+  vlog(F, "apiGoogle", "enviando credencial do Google (não logada)");
+  return fetchWithAuth<LoginResponse | GoogleCadastroNecessario>("/api/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+    noRefresh: true,
+  });
+}
+
+// ECOM-02: POST /api/auth/google/cadastro — cria a conta (ja confirmada) e
+// o cliente, e abre a sessao.
+export async function apiGoogleCadastro(body: GoogleCadastroRequest): Promise<LoginResponse> {
+  vlog(F, "apiGoogleCadastro", "enviando cadastro com Google (credencial e CPF não logados)");
+  return fetchWithAuth<LoginResponse>("/api/auth/google/cadastro", {
+    method: "POST",
+    body: JSON.stringify(body),
+    noRefresh: true,
+  });
+}
+
+// ECOM-03: POST /api/auth/confirmar-email (token do link, lido do #fragmento).
+export async function apiConfirmarEmail(token: string): Promise<{ mensagem: string }> {
+  vlog(F, "apiConfirmarEmail", "enviando confirmacao de email (token não logado)");
+  return fetchWithAuth<{ mensagem: string }>("/api/auth/confirmar-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+    noRefresh: true,
+  });
+}
+
+// ECOM-03: POST /api/auth/reenviar-confirmacao (resposta sempre neutra).
+export async function apiReenviarConfirmacao(email: string, captchaToken?: string): Promise<{ mensagem: string }> {
+  vlog(F, "apiReenviarConfirmacao", "pedindo novo link de confirmacao");
+  return fetchWithAuth<{ mensagem: string }>("/api/auth/reenviar-confirmacao", {
+    method: "POST",
+    body: JSON.stringify({ email, captchaToken }),
+    noRefresh: true,
+  });
+}
+
+// ECOM-01: GET /api/loja/produtos — vitrine (so ativos, sem custo).
+export async function apiListProdutosLoja(
+  page = 1,
+  limit = 24,
+  q = "",
+  orderBy?: "descricao" | "marca" | "preco_tabela",
+  orderDir?: "asc" | "desc",
+  filtros: FiltrosLoja = {}
+): Promise<Paginado<ProdutoLoja[]>> {
+  vlog(F, "apiListProdutosLoja", "montando query string da vitrine");
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (q.trim()) qs.set("q", q.trim());
+  if (filtros.categoria) qs.set("categoria", filtros.categoria);
+  if (filtros.marca) qs.set("marca", filtros.marca);
+  if (filtros.nota_olfativa) qs.set("nota_olfativa", filtros.nota_olfativa);
+  if (orderBy) qs.set("order_by", orderBy);
+  if (orderDir) qs.set("order_dir", orderDir);
+  return listarPaginado<ProdutoLoja[]>(`/api/loja/produtos?${qs.toString()}`, page, limit);
+}
+
+// ECOM-04: GET /api/loja/filtros — opcoes de categoria, marca e nota olfativa.
+export async function apiOpcoesFiltroLoja(): Promise<OpcoesFiltroLoja> {
+  vlog(F, "apiOpcoesFiltroLoja", "buscando opcoes dos filtros da vitrine");
+  return fetchWithAuth<OpcoesFiltroLoja>("/api/loja/filtros", { method: "GET" });
 }
 
 export async function apiRefreshToken(refresh_token: string): Promise<{

@@ -52,6 +52,109 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, novoLoginResposta(s, h.ttlAcesso), "")
 }
 
+// Cadastro POST /api/auth/cadastro (público, ECOM-01/03): cria o cliente da
+// loja (role "usuario") com o e-mail pendente e envia o link de
+// confirmação → 201, SEM sessão (o login fica bloqueado até confirmar).
+func (h *AuthHandler) Cadastro(w http.ResponseWriter, r *http.Request) {
+	const tag = "[auth] Cadastro"
+	var req cadastroRequest
+	if err := httpx.DecodificarJSON(r, &req); err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	u, enviado, err := h.casos.Cadastrar(r.Context(), identidadeapp.ComandoCadastro{
+		Nome: req.Nome, Email: req.Email, Senha: identidade.NovaSenha(req.Password), Captcha: req.CaptchaToken, Origem: h.origem(r),
+		Cliente: identidadeapp.DadosClienteLoja{CPF: req.CPF, Endereco: req.Endereco, Numero: req.Numero, Complemento: req.Complemento,
+			Bairro: req.Bairro, CEP: req.CEP, Cidade: req.Cidade, UF: req.UF},
+	})
+	if err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	msg := "conta criada: enviamos um link de confirmação para o seu email"
+	if !enviado {
+		msg = "conta criada, mas não foi possível enviar o email agora: use \"reenviar confirmação\""
+	}
+	httpx.JSON(w, http.StatusCreated, cadastroResposta{Email: u.Email, EmailEnviado: enviado, Mensagem: msg}, "")
+}
+
+// Google POST /api/auth/google (público, ECOM-02): com conta da loja, abre
+// a sessão (cookies, resposta do login); sem conta, 200 com
+// cadastro_necessario e o perfil para completar o cadastro.
+func (h *AuthHandler) Google(w http.ResponseWriter, r *http.Request) {
+	const tag = "[auth] Google"
+	var req googleRequest
+	if err := httpx.DecodificarJSON(r, &req); err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	res, err := h.casos.EntrarComGoogle(r.Context(), req.Credential, h.origem(r))
+	if err != nil {
+		responderFalha(w, tag, err)
+		return
+	}
+	if res.CadastroNecessario {
+		httpx.JSON(w, http.StatusOK, googleCadastroNecessario{CadastroNecessario: true, Email: res.Perfil.Email, Nome: res.Perfil.Nome}, "")
+		return
+	}
+	httpx.DefinirCookiesSessao(w, res.Sessao.Acesso, res.Sessao.Refresh.Revelar(), h.ttlAcesso, h.cookieSeguro)
+	httpx.JSON(w, http.StatusOK, novoLoginResposta(res.Sessao, h.ttlAcesso), "")
+}
+
+// GoogleCadastro POST /api/auth/google/cadastro (público, ECOM-02): cria o
+// cliente da loja com os dados do Google + CPF/endereço e abre a sessão → 201.
+func (h *AuthHandler) GoogleCadastro(w http.ResponseWriter, r *http.Request) {
+	const tag = "[auth] GoogleCadastro"
+	var req googleCadastroRequest
+	if err := httpx.DecodificarJSON(r, &req); err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	s, err := h.casos.CadastrarComGoogle(r.Context(), req.Credential, identidadeapp.DadosClienteLoja{
+		CPF: req.CPF, Endereco: req.Endereco, Numero: req.Numero, Complemento: req.Complemento,
+		Bairro: req.Bairro, CEP: req.CEP, Cidade: req.Cidade, UF: req.UF,
+	}, h.origem(r))
+	if err != nil {
+		responderFalha(w, tag, err)
+		return
+	}
+	httpx.DefinirCookiesSessao(w, s.Acesso, s.Refresh.Revelar(), h.ttlAcesso, h.cookieSeguro)
+	httpx.JSON(w, http.StatusCreated, novoLoginResposta(s, h.ttlAcesso), "")
+}
+
+// ConfirmarEmail POST /api/auth/confirmar-email (público, ECOM-03): token
+// no corpo (o link leva no fragmento #, lido pelo frontend).
+func (h *AuthHandler) ConfirmarEmail(w http.ResponseWriter, r *http.Request) {
+	const tag = "[auth] ConfirmarEmail"
+	var req confirmarEmailRequest
+	if err := httpx.DecodificarJSON(r, &req); err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	if err := h.casos.ConfirmarEmail(r.Context(), req.Token, h.origem(r)); err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, mensagemResposta{Mensagem: "email confirmado: você já pode entrar"}, "")
+}
+
+// ReenviarConfirmacao POST /api/auth/reenviar-confirmacao (público,
+// ECOM-03): resposta neutra (não revela se há conta pendente).
+func (h *AuthHandler) ReenviarConfirmacao(w http.ResponseWriter, r *http.Request) {
+	const tag = "[auth] ReenviarConfirmacao"
+	var req reenviarConfirmacaoRequest
+	if err := httpx.DecodificarJSON(r, &req); err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	err := h.casos.ReenviarConfirmacao(r.Context(), identidadeapp.ComandoReenvio{Email: req.Email, Captcha: req.CaptchaToken, Origem: h.origem(r)})
+	if err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, mensagemResposta{Mensagem: "se houver um cadastro pendente para este email, enviamos um novo link"}, "")
+}
+
 // Refresh POST /api/auth/refresh: refresh_token no body ou no cookie;
 // rotação com tokens novos em cookies.
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {

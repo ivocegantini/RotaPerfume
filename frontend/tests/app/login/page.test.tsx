@@ -129,6 +129,7 @@ describe("LoginPage - sessao existente", () => {
   it.each<[User["role"], string]>([
     ["admin", "/dashboard"],
     ["normal", "/pagamentos"],
+    ["usuario", "/loja"], // ECOM-01
   ])("usuario %s ja logado vai para %s", async (role, destino) => {
     localStorage.setItem("auth_user", JSON.stringify(usuario(role)));
     render(<LoginPage />);
@@ -166,6 +167,7 @@ describe("LoginPage - login com sucesso", () => {
     ["troca de senha obrigatoria", { trocar_senha: true }, "admin", "/trocar-senha"],
     ["admin", { trocar_senha: false }, "admin", "/dashboard"],
     ["usuario padrao", {}, "normal", "/pagamentos"],
+    ["cliente da loja (ECOM-01)", {}, "usuario", "/loja"],
   ])("%s -> %s", async (_n, extra, role, destino) => {
     apiLoginMock.mockResolvedValue({ token: "t", user: usuario(role), ...extra });
     render(<LoginPage />);
@@ -274,5 +276,16 @@ describe("LoginPage - captcha (Turnstile configurado)", () => {
     await screen.findByText("Credenciais invalidas");
     expect(captcha.reset).toHaveBeenCalledTimes(1);
     expect(entrar()).toBeDisabled();
+  });
+});
+
+describe("LoginPage - e-mail nao confirmado (ECOM-03)", () => {
+  it("403 de e-mail pendente mostra o link de reenvio", async () => {
+    apiLoginMock.mockRejectedValue(new Error("email não confirmado: abra o link que enviamos para o seu email"));
+    render(<LoginPage />);
+    await preencherEEnviar();
+    const link = await screen.findByRole("link", { name: "Reenviar email de confirmacao" });
+    expect(link).toHaveAttribute("href", "/confirmar-email");
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 });

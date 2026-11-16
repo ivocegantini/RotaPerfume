@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { getUser, rotaInicial } from "@/lib/auth";
 import { vlog } from "@/lib/vlog";
 
 const FILE = "page.tsx";
@@ -14,9 +14,11 @@ export default function Home() {
   vlog(FILE, "Home", "registrando efeito de redirecionamento inicial");
   useEffect(() => {
     vlog(FILE, "Home.useEffect", "verificando se ha usuario salvo na sessao");
-    if (getUser()) {
-      vlog(FILE, "Home.useEffect", "usuario autenticado; redirecionando para /dashboard");
-      router.replace("/dashboard");
+    const u = getUser();
+    if (u) {
+      // ECOM-01: o cliente da loja vai para /loja; a equipe segue no /dashboard.
+      vlog(FILE, "Home.useEffect", "usuario autenticado; redirecionando conforme papel");
+      router.replace(u.role === "usuario" ? rotaInicial(u.role) : "/dashboard");
     } else {
       vlog(FILE, "Home.useEffect", "sem usuario; redirecionando para /login");
       router.replace("/login");

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -12,9 +13,12 @@ import {
   TurnstileHandle,
   isTurnstileEnabled,
 } from "@/components/ui/Turnstile";
-import { apiLogin } from "@/lib/api";
-import { saveUser, getUser, isAdmin } from "@/lib/auth";
+import { apiGoogle, apiLogin } from "@/lib/api";
+import { GoogleButton, isGoogleEnabled } from "@/components/ui/GoogleButton";
+import { definirCadastroGoogle } from "@/lib/googleConta";
+import { saveUser, getUser, rotaInicial } from "@/lib/auth";
 import { lerAvisoLogin, limparAvisoLogin } from "@/lib/avisoLogin";
+import { ehEmailNaoConfirmado } from "@/lib/confirmacaoEmail";
 import { vlog } from "@/lib/vlog";
 
 const FILE = "login/page.tsx";
@@ -41,6 +45,29 @@ export default function LoginPage() {
   vlog(FILE, "LoginPage", "criando ref do widget Turnstile");
   const turnstileRef = useRef<TurnstileHandle>(null);
 
+  // ECOM-02: "Entrar com Google". Conta da loja: entra; sem conta: segue
+  // para o cadastro com nome e e-mail do Google preenchidos.
+  const entrarComGoogle = async (credential: string) => {
+    vlog(FILE, "LoginPage.entrarComGoogle", "enviando credencial do Google ao backend");
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await apiGoogle(credential);
+      if ("cadastro_necessario" in res) {
+        vlog(FILE, "LoginPage.entrarComGoogle", "sem conta: indo para o cadastro com Google");
+        definirCadastroGoogle({ credential, email: res.email, nome: res.nome });
+        router.push("/cadastro");
+        return;
+      }
+      saveUser(res.user);
+      router.replace(rotaInicial());
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Nao foi possivel entrar com o Google");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   vlog(FILE, "LoginPage", "registrando efeito que consome o aviso de outra tela");
   useEffect(() => {
     vlog(FILE, "LoginPage.useEffect", "aviso exibido; limpando o pendente");
@@ -51,8 +78,8 @@ export default function LoginPage() {
   useEffect(() => {
     vlog(FILE, "LoginPage.useEffect", "verificando se ha usuario salvo na sessao");
     if (getUser()) {
-      vlog(FILE, "LoginPage.useEffect", "usuario ja autenticado; redirecionando (admin=%s)", isAdmin());
-      router.replace(isAdmin() ? "/dashboard" : "/pagamentos");
+      vlog(FILE, "LoginPage.useEffect", "usuario ja autenticado; redirecionando conforme papel");
+      router.replace(rotaInicial());
     }
   }, [router]);
 
@@ -107,8 +134,8 @@ export default function LoginPage() {
         vlog(FILE, "LoginPage.handleSubmit", "redirecionando para /trocar-senha");
         router.replace("/trocar-senha");
       } else {
-        vlog(FILE, "LoginPage.handleSubmit", "redirecionando conforme papel (admin=%s)", isAdmin());
-        router.replace(isAdmin() ? "/dashboard" : "/pagamentos");
+        vlog(FILE, "LoginPage.handleSubmit", "redirecionando conforme papel");
+        router.replace(rotaInicial());
       }
     } catch (err) {
       vlog(FILE, "LoginPage.handleSubmit", "falha no login; extraindo mensagem do erro");
@@ -175,6 +202,14 @@ export default function LoginPage() {
             <div className="mb-4">
               <Alert variant="error" onClose={() => setError(null)}>
                 {error}
+                {ehEmailNaoConfirmado(error) && (
+                  <>
+                    {" "}
+                    <Link href="/confirmar-email" className="font-medium underline">
+                      Reenviar email de confirmacao
+                    </Link>
+                  </>
+                )}
               </Alert>
             </div>
           )}
@@ -250,7 +285,26 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-slate-400">
+          {isGoogleEnabled && (
+            <div className="mt-5">
+              <div className="mb-4 flex items-center gap-3 text-xs text-slate-400">
+                <span className="h-px flex-1 bg-slate-200" />
+                ou
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <GoogleButton texto="signin_with" onCredential={(c) => void entrarComGoogle(c)} />
+              <p className="mt-2 text-center text-xs text-slate-400">Login com Google: so para clientes da loja.</p>
+            </div>
+          )}
+
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Cliente novo?{" "}
+            <Link href="/cadastro" className="font-medium text-primary-600 hover:underline">
+              Criar conta na loja
+            </Link>
+          </p>
+
+          <p className="mt-3 text-center text-xs text-slate-400">
             Acesso restrito. Em caso de duvidas, contate o administrador.
           </p>
         </Card>

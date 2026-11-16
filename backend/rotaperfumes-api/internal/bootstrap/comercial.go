@@ -12,6 +12,7 @@ import (
 	"github.com/rotaperfumes/shared/comercial/comercialmysql"
 	"github.com/rotaperfumes/shared/db"
 	"github.com/rotaperfumes/shared/identidade"
+	"github.com/rotaperfumes/shared/identidade/identidadeapp"
 	"github.com/rotaperfumes/shared/identidade/identidademysql"
 )
 
@@ -111,4 +112,35 @@ func (v vendedoresParaIdentidade) Desligado(ctx context.Context, id int64) (bool
 		return false, nil
 	}
 	return desligado, err
+}
+
+// clientesLojaParaIdentidade liga as portas do cliente da loja (ECOM-05) ao
+// domínio e ao adapter de Comercial: valida com comercial.NovoClienteLoja e
+// grava com comercialmysql (no Querier da tx do cadastro). CPF repetido vira
+// a recusa neutra do cadastro (não revela qual dado já existe).
+type clientesLojaParaIdentidade struct{ clientes *comercialmysql.Clientes }
+
+func dadosComercial(nome string, d identidadeapp.DadosClienteLoja) comercial.DadosClienteLoja {
+	return comercial.DadosClienteLoja{Nome: nome, CPF: d.CPF, Endereco: d.Endereco, Numero: d.Numero,
+		Complemento: d.Complemento, Bairro: d.Bairro, CEP: d.CEP, Cidade: d.Cidade, UF: d.UF}
+}
+
+func (clientesLojaParaIdentidade) ValidarClienteLoja(nome string, d identidadeapp.DadosClienteLoja) error {
+	_, err := comercial.NovoClienteLoja(dadosComercial(nome, d))
+	return err
+}
+
+// CriarClienteLoja revalida (o nome vem do usuário recém-gravado) e insere.
+func (c clientesLojaParaIdentidade) CriarClienteLoja(ctx context.Context, usuarioID int64, nome string, d identidadeapp.DadosClienteLoja) error {
+	cl, err := comercial.NovoClienteLoja(dadosComercial(nome, d))
+	if err != nil {
+		return err
+	}
+	if _, err := c.clientes.InserirClienteLoja(ctx, usuarioID, cl); err != nil {
+		if errors.Is(err, comercial.ErrCPFDuplicado) {
+			return identidade.ErrCadastroIndisponivel
+		}
+		return err
+	}
+	return nil
 }

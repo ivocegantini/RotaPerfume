@@ -16,5 +16,8 @@ func (fakeUserStatusChecker) StatusParaAutenticacao(_ context.Context, userID in
 	if userID == 1 {
 		return identidade.StatusAcesso{Ativo: true, Role: "admin"}, nil
 	}
+	if userID == idUsuarioLoja { // ECOM-01
+		return identidade.StatusAcesso{Ativo: true, Role: "usuario"}, nil
+	}
 	return identidade.StatusAcesso{Ativo: true, Role: "normal"}, nil
 }

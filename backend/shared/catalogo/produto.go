@@ -124,7 +124,17 @@ func (p *Produto) DefinirAtivo(ativo *bool) {
 type FiltroProduto struct {
 	Categoria string
 	Marca     string
-	Ativo     *bool
-	Busca     string // em descrição OU sku (LIKE; %/_ literais, SEC-25)
-	Ordenacao kernel.Ordenacao[CampoProduto]
+	// NotaOlfativa filtra pelo valor exato (ECOM-04, vitrine).
+	NotaOlfativa string
+	Ativo        *bool
+	Busca        string // em descrição OU sku (LIKE; %/_ literais, SEC-25)
+	Ordenacao    kernel.Ordenacao[CampoProduto]
+}
+
+// OpcoesFiltroLoja são os valores oferecidos nos filtros da vitrine
+// (ECOM-04): categorias, marcas e notas olfativas dos produtos ativos.
+type OpcoesFiltroLoja struct {
+	Categorias     []string
+	Marcas         []string
+	NotasOlfativas []string
 }

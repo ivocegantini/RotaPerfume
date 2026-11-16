@@ -31,6 +31,13 @@ type Produtos interface {
 	AlternarAtivo(ctx context.Context, id int64) error
 }
 
+// OpcoesLoja lista os valores distintos dos filtros da vitrine (ECOM-04):
+// só produtos ativos, sem vazios, em ordem alfabética. catalogomysql.Produtos
+// satisfaz; repositório sem ela desliga o caso de uso.
+type OpcoesLoja interface {
+	OpcoesFiltroLoja(ctx context.Context) (catalogo.OpcoesFiltroLoja, error)
+}
+
 // Estoques é o repositório de registros de estoque.
 type Estoques interface {
 	// Historico devolve a série temporal completa que casa com o filtro.

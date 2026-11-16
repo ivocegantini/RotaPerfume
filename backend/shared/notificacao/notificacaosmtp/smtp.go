@@ -98,6 +98,15 @@ func (s *SMTP) EnviarSenhaInicial(ctx context.Context, destinatario, nomeUsuario
 	return s.enviar(ctx, destinatario, notificacao.MensagemSenhaInicial(nomeUsuario, senha))
 }
 
+// EnviarConfirmacaoEmail envia o link de confirmação do autocadastro
+// (porta identidadeapp.EnviadorConfirmacaoEmail, ECOM-03). Nunca loga o link.
+func (s *SMTP) EnviarConfirmacaoEmail(ctx context.Context, destinatario, nomeUsuario, link string) error {
+	if !notificacao.DestinatarioValido(destinatario) {
+		return notificacao.ErrDestinatarioInvalido
+	}
+	return s.enviar(ctx, destinatario, notificacao.MensagemConfirmacaoEmail(nomeUsuario, link))
+}
+
 // EnviarAlertaReusoToken envia o alerta de reuso de refresh token (porta
 // notificacaoapp.EnviadorAlerta, SEC-09). Ao usuário, sem user_id/token_id.
 func (s *SMTP) EnviarAlertaReusoToken(ctx context.Context, destinatario, nomeUsuario string, a notificacao.AlertaReuso, paraAdmin bool) error {

@@ -99,7 +99,7 @@ func TestSEC51_TabelasROConferemComDDL(t *testing.T) {
 	m := regexp.MustCompile(`(?m)^readonly TABELAS_RO=\(([^)]*)\)$`).FindStringSubmatch(md)
 	require.NotNil(t, m, "TABELAS_RO no mariadb-docker.sh")
 	ro := strings.Fields(m[1])
-	excluidas := []string{"usuarios", "refresh_tokens", "senha_historico"}
+	excluidas := []string{"usuarios", "refresh_tokens", "senha_historico", "confirmacoes_email"} // ECOM-03: tokens
 	reTab := regexp.MustCompile("(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?`?([a-z_]+)`?")
 	var ddl []string
 	for _, arq := range linhasUteis(lerRaiz(t, "sql", "ordem-ddl.txt")) {
