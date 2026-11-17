@@ -86,7 +86,7 @@ func TestECOM03_Cadastro_ContaPendenteSemSessao(t *testing.T) {
 		WithArgs(true, int64(42)).WillReturnResult(sqlmock.NewResult(0, 1))
 	// ECOM-05: o cliente pessoa física nasce ligado ao login, na mesma tx.
 	mock.ExpectExec(`INSERT INTO clientes \(cnpj, cpf, razao_social, segmento, cidade, uf, bairro, endereco, numero, complemento, cep, data_cadastro, ativo, usuario_id\)`).
-		WithArgs("52998224725", "Ana", "Loja Online", "São Paulo", "SP", "Sé", "Praça da Sé", "10", nil, "01001000", int64(42)).
+		WithArgs("52998224725", "Ana", "Loja Online", "São Paulo", "SP", "Sé", "Praça da Sé", "10", nil, "01001000", sqlmock.AnyArg(), int64(42)).
 		WillReturnResult(sqlmock.NewResult(5001, 1))
 	mock.ExpectExec(`INSERT INTO confirmacoes_email \(usuario_id, token_hash, expira_em\)`).
 		WithArgs(int64(42), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(7, 1))
@@ -431,7 +431,7 @@ func TestECOM09_Cadastro_SemCEP_GravaNulo(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO usuarios`).WillReturnResult(sqlmock.NewResult(44, 1))
 	mock.ExpectExec(`UPDATE usuarios SET email_confirmacao_pendente`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`INSERT INTO clientes`).
-		WithArgs("52998224725", "Caio", "Loja Online", "Zona Rural", "MG", nil, "Estrada do Sítio", "s/n", nil, nil, int64(44)).
+		WithArgs("52998224725", "Caio", "Loja Online", "Zona Rural", "MG", nil, "Estrada do Sítio", "s/n", nil, nil, sqlmock.AnyArg(), int64(44)).
 		WillReturnResult(sqlmock.NewResult(5002, 1))
 	mock.ExpectExec(`INSERT INTO confirmacoes_email`).WillReturnResult(sqlmock.NewResult(9, 1))
 	mock.ExpectCommit()

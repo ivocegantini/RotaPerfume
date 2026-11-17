@@ -36,7 +36,6 @@ var reDDLRelogioTST23 = regexp.MustCompile(`(?i)\b(?:DEFAULT|ON\s+UPDATE)\s+(?:C
 // excecoesTST23: arquivos (relativos a backend/) que usam o relógio do banco
 // e o do Go sem compará-los entre si; cada um com a justificativa.
 var excecoesTST23 = map[string]string{
-	"shared/tests/analytics/db07_only_full_group_by_integration_test.go": "pedido gravado com CURDATE() e lido pelas consultas do dashboard, que também usam CURDATE() (relógio do próprio banco nos dois lados); o time.Now é só o relógio de fallback do NovoDashboard",
 }
 
 type achadoTST23 struct {

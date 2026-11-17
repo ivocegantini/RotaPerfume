@@ -6,6 +6,8 @@
 **Fonte da verdade:** os scripts em `sql/` (DDLs mais as migrações de alteração, em ordem numérica). Em caso de divergência entre este manual e um script, vale o script.
 **Autor:** SubBrain (2026-09-25, card DOC-02; atualizado no Lote 5 com o NEG-02, CNPJ alfanumérico, no Lote 6 com a migração 21 e `refresh_tokens.revoked_reason`, no Lote 8 com a migração 22 e `usuarios.tokens_validos_desde` e, no Lote 11, 2026-09-26, card DOC-04, com o detalhamento de todas as tabelas; no Lote 12, 2026-09-27, com DB-01 (`estoque` no `db-up`), SEC-11 (credenciais do banco), SEC-12 (migração 23, `refresh_tokens.reuso_detectado_em`) e CHORE-02 (limpeza de `refresh_tokens`); no Lote 26, 2026-10-31, com o IMG-01 (migração 26, `produtos.imagem`, seção 13.1)).
 
+> **Fuso (DB-08):** o DSN da API e das CLIs fixa `time_zone='-03:00'` na sessão (`tz.OffsetSQL`) além de `loc=Local`. Assim, o `DEFAULT`/`ON UPDATE CURRENT_TIMESTAMP` (`created_at`/`updated_at`) e os valores gravados pelo Go ficam em -03, com o servidor em UTC ou em -03. A CLI `mariadb` e os seeds continuam no fuso do servidor, salvo `SET time_zone`. As datas de negócio seguem calculadas no Go (BUG-30/TST-23).
+
 > **Escopo:** todas as tabelas do schema atual, campo a campo, com PK, FKs, índices, relacionamentos, regras de negócio conhecidas e as migrações que afetam cada uma. Os itens que não estão claros nos arquivos estão marcados como **a confirmar** e reunidos na seção 22.
 
 ---
@@ -933,7 +935,7 @@ Levantados no DOC-04 só pela leitura dos arquivos (sem consulta ao banco). Deve
 
 ### 23.2 Senha fora da linha de comando (`MYSQL_PWD`)
 
-- O `MYSQL_OPTS` não tem mais `-p$(DB_SENHA)`: fica só `--local-infile=0 -u $(DB_USUARIO) -h $(DB_HOST) -P $(DB_PORT) --default-character-set=utf8mb4` (era `--local-infile=1` até o DB-03). A senha vai pela variável de ambiente `MYSQL_PWD`, que o Makefile exporta e que o `mariadb`/`mariadb.exe` lê nativamente. Assim ela não aparece no argv do `mariadb` (lista de processos) nem no eco das linhas `mariadb ...` do `make`. O `db-check-env` também testa só o ambiente (`$$DB_USUARIO`/`$$MYSQL_PWD`), sem expandir a senha (seção 23.4, item 6, resolvido).
+- O `MYSQL_OPTS` não tem mais `-p$(DB_SENHA)`: fica só `--local-infile=0 -u $(DB_USUARIO) -h $(DB_HOST) -P $(or $(DB_PORT),3306) --default-character-set=utf8mb4` (BUG-31: porta vazia vira 3306) (era `--local-infile=1` até o DB-03). A senha vai pela variável de ambiente `MYSQL_PWD`, que o Makefile exporta e que o `mariadb`/`mariadb.exe` lê nativamente. Assim ela não aparece no argv do `mariadb` (lista de processos) nem no eco das linhas `mariadb ...` do `make`. O `db-check-env` também testa só o ambiente (`$$DB_USUARIO`/`$$MYSQL_PWD`), sem expandir a senha (seção 23.4, item 6, resolvido).
 - `MSYS2_ENV_CONV_EXCL = MYSQL_PWD` impede o Git Bash/MSYS de converter a senha como se fosse um caminho POSIX.
 - Execução manual de um script (padrão dos cabeçalhos em `sql/`):
 

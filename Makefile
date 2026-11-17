@@ -91,7 +91,7 @@ GUARDA_INTEGRACAO := $(if $(INTEGRACAO_PELO_MAKE),db-guard-producao db-guard-int
 #   make db-up DB_CLIENTE_BIN=/opt/mariadb/bin/mariadb
 DB_CLIENTE_BIN := $(or $(strip $(subst $(CR),,$(DB_CLIENTE_BIN))),mariadb)
 MYSQL_TLS_OPTS = $(if $(DB_TLS_CA),--ssl-ca="$(DB_TLS_CA)" --ssl-verify-server-cert)
-MYSQL_OPTS = --local-infile=0 -u $(DB_USUARIO) -h $(DB_HOST) -P $(DB_PORT) --default-character-set=utf8mb4 $(MYSQL_TLS_OPTS)
+MYSQL_OPTS = --local-infile=0 -u $(DB_USUARIO) -h $(DB_HOST) -P $(or $(DB_PORT),3306) --default-character-set=utf8mb4 $(MYSQL_TLS_OPTS)
 DB_CLI = $(DB_CLIENTE_BIN) $(MYSQL_OPTS)
 
 help: ## Mostra esta ajuda
