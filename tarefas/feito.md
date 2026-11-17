@@ -12,8 +12,9 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
-## Avulso de 2026-11-17: TST-17 real com 14 tabelas
-- Testes reais rodados pelo usuário fora da produção: TST15 PASS; TST17 falhava esperando 13 tabelas (o ECOM-03 pôs `confirmacoes_email` no `sql/ordem-ddl.txt`). Esperado agora contado dos `CREATE TABLE` da ordem DDL; guia (Passo 7) diz 14. BACKUP01 pulou (usuário sem acesso ao Docker).
+## Avulso de 2026-11-17: testes reais de deploy (BACKUP-01, TST-15, TST-17) verdes
+- Rodados pelo usuário na `residentivo-MS-7E28` (fora da produção), com `sudo` e Docker: `TestBACKUP01_RestauracaoReal_Docker`, `TestTST15_MariadbDocker_Real` e `TestTST17_SeedProducao_Real` (3 subtestes) PASS.
+- TST-17: falhava esperando 13 tabelas (o ECOM-03 pôs `confirmacoes_email` no `sql/ordem-ddl.txt`); o esperado agora vem dos `CREATE TABLE` da ordem DDL (14) e o guia (Passo 7) diz 14.
 
 ## Avulso de 2026-11-17: SEC-78, SEC-77 e DEP-07
 - SEC-78: fechado pelo usuário: as contas `gerente_admin`/`rh_admin` foram extintas (funções passaram ao `admin`).

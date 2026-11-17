@@ -14,7 +14,7 @@
 
 ## MERGE-01: cards da branch `lote-42` fora do merge de 2026-11-16 — MÉDIA
 **Contexto:** a `lote-42` refez os Lotes 37–41 em paralelo; no merge venceu a versão atual (decisão do usuário). Entraram: DB-09 (migração renumerada para `sql/32`, `make db-fix-historico-created-at`), CI-01 (helper), specs `tarefas/lote-42-*.md`/`lote-43-spec.md`.
-**Ação:** portar sobre a versão atual, card a card, com testes: BACKUP-01/02 (`backup-banco.sh`, `verificar-backup.sh`, `restaurar-maquina.sh` sem paridade com o `mariadb-docker.sh` atual), DEPLOY-10 (conta DBA, sem `--dev-ip`), BUG-32, CI-02, SEC-61/62/63/71 da lote-42 (SEC-58 já existe na versão atual). BUG-30, BUG-31 e DB-08 já portados (2026-11-17). Fonte: `git show origin/lote-42:<arquivo>`. Os números SEC-60 a 75 da lote-42 colidem com os daqui: renumerar ao portar.
+**Ação:** portar sobre a versão atual, card a card, com testes: BACKUP-01/02 (`backup-banco.sh`, `verificar-backup.sh`, `restaurar-maquina.sh` sem paridade com o `mariadb-docker.sh` atual), DEPLOY-10 (conta DBA, sem `--dev-ip`), BUG-32, CI-02, SEC-61/62/63/71 da lote-42 (SEC-58 já existe na versão atual). BUG-30, BUG-31 e DB-08 já portados (2026-11-17). Base dos scripts atuais validada em máquina real (BACKUP01/TST15/TST17 PASS, 2026-11-17): repetir esses testes depois de portar BACKUP-01/02 e a conta DBA. Fonte: `git show origin/lote-42:<arquivo>`. Os números SEC-60 a 75 da lote-42 colidem com os daqui: renumerar ao portar.
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 
