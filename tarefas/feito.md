@@ -12,11 +12,24 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: testes reais de deploy (BACKUP-01, TST-15, TST-17) verdes
+- Rodados pelo usuário na `residentivo-MS-7E28` (fora da produção), com `sudo` e Docker: `TestBACKUP01_RestauracaoReal_Docker`, `TestTST15_MariadbDocker_Real` e `TestTST17_SeedProducao_Real` (3 subtestes) PASS.
+- TST-17: falhava esperando 13 tabelas (o ECOM-03 pôs `confirmacoes_email` no `sql/ordem-ddl.txt`); o esperado agora vem dos `CREATE TABLE` da ordem DDL (14) e o guia (Passo 7) diz 14.
+
+## Avulso de 2026-11-17: SEC-78, SEC-77 e DEP-07
+- SEC-78: fechado pelo usuário: as contas `gerente_admin`/`rh_admin` foram extintas (funções passaram ao `admin`).
+- SEC-77: `deps-audit-imagens` tira o digest da linha `Digest:` (buildx 0.30 ignora o `--format`); teste com o docker falso nas duas saídas.
+- DEP-07: `golang:1.27.4-alpine` no digest novo (`70bd7dde…b280`) em `Jenkinsfile`, `backend/Dockerfile` e `seed-producao.sh`; `go-sql-driver/mysql` 1.10.2, `x/crypto` 0.59, `x/net` 0.63, `x/sys`, `x/text`, `x/image`, `x/term`, `x/mod`, `x/tools` e `yaml` atualizados. `make test`, `lint`, `test-integration` e `deps-audit` rc=0.
+
+## Avulso de 2026-11-17: reavaliação do `FalhasEncontradas.md` (arquivo apagado)
+- Itens 1–13 seguem corrigidos no código atual (histórico sem `itenslocais.txt`/`.env`, sem hash na API, rate limit, security headers, CORS por allowlist, XFF só com `TRUST_PROXY_HEADERS`, e-mail mascarado, seed sem senha comum, `ProtectedRoute` com `/api/auth/me`, `make deps-audit`).
+- Pendências operacionais resolvidas: senha de app SMTP preenchida, 0 forks, Go local 1.27.4, govulncheck instalado. Restantes viraram SEC-78, SEC-77 e DEP-07.
+
 ## Avulso de 2026-11-17: decisões do usuário (DB-08, SEC-60, SEC-76, DEPLOY-10)
 - DB-08 (MERGE-01): DSN com `time_zone='-03:00'` (`tz.OffsetSQL`); `DEFAULT`/`ON UPDATE CURRENT_TIMESTAMP` coerentes com o Go. TIMESTAMP antigos gravados pelo Go na sessão UTC passam a aparecer 3 h mais cedo (ex.: `ultimo_login_at`). Integração `TestIntegracaoDB08_*` verde no CasaOS :3307.
 - SEC-60: decisão do usuário: a `casaos_ro` mantém o SELECT em `clientes` (com CPF/endereço).
 - SEC-76: aceito pelo usuário: a porta 48110 do Redis está fechada no firewall (o tunnel da Cloudflare não a expõe); `REDIS_PASSWORD` segue suportado e a API avisa sem ele.
-- DEPLOY-10 (parte de código): estágio `Migracoes` no `Jenkinsfile` e `GOOGLE_CLIENT_ID` no `Build`; teste `tests/deploy/deploy10_jenkinsfile_migracoes_test.go`. Card segue em `afazer.md` até o deploy.
+- DEPLOY-10 (parte de código): estágio `Migracoes` no `Jenkinsfile` e `GOOGLE_CLIENT_ID` no `Build`; teste `tests/deploy/deploy10_jenkinsfile_migracoes_test.go`. Concluído: após a credencial `rotaperfumes-db-admin` corrigida, o estágio `Migracoes` rodou no Jenkins (confirmado pelo usuário).
 
 ## Avulso de 2026-11-17: MERGE-01 parcial (BUG-30 e BUG-31 da `lote-42`)
 - BUG-30: analytics sem `CURDATE()`; datas de hoje/semana/mês/funil/série calculadas no Go em -03 (`analyticsmysql/datas.go`, relógio injetado em `NovoClientes`/`NovoOportunidades`); testes da `lote-42` adaptados ao ARQ-09. O INSERT do cliente da loja (ECOM-06) também passou a gravar `data_cadastro` com a data do Go. Exceção obsoleta tirada da catraca TST-23.

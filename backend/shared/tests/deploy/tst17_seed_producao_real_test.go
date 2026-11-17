@@ -6,7 +6,7 @@ package deploy_test
 // do TestTST15_MariadbDocker_Real: container, rede e diretórios descartáveis
 // (nomes tst17-*, TempDir), criados pelo deploy/mariadb-docker.sh com as
 // opções do TST-16 (--segredos-dir/--ca-dir). Cobre: seed numa instalação
-// nova (13 tabelas, admin "1 1 1" = ativo, troca obrigatória e Argon2id; 0
+// nova (uma tabela por CREATE TABLE do sql/ordem-ddl.txt, admin "1 1 1" = ativo, troca obrigatória e Argon2id; 0
 // não-admin ativos; senha do admin em arquivo 600), recusa da 2ª execução sem
 // alterar nada e --forcar (nome do banco digitado num pty real do `script`),
 // que troca a senha do admin e reinativa os não-admin.
@@ -40,6 +40,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -182,7 +184,8 @@ func TestTST17_SeedProducao_Real(t *testing.T) {
 		out, err := seed("--admin-senha-arquivo", senha1)
 		require.NoError(t, err, out)
 		assert.Contains(t, out, "Admin ativo, Argon2id, troca obrigatoria no 1o login: OK.")
-		assert.Equal(t, "13", rootSQL("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='rotaperfumes'"))
+		assert.Equal(t, strconv.Itoa(tabelasDaOrdemDDL(t)), rootSQL("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='rotaperfumes'"),
+			"uma tabela por CREATE TABLE dos arquivos de sql/ordem-ddl.txt")
 		assert.Equal(t, "1 1 1", rootSQL(qAdmin))
 		assert.Equal(t, "0", rootSQL(qNaoAdminAtivos))
 		assert.Equal(t, "42", rootSQL("SELECT COUNT(*) FROM usuarios WHERE role <> 'admin'"))
@@ -224,4 +227,24 @@ func TestTST17_SeedProducao_Real(t *testing.T) {
 		assert.Equal(t, "0", rootSQL(qNaoAdminAtivos), "--forcar reinativa os não-admin")
 		assert.FileExists(t, senha3)
 	})
+}
+
+// reCreateTableTST17 casa o CREATE TABLE dos DDLs (com ou sem IF NOT EXISTS).
+var reCreateTableTST17 = regexp.MustCompile(`(?im)^\s*CREATE\s+TABLE\b`)
+
+// tabelasDaOrdemDDL conta os CREATE TABLE dos arquivos de sql/ordem-ddl.txt
+// (a mesma ordem do seed-producao.sh): o total acompanha migração nova sem
+// número fixo no teste (ECOM-03 levou de 13 para 14).
+func tabelasDaOrdemDDL(t *testing.T) int {
+	t.Helper()
+	n := 0
+	for _, l := range strings.Split(lerRaiz(t, "sql", "ordem-ddl.txt"), "\n") {
+		l = strings.TrimSpace(l)
+		if l == "" || strings.HasPrefix(l, "#") {
+			continue
+		}
+		n += len(reCreateTableTST17.FindAllString(lerRaiz(t, "sql", l), -1))
+	}
+	require.Positive(t, n)
+	return n
 }

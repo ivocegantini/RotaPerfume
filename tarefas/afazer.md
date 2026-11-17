@@ -7,19 +7,14 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| DEPLOY-10 | ALTA | estágio `Migracoes` pronto; falta o push na `main` e conferir o 1º deploy | usuário |
 | MERGE-01 | MÉDIA | portar os cards da `lote-42` que ficaram fora do merge (BUG-30/31 e DB-08 feitos) | 🔵 SubBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
 
-## DEPLOY-10: migrações da loja na produção — ALTA
-**Feito (2026-11-17):** estágio `Migracoes` do `Jenkinsfile` (depois do `Importar dump`, antes do `Deploy`) aplica `sql/27`, `28/29`, `30`, `31` e `33` (idempotentes) com a `rotaperfumes-db-admin`; o `Build` lê só o `GOOGLE_CLIENT_ID` do `api.env` (credencial já atualizada no Jenkins) para o frontend.
-**Falta (usuário):** push na `main` (é o deploy) e conferir no log `Migracoes concluidas.` e o botão do Google na loja.
-
 ## MERGE-01: cards da branch `lote-42` fora do merge de 2026-11-16 — MÉDIA
 **Contexto:** a `lote-42` refez os Lotes 37–41 em paralelo; no merge venceu a versão atual (decisão do usuário). Entraram: DB-09 (migração renumerada para `sql/32`, `make db-fix-historico-created-at`), CI-01 (helper), specs `tarefas/lote-42-*.md`/`lote-43-spec.md`.
-**Ação:** portar sobre a versão atual, card a card, com testes: BACKUP-01/02 (`backup-banco.sh`, `verificar-backup.sh`, `restaurar-maquina.sh` sem paridade com o `mariadb-docker.sh` atual), DEPLOY-10 (conta DBA, sem `--dev-ip`), BUG-32, CI-02, SEC-61/62/63/71 da lote-42 (SEC-58 já existe na versão atual). BUG-30, BUG-31 e DB-08 já portados (2026-11-17). Fonte: `git show origin/lote-42:<arquivo>`. Os números SEC-60 a 75 da lote-42 colidem com os daqui: renumerar ao portar.
+**Ação:** portar sobre a versão atual, card a card, com testes: BACKUP-01/02 (`backup-banco.sh`, `verificar-backup.sh`, `restaurar-maquina.sh` sem paridade com o `mariadb-docker.sh` atual), DEPLOY-10 (conta DBA, sem `--dev-ip`), BUG-32, CI-02, SEC-61/62/63/71 da lote-42 (SEC-58 já existe na versão atual). BUG-30, BUG-31 e DB-08 já portados (2026-11-17). Base dos scripts atuais validada em máquina real (BACKUP01/TST15/TST17 PASS, 2026-11-17): repetir esses testes depois de portar BACKUP-01/02 e a conta DBA. Fonte: `git show origin/lote-42:<arquivo>`. Os números SEC-60 a 75 da lote-42 colidem com os daqui: renumerar ao portar.
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 

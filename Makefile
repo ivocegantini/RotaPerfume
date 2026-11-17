@@ -587,6 +587,8 @@ deps-audit-frontend: ## SEC-13: npm audit (falha em severidade high+) e npm outd
 # registry com token anônimo). Nunca falha. Para atualizar: trocar a string
 # nos dois arquivos (mesmo digest do mariadb), make test, backup e
 # sudo bash deploy/mariadb-docker.sh --recriar (ver comentário no Jenkinsfile).
+# SEC-77: há buildx (ex.: 0.30 do Ubuntu) que ignora o --format e imprime o
+# inspect inteiro; o digest sai da linha "Digest:" (ou da linha só com o digest).
 IMAGENS_FIXADAS_EM = Jenkinsfile deploy/mariadb-docker.sh deploy/seed-producao.sh
 # SEC-47: bases dos Dockerfile. O FROM é resolvido com os ARG padrão do próprio
 # arquivo (ex.: ${GO_VERSION} e ${GO_DIGEST} do backend/Dockerfile); FROM sem digest vira AVISO.
@@ -601,7 +603,9 @@ deps-audit-imagens: ## SEC-31/SEC-47: compara os digests fixados (Jenkinsfile, m
 	      | tr -d '\r' | awk -F': ' 'tolower($$1)=="docker-content-digest"{print $$2}' | grep -E '^sha256:[0-9a-f]{64}$$'; return ;; \
 	  esac; \
 	  if command -v docker >/dev/null 2>&1 && docker buildx version >/dev/null 2>&1; then \
-	    docker buildx imagetools inspect "$$1:$$2" --format '{{.Manifest.Digest}}' 2>/dev/null && return; \
+	    dbx=$$(docker buildx imagetools inspect "$$1:$$2" --format '{{.Manifest.Digest}}' 2>/dev/null \
+	      | tr -d '\r' | awk '$$1=="Digest:"{print $$2; exit} $$1 ~ /^sha256:/{print $$1; exit}' | grep -E '^sha256:[0-9a-f]{64}$$') \
+	      && { printf '%s\n' "$$dbx"; return; }; \
 	  fi; \
 	  command -v curl >/dev/null 2>&1 || return 1; \
 	  case "$$1" in */*) repo="$$1" ;; *) repo="library/$$1" ;; esac; \

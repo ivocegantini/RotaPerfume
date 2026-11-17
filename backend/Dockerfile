@@ -16,7 +16,7 @@
 # usa so o digest: GO_VERSION e GO_DIGEST mudam JUNTOS, iguais ao GO_IMAGE do
 # Jenkinsfile (teste confere). "make deps-audit-imagens" avisa digest novo.
 ARG GO_VERSION=1.27.4
-ARG GO_DIGEST=sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf
+ARG GO_DIGEST=sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280
 
 # ---------- build ----------
 FROM golang:${GO_VERSION}-alpine@${GO_DIGEST} AS build
