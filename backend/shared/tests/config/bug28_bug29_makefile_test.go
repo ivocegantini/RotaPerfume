@@ -95,7 +95,7 @@ func TestBUG29_Makefile_MakeflagsNaLinhaDeComandoRecusado(t *testing.T) {
 func TestBUG29_Makefile_MakeflagsNoAmbienteMantemEnvArquivo(t *testing.T) {
 	dir, path, cliente, log := bug27Dir(t, false)
 	comum := "DB_HOST=127.0.0.1\nDB_PORT=3306\nDB_TLS_REQUIRED=false\nDB_USUARIO=u-bug29\nDB_SENHA=s-bug29\nDB_CLIENTE_BIN=" + cliente + "\n"
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte(comum+"DB_NAME=rp_env_padrao\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "backend", ".env"), []byte(comum+"DB_NAME=rp_env_padrao\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "integ.env"), []byte(comum+"DB_NAME=rp_bug29\n"), 0o600))
 	for _, mf := range []string{"MAKEFLAGS=-k", "MAKEFLAGS=k"} {
 		t.Run(mf, func(t *testing.T) {

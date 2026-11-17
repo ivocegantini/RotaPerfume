@@ -12,6 +12,9 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: ENV-01 `.env` em `backend/`
+- ENV-01: `.env`, `.env.example` e `.env.producao.ro` saíram da raiz para `backend/`; Makefile (`-include backend/.env`), `cmdutil.LoadEnvFromCwd` (API usa o mesmo), `testeemail`, `dump-local.ps1`, mensagens dos scripts, testes e docs ajustados. `ENV_ARQUIVO` é relativo à raiz (ex.: `backend/.env.producao`). `make test` rc=0.
+
 ## Avulso de 2026-11-16: merge de todas as branches
 - `origin/main`, `lote-37-40` e `lote-42` mescladas na `lote-42-ecommerce-loja` e na `main` local; nos conflitos venceu a versão atual; extras compatíveis entraram (DB-09 como `sql/32`); o resto virou MERGE-01. `make test` e `make lint` rc=0.
 

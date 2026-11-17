@@ -88,7 +88,7 @@ func TestLoadEnvFromCwd(t *testing.T) {
 		t.Setenv(chave, "")
 		require.NoError(t, os.Unsetenv(chave))
 		root := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(root, ".env"), []byte(chave+"=do_env\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(arvore(t, root, "backend"), ".env"), []byte(chave+"=do_env\n"), 0o600))
 		chdir(t, arvore(t, root, "backend", "shared"))
 
 		cmdutil.LoadEnvFromCwd()
@@ -97,11 +97,22 @@ func TestLoadEnvFromCwd(t *testing.T) {
 	t.Run("não sobrescreve variável já definida", func(t *testing.T) {
 		t.Setenv(chave, "do_shell")
 		root := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(root, ".env"), []byte(chave+"=do_env\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(arvore(t, root, "backend"), ".env"), []byte(chave+"=do_env\n"), 0o600))
 		chdir(t, root)
 
 		cmdutil.LoadEnvFromCwd()
 		assert.Equal(t, "do_shell", os.Getenv(chave))
+	})
+	t.Run("ENV-01: .env na raiz (local antigo) não é lido", func(t *testing.T) {
+		t.Setenv(chave, "")
+		require.NoError(t, os.Unsetenv(chave))
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, ".env"), []byte(chave+"=da_raiz\n"), 0o600))
+		chdir(t, arvore(t, root, "backend", "shared"))
+
+		cmdutil.LoadEnvFromCwd()
+		_, definida := os.LookupEnv(chave)
+		assert.False(t, definida)
 	})
 	t.Run("sem .env segue sem erro", func(t *testing.T) {
 		t.Setenv(chave, "")

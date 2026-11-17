@@ -1,7 +1,7 @@
 // Package config carrega configurações do sistema a partir de variáveis de ambiente.
 //
-// O arquivo .env na raiz do projeto é carregado pelos binários (cmdutil /
-// godotenv) ou pelo Makefile ("-include .env") antes de chamar o Load — aqui
+// O arquivo backend/.env é carregado pelos binários (cmdutil /
+// godotenv) ou pelo Makefile ("-include backend/.env") antes de chamar o Load — aqui
 // apenas consumimos via os.Getenv. DB_USUARIO/DB_SENHA são obrigatórios e
 // não têm default (SEC-11): sem eles, Load devolve ErrCredenciaisDB.
 package config

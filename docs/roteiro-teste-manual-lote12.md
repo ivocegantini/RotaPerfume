@@ -14,7 +14,7 @@ Marque cada checkbox depois de conferir. Se algo divergir, anote o caso e encami
 
 ## 0. Preparação
 
-1. Salve uma cópia do `.env` da raiz (ex.: `cp .env .env.bak`). Vários passos editam o arquivo; restaure com `cp .env.bak .env` ao final de cada um.
+1. Salve uma cópia do `backend/.env` (ex.: `cp backend/.env backend/.env.bak`). Vários passos editam o arquivo; restaure com `cp backend/.env.bak backend/.env` ao final de cada um.
 2. Confira que o `.env` tem `DB_USUARIO` e `DB_SENHA` preenchidos, sem `$`, `#`, aspas, espaços nas pontas nem valor começando com `/` (vale para **todos** os valores do `.env`, porque o `make` lê o arquivo inteiro), e que está salvo com final de linha **LF**.
 3. Garanta que o shell não tem as variáveis do banco exportadas (senão elas mascaram o teste de "sem credenciais"): no Git Bash, `[ -z "$DB_USUARIO$DB_SENHA" ] && echo limpo`. Se não imprimir `limpo`, rode `unset DB_USUARIO DB_SENHA MYSQL_PWD`.
 4. Para rodar SQL à mão, use o Workbench ou o `mysql` com a senha pelo ambiente (nunca `-p`):

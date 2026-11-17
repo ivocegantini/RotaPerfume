@@ -1145,7 +1145,7 @@ EOF
 if $PUBLICAR && ! $TEM_MAKE; then
   cat <<EOF
      SEC-59 (so --dev-ip-ro): na maquina do admin, copie $SSL_DIR/ca.pem para
-     deploy/ca-producao.pem (no .gitignore) e use um .env.producao.ro SEPARADO
+     deploy/ca-producao.pem (no .gitignore) e use um backend/.env.producao.ro SEPARADO
      (no .gitignore), so para consultas (a conta $DB_MAKE nao existe):
        DB_HOST=$SITE_IP
        DB_PORT=$PORTA
@@ -1158,18 +1158,18 @@ elif $PUBLICAR; then
   cat <<EOF
      Na maquina do admin (so as de --dev-ip), copie $SSL_DIR/ca.pem para
      deploy/ca-producao.pem (no .gitignore) e use um arquivo SEPARADO,
-     .env.producao (no .gitignore), nunca o .env de dev:
+     backend/.env.producao (no .gitignore), nunca o backend/.env de dev:
        # ATENCAO: este .env aponta para PRODUCAO; make db-* apaga dados reais.
        DB_HOST=$SITE_IP
        DB_PORT=$PORTA
        DB_USUARIO=$DB_MAKE
        DB_SENHA=<conteudo de $SEGREDOS_DIR/$DB_MAKE.senha>
        DB_TLS_CA=deploy/ca-producao.pem
-     Uso: make <alvo> ENV_ARQUIVO=.env.producao CONFIRMO_PRODUCAO=$SITE_IP/$DB_NOME
-     (o .env nao e lido; sem o CONFIRMO_PRODUCAO os alvos make db-* recusam
+     Uso: make <alvo> ENV_ARQUIVO=backend/.env.producao CONFIRMO_PRODUCAO=$SITE_IP/$DB_NOME
+     (o backend/.env nao e lido; sem o CONFIRMO_PRODUCAO os alvos make db-* recusam
      este host). Cliente mariadb com o plugin client_ed25519.
      SEC-51: para CONSULTAS use a conta $DB_MAKE_RO (so SELECT), com a senha
-     de $SEGREDOS_DIR/$DB_MAKE_RO.senha num .env.producao.ro separado
+     de $SEGREDOS_DIR/$DB_MAKE_RO.senha num backend/.env.producao.ro separado
      (DB_USUARIO=$DB_MAKE_RO); o $DB_MAKE (ALL) fica so para migracoes.
 EOF
 fi

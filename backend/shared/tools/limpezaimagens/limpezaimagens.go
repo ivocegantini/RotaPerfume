@@ -2,7 +2,7 @@
 // apaga do PRODUTO_IMAGENS_DIR as imagens de produto que nenhum
 // produtos.imagem referencia e os temporários .tmp-* abandonados.
 //
-// Uso (a partir de backend/shared, com o .env da raiz):
+// Uso (a partir de backend/shared, com o backend/.env):
 //
 //	go run ./cmd/limpezaimagens -dry-run   # só relata o que apagaria
 //	go run ./cmd/limpezaimagens            # apaga

@@ -134,7 +134,7 @@ Opcoes:
 
 Fluxo:
   Servidor: sudo bash deploy/mariadb-docker.sh ...   (banco, uma vez)
-  Windows:  scp deploy/dumps/<arquivo>.sql.gz .env USUARIO@ivo-inspiron-15-3530:/tmp/
+  Windows:  scp deploy/dumps/<arquivo>.sql.gz backend/.env USUARIO@ivo-inspiron-15-3530:/tmp/
   Servidor: curl -fsSLO https://raw.githubusercontent.com/residentivo/RotaPerfume/main/deploy/setup-servidor.sh
             sudo bash setup-servidor.sh --env /tmp/.env --dump /tmp/<arquivo>.sql.gz
 

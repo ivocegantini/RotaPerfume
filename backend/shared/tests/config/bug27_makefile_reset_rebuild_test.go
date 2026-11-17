@@ -146,7 +146,7 @@ func TestBUG27_Makefile_KDropRecusadoNaoSemeia(t *testing.T) {
 	})
 	t.Run("CONFIRMAR no .env não vale nos sub-makes", func(t *testing.T) {
 		dir, path, cliente, log := bug27Dir(t, false)
-		require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("CONFIRMAR=rotaperfumes\nCONFIRMO_PRODUCAO=192.168.168.106/rotaperfumes\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "backend", ".env"), []byte("CONFIRMAR=rotaperfumes\nCONFIRMO_PRODUCAO=192.168.168.106/rotaperfumes\n"), 0o600))
 		out, err := makeAlvo(t, dir, "db-rebuild", []string{path}, append([]string{"-k"}, bug27Args(cliente, casaos27...)...)...)
 		require.Error(t, err, out)
 		assert.Empty(t, lerSeExiste(t, log))

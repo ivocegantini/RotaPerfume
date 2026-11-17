@@ -1,6 +1,6 @@
 // Package cmdutil reúne os utilitários comuns aos comandos de linha de
 // comando de backend/shared/cmd (importadores e ferramentas): localizar a raiz
-// do repositório e carregar o .env.
+// do repositório e carregar o backend/.env.
 package cmdutil
 
 import (
@@ -22,8 +22,12 @@ func FindProjectRoot() (string, error) {
 	return projroot.Find()
 }
 
-// LoadEnvFromCwd tenta carregar o .env da raiz do projeto subindo diretórios
-// a partir do working directory. Não retorna erro — se não achar, segue sem .env.
+// EnvRelativo é o caminho do .env a partir da raiz do projeto (ENV-01: fica
+// em backend/, não mais na raiz).
+const EnvRelativo = "backend/.env"
+
+// LoadEnvFromCwd tenta carregar o backend/.env subindo diretórios a partir do
+// working directory. Não retorna erro — se não achar, segue sem .env.
 func LoadEnvFromCwd() {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -31,8 +35,9 @@ func LoadEnvFromCwd() {
 	}
 	dir := wd
 	for i := 0; i < maxNiveis; i++ {
-		if _, err := os.Stat(filepath.Join(dir, ".env")); err == nil {
-			_ = godotenv.Load(filepath.Join(dir, ".env"))
+		arquivo := filepath.Join(dir, filepath.FromSlash(EnvRelativo))
+		if _, err := os.Stat(arquivo); err == nil {
+			_ = godotenv.Load(arquivo)
 			return
 		}
 		parent := filepath.Dir(dir)

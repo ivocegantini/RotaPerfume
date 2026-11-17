@@ -6,12 +6,9 @@ package main
 
 import (
 	"log"
-	"os"
-	"path/filepath"
-
-	"github.com/joho/godotenv"
 
 	"github.com/rotaperfumes/rotaperfumes-api/internal/bootstrap"
+	"github.com/rotaperfumes/shared/cmdutil"
 	"github.com/rotaperfumes/shared/config"
 	"github.com/rotaperfumes/shared/vlog"
 )
@@ -19,7 +16,8 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("[server] iniciando rotaperfumes-api")
-	carregarEnv()
+	// ENV-01: backend/.env (subindo a partir do cwd); sem ele, só o ambiente.
+	cmdutil.LoadEnvFromCwd()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -39,26 +37,4 @@ func main() {
 	log.Printf("[server] TLS do banco: %s", cfg.DBTLS.Descricao())
 
 	bootstrap.Run(cfg)
-}
-
-// carregarEnv procura o .env da raiz do projeto subindo até 6 diretórios a
-// partir do working directory (funciona em `go run` e no binário). Sem .env,
-// segue só com o ambiente.
-func carregarEnv() {
-	dir, err := os.Getwd()
-	if err != nil {
-		return
-	}
-	for i := 0; i < 6; i++ {
-		arquivo := filepath.Join(dir, ".env")
-		if _, err := os.Stat(arquivo); err == nil {
-			_ = godotenv.Load(arquivo)
-			return
-		}
-		pai := filepath.Dir(dir)
-		if pai == dir {
-			return
-		}
-		dir = pai
-	}
 }
