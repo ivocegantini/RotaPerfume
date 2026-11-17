@@ -62,6 +62,7 @@ const CANAL_OPTIONS = [
   { value: "Telefone", label: "Telefone" },
   { value: "Visita", label: "Visita" },
   { value: "WhatsApp", label: "WhatsApp" },
+  { value: "Loja", label: "Loja online" },
 ];
 
 const LIMIT_OPTIONS = [

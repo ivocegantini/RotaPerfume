@@ -19,7 +19,7 @@ import (
 	"github.com/rotaperfumes/shared/comercial"
 )
 
-const reInsertClienteRepo = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)\s+VALUES \(\?, \?, \?, \?, \?, \?, \?, \?\)`
+const reInsertClienteRepo = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)\s+VALUES \(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)`
 
 func TestClienteRepository_Create(t *testing.T) {
 	errDB := errors.New("falha simulada")
@@ -54,7 +54,7 @@ func TestClienteRepository_Create(t *testing.T) {
 				exec = tx
 			}
 			tc.result(mock.ExpectExec(reInsertClienteRepo).
-				WithArgs("12345678000199", "Empresa", "varejo", "Curitiba", "PR", "Centro", dataCad, true))
+				WithArgs("12345678000199", "Empresa", "varejo", "Curitiba", "PR", "Centro", dataCad, true, nil, nil, nil, nil, nil))
 			if tc.emTx {
 				mock.ExpectRollback()
 			}

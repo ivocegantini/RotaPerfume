@@ -191,14 +191,14 @@ const (
 )
 
 var (
-	colsCliente  = []string{"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro", "data_cadastro", "ativo", "created_at", "updated_at"}
+	colsCliente  = []string{"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro", "data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep"}
 	colsCarteira = []string{"carteira_id_origem", "cliente_id", "vendedor_id", "data_inicio", "data_fim", "created_at", "updated_at"}
 )
 
 func esperarVincularAte(m sqlmock.Sqlmock) {
 	m.ExpectQuery(reExisteVendedor).WithArgs(int64(1)).WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	m.ExpectQuery(reClientePorID).WithArgs(int64(2)).
-		WillReturnRows(sqlmock.NewRows(colsCliente).AddRow(int64(2), "c", "r", "s", "ci", "PR", "", agoraFixo, true, agoraFixo, agoraFixo))
+		WillReturnRows(sqlmock.NewRows(colsCliente).AddRow(int64(2), "c", "r", "s", "ci", "PR", "", agoraFixo, true, agoraFixo, agoraFixo, "", "", "", "", ""))
 	esperarTravaDoCliente(m)
 }
 

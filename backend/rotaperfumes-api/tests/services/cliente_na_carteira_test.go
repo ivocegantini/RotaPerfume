@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	reInsertClienteS  = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`
+	reInsertClienteS  = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`
 	reInsertCarteiraS = `INSERT INTO carteiras \(cliente_id, vendedor_id, data_inicio, data_fim\)`
 )
 
@@ -59,7 +59,7 @@ func TestClienteService_CreateClienteNaCarteira(t *testing.T) {
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectBegin()
 				m.ExpectExec(reInsertClienteS).
-					WithArgs("11222333000181", "Empresa", "varejo", "Curitiba", "PR", "Centro", sqlmock.AnyArg(), true).
+					WithArgs("11222333000181", "Empresa", "varejo", "Curitiba", "PR", "Centro", sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(555, 1))
 				m.ExpectExec(reInsertCarteiraS).
 					WithArgs(int64(555), int64(10), meiaNoiteDeHoje{}, nil).

@@ -87,8 +87,8 @@ func TestRepositorios_ExecComNotFound(t *testing.T) {
 			},
 		},
 		{
-			nome: "ClienteRepository.Update", sqlRe: `UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`,
-			args:              []driver.Value{cli.CNPJ, cli.RazaoSocial, "", "", "SP", "", cli.DataCadastro, int64(5)},
+			nome: "ClienteRepository.Update", sqlRe: `UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`,
+			args:              []driver.Value{cli.CNPJ, cli.RazaoSocial, "", "", "SP", "", cli.DataCadastro, nil, nil, nil, nil, nil, int64(5)},
 			checaRowsAffected: true, naoEncontrado: comercial.ErrClienteNaoEncontrado,
 			chama: func(ctx context.Context, db *sql.DB) error {
 				return comercialmysql.NovoClientes(db).Atualizar(ctx, 5, cli)
@@ -271,7 +271,7 @@ func TestClienteGetByID(t *testing.T) {
 	}{
 		{"encontrado", func(e *sqlmock.ExpectedQuery) {
 			e.WillReturnRows(sqlmock.NewRows(clienteRepoColumns).
-				AddRow(int64(9), "11222333000181", "ACME", "Varejo", "Campinas", "SP", "Centro", agora, true, agora, agora))
+				AddRow(int64(9), "11222333000181", "ACME", "Varejo", "Campinas", "SP", "Centro", agora, true, agora, agora, "", "", "", "", ""))
 		}, nil},
 		{"não encontrado", func(e *sqlmock.ExpectedQuery) { e.WillReturnRows(sqlmock.NewRows(clienteRepoColumns)) }, comercial.ErrClienteNaoEncontrado},
 		{"erro do banco", func(e *sqlmock.ExpectedQuery) { e.WillReturnError(errBanco) }, errBanco},

@@ -12,6 +12,9 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: ECOM-06 cliente PF no CRM e base do checkout
+- ECOM-06: o admin cria/edita cliente pessoa física (CPF + rua/número obrigatórios, complemento/CEP opcionais; PJ igual); API devolve `cpf`/`endereco`/`numero`/`complemento`/`cep`; 1062 do CPF → 409. `sql/33` (`make db-fix-pedidos-canal-loja`): canal `Loja` e vendedor "Loja Online"; aplicado no CasaOS :3307 (id 168). `make test`, `test-integration` e `test-frontend` rc=0.
+
 ## Avulso de 2026-11-17: ENV-01 `.env` em `backend/`
 - ENV-01: `.env`, `.env.example` e `.env.producao.ro` saíram da raiz para `backend/`; Makefile (`-include backend/.env`), `cmdutil.LoadEnvFromCwd` (API usa o mesmo), `testeemail`, `dump-local.ps1`, mensagens dos scripts, testes e docs ajustados. `ENV_ARQUIVO` é relativo à raiz (ex.: `backend/.env.producao`). `make test` rc=0.
 

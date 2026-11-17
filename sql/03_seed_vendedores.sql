@@ -91,6 +91,13 @@ INSERT IGNORE INTO `vendedores` (`id`, `nome`, `regiao`, `uf`, `data_admissao`, 
 (41, 'Henrique Alves', 'Rio de Janeiro', 'RJ', '2022-05-01', NULL, 55000.00),
 (42, 'Felipe Lima', 'Recife', 'PE', '2021-07-31', NULL, 85000.00);
 
+-- ECOM-06: vendedor dos pedidos do checkout da loja (sem usuário de login;
+-- id pelo AUTO_INCREMENT, depois dos 42). Igual ao sql/33.
+INSERT INTO `vendedores` (`nome`, `regiao`, `uf`, `data_admissao`, `data_desligamento`, `meta_mensal`)
+SELECT 'Loja Online', 'Online', 'SP', CURDATE(), NULL, 0.00
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `vendedores` WHERE `nome` = 'Loja Online');
+
 -- ------------------------------------------------------------
 -- Usuários dos vendedores (INSERT IGNORE para idempotência; nunca REPLACE,
 -- que apagaria a linha, levando em cascata refresh_tokens e senha_historico,

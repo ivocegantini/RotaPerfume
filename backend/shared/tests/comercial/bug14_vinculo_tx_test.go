@@ -100,7 +100,7 @@ func TestBUG14_VincularCliente_FalhaDesfazTudo(t *testing.T) {
 		pool, mock := novoMock(t)
 		mock.ExpectQuery(reExisteVendedor).WithArgs(int64(1)).WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 		mock.ExpectQuery(reClientePorID).WithArgs(int64(2)).
-			WillReturnRows(sqlmock.NewRows(colsCliente).AddRow(int64(2), "c", "r", "s", "ci", "PR", "", agoraFixo, true, agoraFixo, agoraFixo))
+			WillReturnRows(sqlmock.NewRows(colsCliente).AddRow(int64(2), "c", "r", "s", "ci", "PR", "", agoraFixo, true, agoraFixo, agoraFixo, "", "", "", "", ""))
 		mock.ExpectBegin()
 		mock.ExpectQuery(reTravarCliente).WithArgs(int64(2)).WillReturnRows(sqlmock.NewRows([]string{"cliente_id_origem"}))
 		mock.ExpectRollback()

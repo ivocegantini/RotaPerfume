@@ -11,9 +11,10 @@ import (
 
 const arqClientes = "clientes.go"
 
-// clienteColunas: bairro e cnpj (NULL no cliente pessoa física da loja,
-// ECOM-05) são NULLable e viram "" (COALESCE).
-const clienteColunas = `cliente_id_origem, COALESCE(cnpj, ''), razao_social, segmento, cidade, uf, COALESCE(bairro, ''), data_cadastro, ativo, created_at, updated_at`
+// clienteColunas: bairro, cnpj/cpf (um dos dois é NULL, ECOM-05) e o
+// endereço são NULLable e viram "" (COALESCE). Os da PF vêm no fim (ECOM-06).
+const clienteColunas = `cliente_id_origem, COALESCE(cnpj, ''), razao_social, segmento, cidade, uf, COALESCE(bairro, ''), data_cadastro, ativo, created_at, updated_at, ` +
+	`COALESCE(cpf, ''), COALESCE(endereco, ''), COALESCE(numero, ''), COALESCE(complemento, ''), COALESCE(cep, '')`
 
 // clienteNaCarteiraCond restringe à carteira ATIVA de um vendedor; o
 // vendedor_id vai sempre por placeholder.
@@ -92,7 +93,7 @@ func (r *Clientes) PorID(ctx context.Context, id int64) (*comercial.Cliente, err
 func scanCliente(s db.Linha) (*comercial.Cliente, error) {
 	return db.LerUma(s, comercial.ErrClienteNaoEncontrado, "comercialmysql: ler cliente", func(c *comercial.Cliente) []any {
 		return []any{&c.ClienteIDOrigem, &c.CNPJ, &c.RazaoSocial, &c.Segmento, &c.Cidade, &c.UF, &c.Bairro,
-			&c.DataCadastro, &c.Ativo, &c.CreatedAt, &c.UpdatedAt}
+			&c.DataCadastro, &c.Ativo, &c.CreatedAt, &c.UpdatedAt, &c.CPF, &c.Endereco, &c.Numero, &c.Complemento, &c.CEP}
 	})
 }
 
@@ -113,17 +114,15 @@ func (r *Clientes) TravarParaVinculo(ctx context.Context, id int64) error {
 	return err
 }
 
-// Inserir grava o cliente e preenche ClienteIDOrigem. O 1062 do CNPJ vira
-// ErrCNPJDuplicado SEM o erro do driver, que traz o CNPJ (N-8, M-04).
+// Inserir grava o cliente e preenche ClienteIDOrigem. O 1062 do CNPJ/CPF
+// vira ErrCNPJDuplicado/ErrCPFDuplicado SEM o erro do driver, que traz o
+// documento (N-8, M-04). CNPJ ou CPF vazio grava NULL (ECOM-06).
 func (r *Clientes) Inserir(ctx context.Context, c *comercial.Cliente) error {
 	const q = `
-		INSERT INTO clientes (cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir cliente", q, c.CNPJ, c.RazaoSocial, c.Segmento, c.Cidade, c.UF, c.Bairro, c.DataCadastro, c.Ativo)
-	if db.ChaveDuplicada(err, uqClientesCNPJ) {
-		return comercial.ErrCNPJDuplicado
-	}
-	if err != nil {
+		INSERT INTO clientes (cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir cliente", q, append([]any{nuloSeVazio(c.CNPJ), c.RazaoSocial, c.Segmento, c.Cidade, c.UF, c.Bairro, c.DataCadastro, c.Ativo}, argsPF(c)...)...)
+	if err = documentoDuplicado(err); err != nil {
 		return err
 	}
 	c.ClienteIDOrigem = id
@@ -135,12 +134,27 @@ func (r *Clientes) Inserir(ctx context.Context, c *comercial.Cliente) error {
 func (r *Clientes) Atualizar(ctx context.Context, id int64, c *comercial.Cliente) error {
 	const q = `
 		UPDATE clientes
-		SET cnpj = ?, razao_social = ?, segmento = ?, cidade = ?, uf = ?, bairro = ?, data_cadastro = ?
+		SET cnpj = ?, razao_social = ?, segmento = ?, cidade = ?, uf = ?, bairro = ?, data_cadastro = ?,
+		    cpf = ?, endereco = ?, numero = ?, complemento = ?, cep = ?
 		WHERE cliente_id_origem = ?`
+	args := append([]any{nuloSeVazio(c.CNPJ), c.RazaoSocial, c.Segmento, c.Cidade, c.UF, c.Bairro, c.DataCadastro}, argsPF(c)...)
 	err := db.ExecPorID(ctx, r.q, arqClientes, "Clientes.Atualizar", "comercialmysql: atualizar cliente", comercial.ErrClienteNaoEncontrado,
-		q, c.CNPJ, c.RazaoSocial, c.Segmento, c.Cidade, c.UF, c.Bairro, c.DataCadastro, id)
-	if db.ChaveDuplicada(err, uqClientesCNPJ) {
+		q, append(args, id)...)
+	return documentoDuplicado(err)
+}
+
+// argsPF são cpf e endereço (opcionais: vazio grava NULL), na ordem do SQL.
+func argsPF(c *comercial.Cliente) []any {
+	return []any{nuloSeVazio(c.CPF), nuloSeVazio(c.Endereco), nuloSeVazio(c.Numero), nuloSeVazio(c.Complemento), nuloSeVazio(c.CEP)}
+}
+
+// documentoDuplicado traduz o 1062 dos índices únicos de cnpj e cpf.
+func documentoDuplicado(err error) error {
+	switch {
+	case db.ChaveDuplicada(err, uqClientesCNPJ):
 		return comercial.ErrCNPJDuplicado
+	case db.ChaveDuplicada(err, uqClientesCPF):
+		return comercial.ErrCPFDuplicado
 	}
 	return err
 }

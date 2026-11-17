@@ -13,21 +13,21 @@ import (
 )
 
 // clienteColunasRegex reflete a constante clienteColunas do repositório.
-const clienteColunasRegex = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
+const clienteColunasRegex = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at, COALESCE\(cpf, ''\), COALESCE\(endereco, ''\), COALESCE\(numero, ''\), COALESCE\(complemento, ''\), COALESCE\(cep, ''\)`
 
 func clienteRowsForHandler() *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
 	}).AddRow(int64(100), "11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro",
-		now, true, now, now)
+		now, true, now, now, "", "", "", "", "")
 }
 
 func emptyClienteRows() *sqlmock.Rows {
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
 	})
 }
 
@@ -485,8 +485,8 @@ func TestCreateCliente_Success(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`).
-		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true).
+	mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`).
+		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(101, 1))
 
 	req, _ := http.NewRequest("POST", server.URL+"/api/clientes", makeJSON(validClientePayload()))
@@ -519,8 +519,8 @@ func TestCreateCliente_PermitidoParaNaoAdmin(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id_vendedor"}).AddRow(int64(10)))
 	expectVendedorDesligado(mock, 10, false)
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`).
-		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true).
+	mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`).
+		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(101, 1))
 	mock.ExpectExec(reInsertCarteira).
 		WithArgs(int64(101), int64(10), sqlmock.AnyArg(), nil).
@@ -658,8 +658,8 @@ func TestUpdateCliente_Success(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
-		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(1)).
+	mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
+		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + clienteColunasRegex + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -694,8 +694,8 @@ func TestUpdateCliente_PermitidoParaNaoAdmin(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id_vendedor"}).AddRow(int64(10)))
 	expectVendedorDesligado(mock, 10, false)
 	expectCarteiraAtivaH(mock, 10, 1)
-	mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
-		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(1)).
+	mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
+		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + clienteColunasRegex + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -786,8 +786,8 @@ func TestUpdateCliente_NaoEncontrado(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
-		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(999)).
+	mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
+		WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/clientes/999", makeJSON(validClientePayload()))

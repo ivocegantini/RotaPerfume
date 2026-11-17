@@ -166,7 +166,7 @@ func TestVendas_MesmosItens(t *testing.T) {
 }
 
 func TestVendas_Enums(t *testing.T) {
-	for _, s := range []string{"App", "Telefone", "Visita", " WhatsApp "} {
+	for _, s := range []string{"App", "Telefone", "Visita", " WhatsApp ", "Loja"} {
 		_, err := vendas.NovoCanal(s)
 		assert.NoError(t, err, s)
 	}

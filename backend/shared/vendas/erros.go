@@ -26,7 +26,7 @@ var (
 	ErrClienteIDObrigatorio   = kernel.NovoErro(kernel.KindInvalido, "cliente_id é obrigatório")
 	ErrVendedorIDObrigatorio  = kernel.NovoErro(kernel.KindInvalido, "vendedor_id é obrigatório")
 	ErrDataPedidoInvalida     = kernel.NovoErro(kernel.KindInvalido, "data_pedido inválida (use o formato AAAA-MM-DD)")
-	ErrCanalInvalido          = kernel.NovoErro(kernel.KindInvalido, "canal inválido (use: App, Telefone, Visita, WhatsApp)")
+	ErrCanalInvalido          = kernel.NovoErro(kernel.KindInvalido, "canal inválido (use: App, Telefone, Visita, WhatsApp, Loja)")
 	ErrStatusInvalido         = kernel.NovoErro(kernel.KindInvalido, "status inválido (use: Cancelado, Em separação, Entregue, Faturado)")
 	ErrItensObrigatorios      = kernel.NovoErro(kernel.KindInvalido, "o pedido deve ter ao menos um item")
 	ErrItensDemais            = kernel.NovoErro(kernel.KindInvalido, "o pedido deve ter no máximo 200 itens") // SEC-14: MaxItensPedido

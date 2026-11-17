@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `pedidos` (
     `cliente_id` BIGINT NOT NULL COMMENT 'FK para clientes.cliente_id_origem',
     `vendedor_id` BIGINT NOT NULL COMMENT 'FK para vendedores.id (vendedor_id do CSV já corresponde 1:1)',
     `data_pedido` DATE NOT NULL COMMENT 'Data do pedido',
-    `canal` ENUM('App','Telefone','Visita','WhatsApp') NOT NULL COMMENT 'Canal de venda do pedido',
+    `canal` ENUM('App','Telefone','Visita','WhatsApp','Loja') NOT NULL COMMENT 'Canal de venda do pedido (Loja = checkout da loja online, ECOM-06)',
     `status` ENUM('Cancelado','Em separação','Entregue','Faturado') NOT NULL COMMENT 'Status do pedido',
     `valor_total` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Valor total do pedido em R$',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação do registro',

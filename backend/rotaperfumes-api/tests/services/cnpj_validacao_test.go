@@ -34,7 +34,7 @@ func cnpjCriarCliente(t *testing.T, raw string) (gravado string, err error) {
 	db, mock := dlNewDB(t)
 	mock.ExpectExec(`INSERT INTO clientes`).
 		WithArgs(dlCapturaTexto{&gravado}, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true).
+			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	// A releitura (BUG-08) não tem expectativa: o service devolve o objeto em memória.
 	c, err := casosComercial(db, 0).CriarCliente(context.Background(), principalAdmin(), fixo(comercial.DadosCliente{

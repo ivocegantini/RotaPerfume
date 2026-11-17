@@ -42,12 +42,13 @@ const (
 	CanalTelefone Canal = "Telefone"
 	CanalVisita   Canal = "Visita"
 	CanalWhatsApp Canal = "WhatsApp"
+	CanalLoja     Canal = "Loja" // checkout da loja online (ECOM-06, sql/33)
 )
 
 // NovoCanal valida o canal (espaços nas pontas ignorados).
 func NovoCanal(s string) (Canal, error) {
 	switch v := Canal(strings.TrimSpace(s)); v {
-	case CanalApp, CanalTelefone, CanalVisita, CanalWhatsApp:
+	case CanalApp, CanalTelefone, CanalVisita, CanalWhatsApp, CanalLoja:
 		return v, nil
 	}
 	return "", ErrCanalInvalido

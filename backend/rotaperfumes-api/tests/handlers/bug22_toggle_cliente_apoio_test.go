@@ -27,8 +27,8 @@ func clienteRowsAtivoH(id int64, cnpj string, ativo bool) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
-	}).AddRow(id, cnpj, "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", now, ativo, now, now)
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
+	}).AddRow(id, cnpj, "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", now, ativo, now, now, "", "", "", "", "")
 }
 
 // expectToggleClienteTxH registra a tx do toggle. vendedorID 0 = admin (sem

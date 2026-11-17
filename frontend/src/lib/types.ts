@@ -297,6 +297,12 @@ export interface Cliente {
   ativo: boolean;
   created_at: string;
   updated_at: string;
+  // ECOM-06: pessoa fisica (cpf preenchido e cnpj vazio) e endereco.
+  cpf?: string;
+  endereco?: string;
+  numero?: string;
+  complemento?: string;
+  cep?: string;
 }
 
 // Payload usado tanto para POST /api/clientes (criar) quanto para
@@ -310,6 +316,13 @@ export interface ClienteInput {
   uf: string;
   bairro: string;
   data_cadastro?: string; // formato AAAA-MM-DD
+  // ECOM-06: pessoa fisica manda cpf (e cnpj vazio); rua e numero
+  // obrigatorios na PF, opcionais na PJ.
+  cpf?: string;
+  endereco?: string;
+  numero?: string;
+  complemento?: string;
+  cep?: string;
 }
 
 export interface ClienteSegmentoTotal {
@@ -371,7 +384,7 @@ export interface ProdutoInput {
 
 // Canais e status aceitos pelo backend (ver services.canaisValidos /
 // statusValidos em backend/rotaperfumes-api/services/pedido_service.go).
-export type PedidoCanal = "App" | "Telefone" | "Visita" | "WhatsApp";
+export type PedidoCanal = "App" | "Telefone" | "Visita" | "WhatsApp" | "Loja"; // Loja: checkout (ECOM-06)
 export type PedidoStatus =
   | "Cancelado"
   | "Em separação"

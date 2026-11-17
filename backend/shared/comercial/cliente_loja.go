@@ -23,6 +23,7 @@ var (
 	ErrCidadeMuitoLonga      = kernel.NovoErro(kernel.KindInvalido, "cidade deve ter no máximo 120 caracteres")
 	ErrUFDesconhecida        = kernel.NovoErro(kernel.KindInvalido, "uf inválida")
 	ErrCPFDuplicado          = kernel.NovoErro(kernel.KindConflito, "cpf já cadastrado")
+	ErrDocumentoDuplo        = kernel.NovoErro(kernel.KindInvalido, "informe cnpj (pessoa jurídica) ou cpf (pessoa física), não os dois")
 )
 
 // ufsBrasil são as 27 UFs.

@@ -28,6 +28,7 @@ import { ApiError } from "@/lib/apiError";
 import { useSessionUser, useVendedorDesligado } from "@/lib/session";
 import { Cliente, ClienteInput } from "@/lib/types";
 import { formatCnpj } from "@/lib/cnpj";
+import { mascararCPF } from "@/lib/clienteLoja";
 import { formatarData } from "@/lib/formatarData";
 import { vlog } from "@/lib/vlog";
 import { TOGGLE_BLOQUEIO_MS, useBloqueioToggle } from "@/lib/useBloqueioToggle";
@@ -492,12 +493,13 @@ function ClientesContent() {
     },
     {
       key: "cnpj",
-      header: "CNPJ",
+      header: "CNPJ / CPF",
       width: "180px",
       sortable: true,
+      // ECOM-06: cliente pessoa fisica (loja) mostra o CPF.
       render: (c) => (
         <span className="font-mono text-xs text-slate-600">
-          {formatCnpj(c.cnpj)}
+          {c.cnpj ? formatCnpj(c.cnpj) : mascararCPF(c.cpf ?? "")}
         </span>
       ),
     },

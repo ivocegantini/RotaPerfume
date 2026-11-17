@@ -756,8 +756,8 @@ func clienteGetByIDRows(idOrigem int64, razaoSocial string) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
-	}).AddRow(idOrigem, "11.111.111/0001-11", razaoSocial, "Varejo", "São Paulo", "SP", "Centro", now, true, now, now)
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
+	}).AddRow(idOrigem, "11.111.111/0001-11", razaoSocial, "Varejo", "São Paulo", "SP", "Centro", now, true, now, now, "", "", "", "", "")
 }
 
 func carteiraVinculoRow(carteiraIDOrigem, clienteID, vendedorID int64) *sqlmock.Rows {

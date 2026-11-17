@@ -105,7 +105,7 @@ func TestARQ07_G_ClienteForaDaCarteira_404NaLeitura(t *testing.T) {
 	pool, mock := novoMock(t)
 	esperarAtivo(mock)
 	mock.ExpectQuery(reClientePorID).WithArgs(int64(2)).
-		WillReturnRows(sqlmock.NewRows(colsCliente).AddRow(int64(2), "c", "r", "s", "ci", "PR", "", agoraFixo, true, agoraFixo, agoraFixo))
+		WillReturnRows(sqlmock.NewRows(colsCliente).AddRow(int64(2), "c", "r", "s", "ci", "PR", "", agoraFixo, true, agoraFixo, agoraFixo, "", "", "", "", ""))
 	mock.ExpectQuery(reVinculoAtivo).WithArgs(vendedorDoEscopo, int64(2)).WillReturnRows(sqlmock.NewRows(colsCarteira))
 
 	_, err := novosCasos(pool, vinculoFake{id: vendedorDoEscopo}).ObterCliente(context.Background(), principal(t, kernel.RoleNormal), 2)
