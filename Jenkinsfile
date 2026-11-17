@@ -59,7 +59,7 @@ pipeline {
         //   no IMAGEM_BASE do deploy/mariadb-docker.sh (mesma string) -> make test
         //   -> sudo bash deploy/mariadb-docker.sh --recriar --backup-agora (BACKUP-01).
         // "make deps-audit-imagens" mostra se ha digest novo (so informa).
-        GO_IMAGE             = 'golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf'
+        GO_IMAGE             = 'golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280'
         // TST-18: estagio "Testes Frontend" (npm ci + lint + vitest).
         NODE_IMAGE           = 'node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5'
         // Cliente do MariaDB 11.4 LTS (mesma imagem do servidor); a imagem 11.x

@@ -117,7 +117,7 @@ Navegador (LAN)                          Navegador (internet)
 | ID | Tipo | Conteúdo |
 |---|---|---|
 | `rotaperfumes-api-env` | Secret file | `.env` de produção da API (modelo: `deploy/api.env.example`), com `DB_USUARIO=rotaperfumes_app` e a senha de `/root/rotaperfumes-mariadb/rotaperfumes_app.senha` |
-| `rotaperfumes-db-admin` | Username with password | `rotaperfumes_admin` + senha de `/root/rotaperfumes-mariadb/rotaperfumes_admin.senha` (usada só com `IMPORTAR_DUMP=true`) |
+| `rotaperfumes-db-admin` | Username with password | `rotaperfumes_admin` + senha de `/root/rotaperfumes-mariadb/rotaperfumes_admin.senha` (usada pelo `Importar dump` e pelo `Migracoes`, DEPLOY-10) |
 
 ---
 
@@ -560,7 +560,7 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 | API: `x509: certificate signed by unknown authority` | A API ainda monta a CA antiga depois de uma troca de CA (`--nova-ca`) | Rode o job (a label do sha256 recria a API) depois do commit do fingerprint (`docs/Instal_SSL.md` passo 9.2) |
 | API: `x509: certificate is valid for ..., not rotaperfumes-mariadb` | Certificado do servidor emitido fora do script ou com SAN antigo | `sudo bash deploy/mariadb-docker.sh --novo-cert --ca-key ...` |
 | Estágio **Importar dump** falha com "Dump nao encontrado/legivel" | Arquivo fora do `DUMP_PATH` ou sem permissão para o usuário do Jenkins | Seção 7.2/7.3 (`chown`/`chmod`), ou o `DUMP_PATH` informado pelo `setup-servidor.sh` (Jenkins em container) |
-| Import falha com `Access denied` | Credencial `rotaperfumes-db-admin` com senha diferente de `rotaperfumes_admin.senha` | Atualize a credencial (seção 5.2) |
+| Import ou `Migracoes` falha com `Access denied` (1045) | Credencial `rotaperfumes-db-admin` com senha diferente de `rotaperfumes_admin.senha` | Atualize a credencial (seção 5.2) |
 | `make db-* ENV_ARQUIVO=backend/.env.producao` da máquina do admin: `Access denied for user 'casaos'@'<IP>'` ou timeout | IP da máquina fora da lista `--dev-ip` (ou mudou por DHCP) | Rode o script com o `--dev-ip` certo (e `--recriar` se a lista mudou); fixe o IP. **Hoje o timeout é o esperado:** produção só local, sem `--dev-ip` (passo 11 da seção 11 não se aplica); confira o banco pelo passo 7, no servidor, como root |
 | Cliente: `Authentication plugin 'client_ed25519' cannot be loaded` | Cliente sem ed25519 (ex.: `mysql` do Oracle, Workbench) | Use o cliente `mariadb` 11.x; em último caso, `--casaos-native-motivo` (`docs/Instal_SSL.md` passo 8) |
 | `mariadb-docker.sh`: "rode de novo com --recriar" | Container existente difere do desejado (rede, porta, `--dev-ip`, read-only, usuário) | Confira a lista `--dev-ip`; rode com `--recriar` (o banco fica fora do ar alguns segundos) |

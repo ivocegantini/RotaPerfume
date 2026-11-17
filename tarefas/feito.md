@@ -12,6 +12,15 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: SEC-78, SEC-77 e DEP-07
+- SEC-78: fechado pelo usuário: as contas `gerente_admin`/`rh_admin` foram extintas (funções passaram ao `admin`).
+- SEC-77: `deps-audit-imagens` tira o digest da linha `Digest:` (buildx 0.30 ignora o `--format`); teste com o docker falso nas duas saídas.
+- DEP-07: `golang:1.27.4-alpine` no digest novo (`70bd7dde…b280`) em `Jenkinsfile`, `backend/Dockerfile` e `seed-producao.sh`; `go-sql-driver/mysql` 1.10.2, `x/crypto` 0.59, `x/net` 0.63, `x/sys`, `x/text`, `x/image`, `x/term`, `x/mod`, `x/tools` e `yaml` atualizados. `make test`, `lint`, `test-integration` e `deps-audit` rc=0.
+
+## Avulso de 2026-11-17: reavaliação do `FalhasEncontradas.md` (arquivo apagado)
+- Itens 1–13 seguem corrigidos no código atual (histórico sem `itenslocais.txt`/`.env`, sem hash na API, rate limit, security headers, CORS por allowlist, XFF só com `TRUST_PROXY_HEADERS`, e-mail mascarado, seed sem senha comum, `ProtectedRoute` com `/api/auth/me`, `make deps-audit`).
+- Pendências operacionais resolvidas: senha de app SMTP preenchida, 0 forks, Go local 1.27.4, govulncheck instalado. Restantes viraram SEC-78, SEC-77 e DEP-07.
+
 ## Avulso de 2026-11-17: decisões do usuário (DB-08, SEC-60, SEC-76, DEPLOY-10)
 - DB-08 (MERGE-01): DSN com `time_zone='-03:00'` (`tz.OffsetSQL`); `DEFAULT`/`ON UPDATE CURRENT_TIMESTAMP` coerentes com o Go. TIMESTAMP antigos gravados pelo Go na sessão UTC passam a aparecer 3 h mais cedo (ex.: `ultimo_login_at`). Integração `TestIntegracaoDB08_*` verde no CasaOS :3307.
 - SEC-60: decisão do usuário: a `casaos_ro` mantém o SELECT em `clientes` (com CPF/endereço).
