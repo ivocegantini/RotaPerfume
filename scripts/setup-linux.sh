@@ -520,13 +520,14 @@ resumo_chaves() {
 # SEC-58: conferir_chave_mariadb ARQ FINGERPRINT SAIDA. Exige UMA chave pública
 # primária com o fingerprint esperado, sem material secreto (sec/ssb), não
 # revogada nem expirada; grava em SAIDA só o export-minimal dessa chave
-# (nunca o arquivo baixado).
+# (nunca o arquivo baixado). SEC-61: retorno 1 = chave recusada; 2 = não foi
+# possível conferir (fingerprint inválido em versoes.conf ou gpg ausente).
 conferir_chave_mariadb() {
 	local arq="$1" esperado saida="${3:-}" resumo pubs gh
 	esperado="$(printf '%s' "${2:-}" | tr -d ' ' | tr '[:lower:]' '[:upper:]')"
-	[[ "$esperado" =~ ^[0-9A-F]{40}$ ]] || { aviso "MARIADB_CHAVE_FINGERPRINT ausente ou inválido em versoes.conf (SEC-58): chave recusada"; return 1; }
+	[[ "$esperado" =~ ^[0-9A-F]{40}$ ]] || { aviso "MARIADB_CHAVE_FINGERPRINT ausente ou inválido em versoes.conf (SEC-58): chave recusada"; return 2; }
 	[ -n "$saida" ] || { aviso "conferir_chave_mariadb sem arquivo de saída (SEC-58)"; return 1; }
-	tem gpg || { aviso "gpg não encontrado: não dá para conferir a chave do MariaDB (SEC-58): chave recusada"; return 1; }
+	tem gpg || { aviso "gpg não encontrado: não dá para conferir a chave do MariaDB (SEC-58): chave recusada"; return 2; }
 	resumo="$(resumo_chaves "$arq")"
 	if printf '%s\n' "$resumo" | grep -qE '^(sec|ssb):'; then
 		aviso "arquivo da chave do MariaDB traz chave secreta (sec/ssb) (SEC-58): chave recusada"; return 1
@@ -554,6 +555,49 @@ conferir_chave_mariadb() {
 		aviso "export da chave do MariaDB inesperado (SEC-58): chave recusada"; return 1
 	fi
 	info "Chave do MariaDB conferida: $esperado"
+}
+
+# SEC-58: a chave já instalada (de um setup anterior) é conferida também.
+# Retorno: 0 = ausente ou confere; 1 e 2 como em conferir_chave_mariadb.
+conferir_keyring_mariadb_instalado() { # ARQ
+	local k=$1 rc=0
+	[ -e "$k" ] || [ -L "$k" ] || return 0
+	local saida
+	saida="$(mktemp)" || return 2
+	conferir_chave_mariadb "$k" "${MARIADB_CHAVE_FINGERPRINT:-}" "$saida" || rc=$?
+	rm -f "$saida"
+	[ "$rc" -ne 0 ] || info "SEC-58: $k confere com MARIADB_CHAVE_FINGERPRINT"
+	return "$rc"
+}
+
+# SEC-61: o mariadb.sources confia nesse keyring, e o primeiro apt-get update
+# já usaria a chave; por isso roda em main() antes de etapa_basicas. Instalar
+# com apt: keyring divergente ou não conferível aborta antes de qualquer apt.
+# Sem apt ou no --check: nada será instalado, só registra (divergente = FALTA;
+# não conferível = AVISO).
+preflight_keyring_mariadb() { # ARQ
+	local k=$1 rc=0 problema status
+	conferir_keyring_mariadb_instalado "$k" || rc=$?
+	case "$rc" in
+	0) return 0 ;;
+	2)
+		status=AVISO
+		if tem gpg; then
+			problema="não foi possível conferir $k: MARIADB_CHAVE_FINGERPRINT inválido em scripts/versoes.conf ou mktemp falhou"
+		else
+			problema="não foi possível conferir $k: gpg ausente"
+		fi
+		;;
+	*)
+		status=FALTA
+		problema="$k não confere com MARIADB_CHAVE_FINGERPRINT (scripts/versoes.conf)"
+		;;
+	esac
+	if [ "$MODO" = instalar ] && [ "$APT" -eq 1 ]; then
+		printf 'SEC-61: %s. Nada foi instalado. Confira e reinstale: sudo rm %s /etc/apt/sources.list.d/mariadb.sources && make setup\n' "$problema" "$k" >&2
+		exit 1
+	fi
+	registrar mariadb-key "$status" "$problema: confira e reinstale (sudo rm $k /etc/apt/sources.list.d/mariadb.sources && make setup)"
 }
 
 configurar_repo_mariadb() {
@@ -761,6 +805,7 @@ main() {
 	printf 'RotaPerfume - setup do ambiente (Linux) - modo: %s\n' "$MODO"
 	info "Repositório: $RAIZ"
 	detectar_distro
+	preflight_keyring_mariadb /etc/apt/keyrings/mariadb-keyring.pgp
 	etapa_basicas
 	etapa_go
 	etapa_node

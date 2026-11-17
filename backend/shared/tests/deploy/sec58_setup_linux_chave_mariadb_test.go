@@ -54,10 +54,9 @@ type sec58Chaves struct {
 func sec58GerarChaves(t *testing.T) sec58Chaves {
 	t.Helper()
 	precisaBash(t)
+	ferramentaObrigatoria(t, "gpg") // CI-02: no CI, gpg ausente falha em vez de pular
 	gpg, err := exec.LookPath("gpg")
-	if err != nil {
-		t.Skip("gpg não está no PATH")
-	}
+	require.NoError(t, err)
 	dir := t.TempDir()
 	home := filepath.Join(dir, "gnupg")
 	require.NoError(t, os.Mkdir(home, 0o700))

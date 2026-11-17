@@ -3,7 +3,8 @@
 // Pre-requisitos no agente (o proprio servidor):
 //   - docker + plugin "docker compose" v2;
 //     usuario do Jenkins no grupo "docker".
-//   - curl, gzip (zcat), install (coreutils), bash, openssl.
+//   - curl, gzip (zcat), install (coreutils), bash, openssl, git (SEC-62: o
+//     codigo dos estagios de teste sai do git archive HEAD).
 //   - DEPLOY-06: banco = container MariaDB 11.4 "rotaperfumes-mariadb" criado
 //     por deploy/mariadb-docker.sh, so na rede Docker EXTERNA "rotaperfumes-db"
 //     (172.30.42.0/24; MariaDB em 172.30.42.2). A API entra nela com IP fixo
@@ -52,7 +53,8 @@ pipeline {
         // SEC-31: imagens fixadas por digest (indice multi-arch) - a tag sozinha
         // pode ser republicada. Como atualizar:
         //   docker buildx imagetools inspect mariadb:11.4 --format '{{.Manifest.Digest}}'
-        //   (golang: idem com golang:1.27-alpine; versao do Go = go.mod)
+        //   (golang: idem com golang:1.27-alpine e golang:1.27-trixie; versao do
+        //   Go = go.mod, a mesma no GO_IMAGE e no GO_TEST_IMAGE)
         //   (node: idem com node:26.13-alpine; versao do Node = frontend/.nvmrc,
         //   a mesma linha 26 do NODE_VERSION do frontend/Dockerfile)
         //   -> trocar "<tag com patch>@sha256:<digest>" aqui; o do mariadb TAMBEM
@@ -60,6 +62,9 @@ pipeline {
         //   -> sudo bash deploy/mariadb-docker.sh --recriar --backup-agora (BACKUP-01).
         // "make deps-audit-imagens" mostra se ha digest novo (so informa).
         GO_IMAGE             = 'golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280'
+        // CI-02: estagio "Testes Go". Debian porque os testes de tests/deploy
+        // precisam de bash e gpg, que a imagem ja traz (sem apk/apt no estagio).
+        GO_TEST_IMAGE        = 'golang:1.27.4-trixie@sha256:f18c3d73a184fb0582828510722e723b63a93f7188d11dd223d9be6f6880e65d'
         // TST-18: estagio "Testes Frontend" (npm ci + lint + vitest).
         NODE_IMAGE           = 'node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5'
         // Cliente do MariaDB 11.4 LTS (mesma imagem do servidor); a imagem 11.x
@@ -94,23 +99,34 @@ pipeline {
                 // Codigo enviado por stdin (tar) em vez de bind mount: funciona
                 // tambem com Jenkins em container. Testes de integracao so rodam
                 // com INTEGRATION=1, entao aqui sao pulados (sem MariaDB).
+                // SEC-62: o tar vem do git archive HEAD (so o que esta rastreado):
+                // .env, chaves e dumps deixados no workspace nunca entram, e um
+                // caminho da lista que nao esteja rastreado derruba o estagio.
                 // O layout do repositorio e preservado (backend/..., sql/, Makefile,
-                // deploy/, Jenkinsfile, .gitignore): cmdutil.FindProjectRoot procura
-                // backend/shared/go.mod; os testes de config leem o Makefile e os
-                // .sql da raiz, e os de tests/deploy e o sec37 leem deploy/*, o
-                // Jenkinsfile e o .gitignore (falham de proposito se ausentes). O TST-18
+                // deploy/, scripts/, Jenkinsfile, .gitignore): cmdutil.FindProjectRoot
+                // procura backend/shared/go.mod; os testes de config leem o Makefile e
+                // os .sql da raiz, e os de tests/deploy e o sec37 leem deploy/*, o
+                // Jenkinsfile e o .gitignore (falham de proposito se ausentes). O
+                // scripts/ (setup-linux.sh, setup-windows.ps1, versoes.conf; sem
+                // segredos) e lido pelo SEC-58 e pelo TST-17 (CI-01). CI=true faz o
+                // arquivo ausente falhar em vez de pular (os testes leem so
+                // os.Getenv("CI"); o docker run so repassa -e explicitos). O TST-18
                 // le frontend/.nvmrc, frontend/Dockerfile, frontend/package*.json e
                 // frontend/tests (estagio "Testes Frontend"). SEC-47/SEC-58 leem o
                 // backend/Dockerfile e scripts/; BACKUP-01/SEC-51 leem o
                 // docs/deploy-servidor.md. Ficam de fora os dumps e o api.env
                 // (segredo) do deploy/.
+                // CI-02: bash e gpg faltando no GO_TEST_IMAGE falham o teste
+                // (precisaBash, SEC-58); os testes com unshare continuam pulando no
+                // container (o seccomp padrao do Docker bloqueia user namespace).
                 sh '''#!/bin/bash
                     set -euo pipefail
-                    tar -cf - --exclude=deploy/dumps --exclude=deploy/api.env \
-                        backend/shared backend/rotaperfumes-api sql Makefile deploy Jenkinsfile .gitignore \
+                    command -v git >/dev/null || { echo "git ausente no agente (SEC-62)" >&2; exit 1; }
+                    git archive --format=tar HEAD -- \
+                        backend/shared backend/rotaperfumes-api sql Makefile deploy scripts Jenkinsfile .gitignore \
                         frontend/.nvmrc frontend/Dockerfile frontend/package.json frontend/package-lock.json frontend/tests \
-                        backend/Dockerfile scripts docs/deploy-servidor.md \
-                      | docker run --rm -i -e CGO_ENABLED=0 -e GOFLAGS=-mod=readonly "$GO_IMAGE" sh -ec '
+                        backend/Dockerfile docs/deploy-servidor.md \
+                      | docker run --rm -i -e CI=true -e CGO_ENABLED=0 -e GOFLAGS=-mod=readonly "$GO_TEST_IMAGE" sh -ec '
                           mkdir -p /src && tar -xf - -C /src
                           cd /src/backend/shared && go vet ./... && go test ./...
                           cd /src/backend/rotaperfumes-api && go vet ./... && go test ./...
@@ -122,18 +138,16 @@ pipeline {
         stage('Testes Frontend') {
             steps {
                 // TST-18: mesmo padrao do "Testes Go" (codigo por stdin/tar, sem
-                // bind mount). Vai so o frontend/ rastreado, sem node_modules,
-                // .next, coverage, tsbuildinfo e .env (o npm ci reinstala pelo
-                // lockfile, reprodutivel). Dois testes leem arquivos do backend
+                // bind mount). SEC-62: git archive HEAD, so o frontend/ rastreado
+                // (o npm ci reinstala pelo lockfile, reprodutivel). Dois testes leem arquivos do backend
                 // pelo layout do repositorio (../backend/...): o contrato de
                 // erros do PedidoModal (backend/shared/vendas/erros.go) e a massa
                 // cruzada do CNPJ (backend/shared/cnpj/testdata/casos_cruzados.json);
                 // vao junto, no mesmo caminho relativo.
                 sh '''#!/bin/bash
                     set -euo pipefail
-                    tar -cf - --exclude=frontend/node_modules --exclude=frontend/.next \
-                        --exclude=frontend/coverage --exclude=frontend/tsconfig.tsbuildinfo \
-                        --exclude=frontend/.env --exclude=frontend/.env.local \
+                    command -v git >/dev/null || { echo "git ausente no agente (SEC-62)" >&2; exit 1; }
+                    git archive --format=tar HEAD -- \
                         frontend backend/shared/vendas/erros.go backend/shared/cnpj/testdata/casos_cruzados.json \
                       | docker run --rm -i -e CI=true -e NEXT_TELEMETRY_DISABLED=1 "$NODE_IMAGE" sh -ec '
                           mkdir -p /src && tar -xf - -C /src
