@@ -14,6 +14,12 @@ import {
   normalizeCnpj,
   validateCnpj,
 } from "@/lib/cnpj";
+import {
+  cepOpcionalValido,
+  cpfValido,
+  mascararCEP,
+  mascararCPF,
+} from "@/lib/clienteLoja";
 import { vlog } from "@/lib/vlog";
 
 const F = "ClienteModal.tsx";
@@ -25,6 +31,9 @@ interface ClienteModalProps {
   onClose: () => void;
   onSubmit: (data: ClienteInput) => Promise<void>;
 }
+
+// ECOM-06: pessoa juridica (CNPJ) ou fisica (CPF + endereco obrigatorio).
+type TipoPessoa = "pj" | "pf";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -51,6 +60,13 @@ export function ClienteModal({
   const [bairro, setBairro] = useState("");
   vlog(F, "ClienteModal", "criando estado dataCadastro");
   const [dataCadastro, setDataCadastro] = useState("");
+  vlog(F, "ClienteModal", "criando estado tipoPessoa e endereço (ECOM-06)");
+  const [tipoPessoa, setTipoPessoa] = useState<TipoPessoa>("pj");
+  const [cpf, setCpf] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [numero, setNumero] = useState("");
+  const [complemento, setComplemento] = useState("");
+  const [cep, setCep] = useState("");
   vlog(F, "ClienteModal", "criando estado submitting");
   const [submitting, setSubmitting] = useState(false);
   vlog(F, "ClienteModal", "criando estado error");
@@ -78,6 +94,13 @@ export function ClienteModal({
       setUf(cliente.uf);
       vlog(F, "ClienteModal.reset", "preenchendo bairro do cliente");
       setBairro(cliente.bairro);
+      vlog(F, "ClienteModal.reset", "preenchendo tipo de pessoa, CPF e endereço");
+      setTipoPessoa(cliente.cpf ? "pf" : "pj");
+      setCpf(mascararCPF(cliente.cpf ?? ""));
+      setEndereco(cliente.endereco ?? "");
+      setNumero(cliente.numero ?? "");
+      setComplemento(cliente.complemento ?? "");
+      setCep(mascararCEP(cliente.cep ?? ""));
       vlog(F, "ClienteModal.reset", "definindo data de cadastro");
       setDataCadastro(
         cliente.data_cadastro ? cliente.data_cadastro.slice(0, 10) : todayISO()
@@ -95,6 +118,13 @@ export function ClienteModal({
       setUf("");
       vlog(F, "ClienteModal.reset", "limpando bairro");
       setBairro("");
+      vlog(F, "ClienteModal.reset", "limpando tipo de pessoa, CPF e endereço");
+      setTipoPessoa("pj");
+      setCpf("");
+      setEndereco("");
+      setNumero("");
+      setComplemento("");
+      setCep("");
       vlog(F, "ClienteModal.reset", "definindo data de cadastro como hoje");
       setDataCadastro(todayISO());
     }
@@ -112,14 +142,25 @@ export function ClienteModal({
       setError("Razao social e obrigatoria.");
       return;
     }
-    // NEG-02: mesma regra do backend (CNPJ numerico ou alfanumerico + DV).
-    vlog(F, "ClienteModal.handleSubmit", "validando CNPJ");
-    const erroCnpj = validateCnpj(cnpj);
-    vlog(F, "ClienteModal.handleSubmit", "verificando resultado da validação do CNPJ:", !erroCnpj);
-    if (erroCnpj) {
-      vlog(F, "ClienteModal.handleSubmit", "CNPJ inválido");
-      setError(erroCnpj);
-      return;
+    const pf = tipoPessoa === "pf";
+    if (pf) {
+      // ECOM-06: pessoa fisica valida o CPF (DV) no lugar do CNPJ.
+      vlog(F, "ClienteModal.handleSubmit", "validando CPF");
+      if (!cpfValido(cpf)) {
+        vlog(F, "ClienteModal.handleSubmit", "CPF inválido");
+        setError("CPF invalido.");
+        return;
+      }
+    } else {
+      // NEG-02: mesma regra do backend (CNPJ numerico ou alfanumerico + DV).
+      vlog(F, "ClienteModal.handleSubmit", "validando CNPJ");
+      const erroCnpj = validateCnpj(cnpj);
+      vlog(F, "ClienteModal.handleSubmit", "verificando resultado da validação do CNPJ:", !erroCnpj);
+      if (erroCnpj) {
+        vlog(F, "ClienteModal.handleSubmit", "CNPJ inválido");
+        setError(erroCnpj);
+        return;
+      }
     }
     vlog(F, "ClienteModal.handleSubmit", "validando segmento");
     if (!segmento.trim()) {
@@ -139,6 +180,20 @@ export function ClienteModal({
       setError("UF deve ter 2 letras.");
       return;
     }
+    vlog(F, "ClienteModal.handleSubmit", "validando endereço, pf:", pf);
+    if (pf && !endereco.trim()) {
+      setError("Rua (logradouro) e obrigatoria para pessoa fisica.");
+      return;
+    }
+    if (pf && !numero.trim()) {
+      setError("Numero e obrigatorio para pessoa fisica (use s/n se nao houver).");
+      return;
+    }
+    if (!cepOpcionalValido(cep)) {
+      vlog(F, "ClienteModal.handleSubmit", "CEP inválido");
+      setError("CEP deve ter 8 digitos.");
+      return;
+    }
     vlog(F, "ClienteModal.handleSubmit", "validando data de cadastro na edição");
     if (mode === "edit" && !dataCadastro) {
       vlog(F, "ClienteModal.handleSubmit", "data de cadastro ausente");
@@ -152,12 +207,17 @@ export function ClienteModal({
       vlog(F, "ClienteModal.handleSubmit", "enviando formulário do cliente, modo:", mode);
       await onSubmit({
         razao_social: razaoSocial.trim(),
-        cnpj: normalizeCnpj(cnpj),
+        cnpj: pf ? "" : normalizeCnpj(cnpj),
+        cpf: pf ? cpf.replace(/\D/g, "") : "",
         segmento: segmento.trim(),
         cidade: cidade.trim(),
         uf: uf.trim().toUpperCase(),
         bairro: bairro.trim(),
         data_cadastro: dataCadastro || undefined,
+        endereco: endereco.trim(),
+        numero: numero.trim(),
+        complemento: complemento.trim(),
+        cep: cep.replace(/\D/g, ""),
       });
     } catch (err) {
       vlog(F, "ClienteModal.handleSubmit", "falha ao salvar cliente: montando mensagem de erro");
@@ -181,8 +241,32 @@ export function ClienteModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <Alert variant="error">{error}</Alert>}
 
+        <fieldset className="flex flex-wrap gap-4 text-sm text-slate-700">
+          <legend className="sr-only">Tipo de pessoa</legend>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="tipo-pessoa"
+              value="pj"
+              checked={tipoPessoa === "pj"}
+              onChange={() => setTipoPessoa("pj")}
+            />
+            Pessoa juridica (CNPJ)
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="tipo-pessoa"
+              value="pf"
+              checked={tipoPessoa === "pf"}
+              onChange={() => setTipoPessoa("pf")}
+            />
+            Pessoa fisica (CPF)
+          </label>
+        </fieldset>
+
         <Input
-          label="Razao social"
+          label={tipoPessoa === "pf" ? "Nome" : "Razao social"}
           value={razaoSocial}
           onChange={(e) => setRazaoSocial(e.target.value)}
           placeholder="Ex: Perfumaria Exemplo Ltda"
@@ -190,18 +274,30 @@ export function ClienteModal({
           autoFocus
         />
 
-        <Input
-          label="CNPJ"
-          value={cnpj}
-          onChange={(e) => setCnpj(maskCnpjInput(e.target.value))}
-          placeholder={CNPJ_PLACEHOLDER}
-          helperText={CNPJ_HELPER}
-          inputMode="text"
-          autoCapitalize="characters"
-          autoComplete="off"
-          spellCheck={false}
-          required
-        />
+        {tipoPessoa === "pf" ? (
+          <Input
+            label="CPF"
+            value={cpf}
+            onChange={(e) => setCpf(mascararCPF(e.target.value))}
+            placeholder="000.000.000-00"
+            inputMode="numeric"
+            autoComplete="off"
+            required
+          />
+        ) : (
+          <Input
+            label="CNPJ"
+            value={cnpj}
+            onChange={(e) => setCnpj(maskCnpjInput(e.target.value))}
+            placeholder={CNPJ_PLACEHOLDER}
+            helperText={CNPJ_HELPER}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            required
+          />
+        )}
 
         <Input
           label="Segmento"
@@ -237,6 +333,44 @@ export function ClienteModal({
           onChange={(e) => setBairro(e.target.value)}
           placeholder="Ex: Centro"
         />
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <Input
+              label="Rua (logradouro)"
+              value={endereco}
+              onChange={(e) => setEndereco(e.target.value)}
+              maxLength={255}
+              required={tipoPessoa === "pf"}
+            />
+          </div>
+          <Input
+            label="Numero"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            placeholder="s/n"
+            maxLength={20}
+            required={tipoPessoa === "pf"}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <Input
+              label="Complemento"
+              value={complemento}
+              onChange={(e) => setComplemento(e.target.value)}
+              maxLength={120}
+            />
+          </div>
+          <Input
+            label="CEP"
+            value={cep}
+            onChange={(e) => setCep(mascararCEP(e.target.value))}
+            placeholder="00000-000"
+            inputMode="numeric"
+          />
+        </div>
 
         <Input
           label="Data de cadastro"

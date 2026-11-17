@@ -65,6 +65,12 @@ type (
 		Ativo           bool      `json:"ativo"`
 		CreatedAt       time.Time `json:"created_at"`
 		UpdatedAt       time.Time `json:"updated_at"`
+		// ECOM-06: campos novos da pessoa física, no fim do objeto.
+		CPF         string `json:"cpf"`
+		Endereco    string `json:"endereco"`
+		Numero      string `json:"numero"`
+		Complemento string `json:"complemento"`
+		CEP         string `json:"cep"`
 	}
 	legadoOportunidade struct {
 		OportunidadeID   int64      `json:"oportunidade_id"`
@@ -110,8 +116,8 @@ func TestARQ04_ContratoJSON_ByteAByte(t *testing.T) {
 		defer server.Close()
 		defer db.Close()
 		mock.ExpectQuery(`FROM clientes WHERE cliente_id_origem = \? LIMIT 1`).WithArgs(int64(5)).WillReturnRows(
-			sqlmock.NewRows([]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}).
-				AddRow(int64(5), "11222333000181", "ACME", "varejo", "Curitiba", "PR", "", quando, true, quando, quando))
+			sqlmock.NewRows([]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"}).
+				AddRow(int64(5), "11222333000181", "ACME", "varejo", "Curitiba", "PR", "", quando, true, quando, quando, "", "", "", "", ""))
 		status, body := getComToken(t, server.URL+"/api/clientes/5", 1, "admin")
 		assert.Equal(t, http.StatusOK, status)
 		assert.Equal(t, envelopeComercialLegado(t, map[string]any{"success": true, "data": legadoCliente{

@@ -7,8 +7,7 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| DEPLOY-10 | ALTA | migrações 27, 28/29, 30 e 31 + `APP_URL` e `GOOGLE_CLIENT_ID` na produção antes do deploy | 🌸 DataBrain |
-| ECOM-06 | MÉDIA | pendente | 🟡 BackBrain / 🟢 FrontBrain |
+| DEPLOY-10 | ALTA | migrações 27, 28/29, 30, 31 e 33 + `APP_URL` e `GOOGLE_CLIENT_ID` na produção antes do deploy | 🌸 DataBrain |
 | SEC-60 | MÉDIA | decisão do usuário | 🟣 SecBrain |
 | SEC-76 | ALTA | Redis do cache sem senha na LAN | 🟣 SecBrain |
 | MERGE-01 | MÉDIA | portar os cards da `lote-42` que ficaram fora do merge | 🔵 SubBrain |
@@ -17,13 +16,10 @@
 ---
 
 ## DEPLOY-10: migrações 27 e 28/29 (loja) na produção — ALTA
-**Ação:** CasaOS :3307 já aplicado (27, 28/29). Na produção: `make db-fix-role-usuario`, `make db-fix-confirmacao-email` `make db-fix-clientes-loja` e `make db-fix-clientes-numero`, com `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>`, **antes** de subir a API do ECOM-01. Google: criar o Client ID com a origem https de produção, pôr `GOOGLE_CLIENT_ID` no `api.env` e no build do frontend (compose já lê; falta o parâmetro no `Jenkinsfile`/`setup-servidor.sh`) (sem ela, o cadastro falha no INSERT).
-
-## ECOM-06: cliente pessoa física no CRM e pedidos da loja — MÉDIA
-**Ação:** a edição de cliente no admin ainda exige CNPJ (um cliente da loja não salva por lá); mostrar CPF/endereço e permitir editar PF. Para o checkout: pedidos exigem vendedor e canal (`App/Telefone/Visita/WhatsApp`) → criar vendedor "Loja Online" e canal `Loja`.
+**Ação:** CasaOS :3307 já aplicado (27, 28/29, 33). Na produção: `make db-fix-role-usuario`, `make db-fix-confirmacao-email` `make db-fix-clientes-loja`, `make db-fix-clientes-numero` e `make db-fix-pedidos-canal-loja` (ECOM-06), com `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>`, **antes** de subir a API do ECOM-01. Google: criar o Client ID com a origem https de produção, pôr `GOOGLE_CLIENT_ID` no `api.env` e no build do frontend (compose já lê; falta o parâmetro no `Jenkinsfile`/`setup-servidor.sh`) (sem ela, o cadastro falha no INSERT).
 
 ## SEC-60: PII do cliente da loja na conta `casaos_ro` — MÉDIA
-**Ação:** `clientes` está em `TABELAS_RO` e agora guarda CPF e endereço de pessoas físicas. Decidir se a `casaos_ro` perde o SELECT em `clientes` (ou ganha uma view sem `cpf`/`endereco`/`cep`).
+**Ação:** `clientes` está em `TABELAS_RO` e agora guarda CPF e endereço de pessoas físicas (e o admin agora os edita, ECOM-06). Decidir se a `casaos_ro` perde o SELECT em `clientes` (ou ganha uma view sem `cpf`/`endereco`/`cep`).
 
 ## SEC-76: Redis do cache (CACHE-01) sem senha — ALTA
 **Ação:** o `192.168.168.106:48110` aceita comandos sem AUTH; qualquer host da LAN pode envenenar a vitrine ou apagar chaves. Ligar `requirepass`/ACL (usuário só com GET/SET/INCR em `rotaperfumes*`), pôr `REDIS_PASSWORD` no `.env`/`api.env` e restringir a porta no firewall.

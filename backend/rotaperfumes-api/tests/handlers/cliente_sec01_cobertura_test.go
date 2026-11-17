@@ -18,7 +18,7 @@ import (
 
 const (
 	reSelectClienteH         = `SELECT ` + clienteColunasRegex + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`
-	reUpdateClienteH         = `UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`
+	reUpdateClienteH         = `UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`
 	msgClienteNaoEncontradoH = "cliente não encontrado"
 )
 
@@ -110,7 +110,7 @@ func TestSEC01_Update_CamposExtrasDeCarteiraIgnorados(t *testing.T) {
 			expectEscopoUsuarioH(mock, 2, 10)
 			expectCarteiraAtivaH(mock, 10, 1)
 			mock.ExpectExec(reUpdateClienteH).
-				WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(1)).
+				WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			mock.ExpectQuery(reSelectClienteH).WithArgs(int64(1)).WillReturnRows(clienteRowsForHandler())
 

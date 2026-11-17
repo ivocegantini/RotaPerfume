@@ -85,6 +85,11 @@ type clienteJSON struct {
 	Ativo           bool      `json:"ativo"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+	CPF             string    `json:"cpf"` // ECOM-06: "" = pessoa jurídica
+	Endereco        string    `json:"endereco"`
+	Numero          string    `json:"numero"`
+	Complemento     string    `json:"complemento"`
+	CEP             string    `json:"cep"`
 }
 
 func novoClienteJSON(c comercial.Cliente) clienteJSON { return clienteJSON(c) }
@@ -145,6 +150,11 @@ type clienteRequest struct {
 	UF           string `json:"uf"`
 	Bairro       string `json:"bairro"`
 	DataCadastro string `json:"data_cadastro"` // AAAA-MM-DD (opcional na criação)
+	CPF          string `json:"cpf"`           // pessoa física (ECOM-06), no lugar do cnpj
+	Endereco     string `json:"endereco"`
+	Numero       string `json:"numero"`
+	Complemento  string `json:"complemento"`
+	CEP          string `json:"cep"`
 }
 
 type visitaRequest struct {

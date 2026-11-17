@@ -16,7 +16,7 @@ import (
 // NEG-01: validação e duplicidade de CNPJ no ClienteService.
 
 const (
-	reInsertClienteCNPJ = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`
+	reInsertClienteCNPJ = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`
 	reUpdateClienteCNPJ = `UPDATE clientes\s+SET cnpj = \?`
 	reGetClienteCNPJ    = `FROM clientes WHERE cliente_id_origem = \? LIMIT 1`
 )
@@ -30,8 +30,8 @@ func clienteRowsComCNPJ(cnpj string) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
-	}).AddRow(int64(1), cnpj, "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", now, true, now, now)
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
+	}).AddRow(int64(1), cnpj, "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", now, true, now, now, "", "", "", "", "")
 }
 
 func TestClienteService_CreateCliente_CNPJ(t *testing.T) {
@@ -47,7 +47,7 @@ func TestClienteService_CreateCliente_CNPJ(t *testing.T) {
 			cnpj: "11.222.333/0001-81",
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec(reInsertClienteCNPJ).
-					WithArgs("11222333000181", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true).
+					WithArgs("11222333000181", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			wantCNPJ: "11222333000181",
@@ -57,7 +57,7 @@ func TestClienteService_CreateCliente_CNPJ(t *testing.T) {
 			cnpj: "12.abc.345/01de-35",
 			expect: func(m sqlmock.Sqlmock) {
 				m.ExpectExec(reInsertClienteCNPJ).
-					WithArgs("12ABC34501DE35", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true).
+					WithArgs("12ABC34501DE35", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			wantCNPJ: "12ABC34501DE35",
@@ -209,7 +209,7 @@ func TestClienteService_UpdateCliente_CNPJ(t *testing.T) {
 				tc.expect(mock)
 			case tc.wantArgUp != "":
 				mock.ExpectExec(reUpdateClienteCNPJ).
-					WithArgs(tc.wantArgUp, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+					WithArgs(tc.wantArgUp, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectQuery(reGetClienteCNPJ).WithArgs(int64(1)).WillReturnRows(clienteRowsComCNPJ(tc.wantArgUp))
 			}

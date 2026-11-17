@@ -560,7 +560,7 @@ func TestCreatePedido_ValidacaoNegocio(t *testing.T) {
 				p["canal"] = "Email"
 				return p
 			},
-			wantMsg: "canal inválido (use: App, Telefone, Visita, WhatsApp)",
+			wantMsg: "canal inválido (use: App, Telefone, Visita, WhatsApp, Loja)",
 		},
 		{
 			nome: "status inválido",
@@ -846,7 +846,7 @@ func TestUpdatePedido_ValidacaoNegocio(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	body := decodeResponse(t, readBody(t, resp))
-	assert.Equal(t, "canal inválido (use: App, Telefone, Visita, WhatsApp)", body["error"])
+	assert.Equal(t, "canal inválido (use: App, Telefone, Visita, WhatsApp, Loja)", body["error"])
 }
 
 func TestUpdatePedido_NaoEncontrado(t *testing.T) {

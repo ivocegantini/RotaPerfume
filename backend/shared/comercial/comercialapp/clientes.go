@@ -210,10 +210,14 @@ func (c *Casos) exigirNaCarteira(ctx context.Context, e kernel.Escopo, clienteID
 	return nil
 }
 
-// cnpjDuplicado loga a recusa do 1062 do CNPJ (sem o valor, M-04/E-07).
+// cnpjDuplicado loga a recusa do 1062 do CNPJ ou do CPF (sem o valor,
+// M-04/E-07).
 func cnpjDuplicado(err error) error {
-	if errors.Is(err, comercial.ErrCNPJDuplicado) {
+	switch {
+	case errors.Is(err, comercial.ErrCNPJDuplicado):
 		log.Printf("[clientes] cnpj duplicado recusado (uq_clientes_cnpj)")
+	case errors.Is(err, comercial.ErrCPFDuplicado):
+		log.Printf("[clientes] cpf duplicado recusado (uq_clientes_cpf)")
 	}
 	return err
 }

@@ -73,11 +73,11 @@ func TestClienteCountNovosNoPeriodo_Success(t *testing.T) {
 	}
 }
 
-const clienteColunasRegexp = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
+const clienteColunasRegexp = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at, COALESCE\(cpf, ''\), COALESCE\(endereco, ''\), COALESCE\(numero, ''\), COALESCE\(complemento, ''\), COALESCE\(cep, ''\)`
 
 var clienteRepoColumns = []string{
 	"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-	"data_cadastro", "ativo", "created_at", "updated_at",
+	"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
 }
 
 // TestClienteList_FiltroVendedorID garante que VendedorID > 0 restringe a
@@ -97,7 +97,7 @@ func TestClienteList_FiltroVendedorID(t *testing.T) {
 	mock.ExpectQuery(`SELECT `+clienteColunasRegexp+` FROM clientes `+whereRegexp+` ORDER BY cliente_id_origem ASC LIMIT \? OFFSET \?`).
 		WithArgs(int64(7), 10, 0).
 		WillReturnRows(sqlmock.NewRows(clienteRepoColumns).
-			AddRow(int64(1), "12345678000199", "Empresa Teste", "varejo", "SP", "SP", "Centro", now, true, now, now))
+			AddRow(int64(1), "12345678000199", "Empresa Teste", "varejo", "SP", "SP", "Centro", now, true, now, now, "", "", "", "", ""))
 
 	ctx := context.Background()
 	clientes, total, err := itensETotal(comercialmysql.NovoClientes(db).Listar(ctx, escopoDe(7), comercial.FiltroCliente{Ordenacao: comercial.OrdenacaoClientePadrao()}, kernel.NovaPagina(1, 10)))

@@ -19,7 +19,7 @@ import (
 //   - duplicado (MySQL 1062 em uq_clientes_cnpj) → 409 "cnpj já cadastrado",
 //     sem revelar id, vendedor ou razão social do cliente existente.
 
-const reInsertClienteH = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`
+const reInsertClienteH = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`
 
 func erroDuplicadoCNPJH() error {
 	return &mysql.MySQLError{Number: 1062, Message: "Duplicate entry '11222333000181' for key 'clientes.uq_clientes_cnpj'"}
@@ -56,7 +56,7 @@ func TestCreateCliente_CNPJ(t *testing.T) {
 			cnpj: "11.222.333/0001-81",
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(reInsertClienteH).
-					WithArgs("11222333000181", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true).
+					WithArgs("11222333000181", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(101, 1))
 			},
 			wantStatus: http.StatusCreated,
@@ -67,7 +67,7 @@ func TestCreateCliente_CNPJ(t *testing.T) {
 			cnpj: "12.abc.345/01de-35",
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(reInsertClienteH).
-					WithArgs("12ABC34501DE35", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true).
+					WithArgs("12ABC34501DE35", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(102, 1))
 			},
 			wantStatus: http.StatusCreated,
@@ -158,7 +158,7 @@ func TestUpdateCliente_CNPJ(t *testing.T) {
 			cnpj: "11.444.777/0001-61",
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(reUpdateClienteH).
-					WithArgs("11444777000161", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+					WithArgs("11444777000161", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 					WillReturnError(erroDuplicadoCNPJH())
 			},
 			wantStatus: http.StatusConflict,
@@ -169,7 +169,7 @@ func TestUpdateCliente_CNPJ(t *testing.T) {
 			cnpj: "11222333000181",
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(reUpdateClienteH).
-					WithArgs("11222333000181", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1)).
+					WithArgs("11222333000181", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 0))
 			},
 			wantStatus: http.StatusNotFound,

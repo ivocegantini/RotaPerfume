@@ -16,14 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const reGetClienteByID = `SELECT ` + `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at` + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`
+const reGetClienteByID = `SELECT ` + `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at, COALESCE\(cpf, ''\), COALESCE\(endereco, ''\), COALESCE\(numero, ''\), COALESCE\(complemento, ''\), COALESCE\(cep, ''\)` + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`
 
 func clienteGravadoRows(id int64, criado time.Time) *sqlmock.Rows {
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
 	}).AddRow(id, "11222333000181", "Empresa", "varejo", "Curitiba", "PR", "Centro",
-		criado, true, criado, criado)
+		criado, true, criado, criado, "", "", "", "", "")
 }
 
 func TestBUG08_CreateCliente_DevolveTimestampsDoBanco(t *testing.T) {

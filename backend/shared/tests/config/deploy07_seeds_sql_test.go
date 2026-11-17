@@ -70,7 +70,9 @@ func TestDEPLOY07_SeedVendedores_IdempotenteEDesligadosInativos(t *testing.T) {
 	}
 	assert.Contains(t, sql, "INSERT IGNORE INTO `vendedores`")
 	assert.Contains(t, sql, "INSERT IGNORE INTO `usuarios`")
-	assert.Equal(t, 2, strings.Count(up, "INSERT "), "só os dois INSERT IGNORE")
+	// ECOM-06: o 3º INSERT é o vendedor "Loja Online", só se ainda não existir.
+	assert.Equal(t, 3, strings.Count(up, "INSERT "), "os dois INSERT IGNORE + o vendedor Loja Online")
+	assert.Contains(t, sql, "WHERE NOT EXISTS (SELECT 1 FROM `vendedores` WHERE `nome` = 'Loja Online')")
 	assert.Regexp(t, `SET @HASH_MUDAR_123 = '\$2a\$12\$XXXXPLACEHOLDER[A-Z0-9_]+XXXX';`, sql)
 
 	desligado := map[int]bool{}

@@ -15,7 +15,7 @@ import (
 
 const reInsertCarteira = `INSERT INTO carteiras \(cliente_id, vendedor_id, data_inicio, data_fim\)`
 
-const reInsertCliente = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`
+const reInsertCliente = `INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`
 
 // doClienteReq executa a requisição autenticada como usuário normal (id 2)
 // e devolve status + body decodificado.

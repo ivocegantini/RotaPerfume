@@ -26,15 +26,15 @@ func newClienteTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
-var clienteColunasRegex = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at`
+var clienteColunasRegex = `cliente_id_origem, COALESCE\(cnpj, ''\), razao_social, segmento, cidade, uf, COALESCE\(bairro, ''\), data_cadastro, ativo, created_at, updated_at, COALESCE\(cpf, ''\), COALESCE\(endereco, ''\), COALESCE\(numero, ''\), COALESCE\(complemento, ''\), COALESCE\(cep, ''\)`
 
 func clienteRows() *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
 	}).AddRow(int64(100), "11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro",
-		now, true, now, now)
+		now, true, now, now, "", "", "", "", "")
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ func TestClienteService_GetClienteByID(t *testing.T) {
 			WithArgs(int64(999)).
 			WillReturnRows(sqlmock.NewRows([]string{
 				"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-				"data_cadastro", "ativo", "created_at", "updated_at",
+				"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
 			}))
 
 		casos := casosComercial(db, 0)
@@ -200,8 +200,8 @@ func clienteRowsAtivoS(ativo bool) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows([]string{
 		"cliente_id_origem", "cnpj", "razao_social", "segmento", "cidade", "uf", "bairro",
-		"data_cadastro", "ativo", "created_at", "updated_at",
-	}).AddRow(int64(1), "11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", now, ativo, now, now)
+		"data_cadastro", "ativo", "created_at", "updated_at", "cpf", "endereco", "numero", "complemento", "cep",
+	}).AddRow(int64(1), "11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", now, ativo, now, now, "", "", "", "", "")
 }
 
 func expectTravarClienteS(mock sqlmock.Sqlmock, id int64, existe bool) {
@@ -306,8 +306,8 @@ func TestClienteService_CreateCliente(t *testing.T) {
 			nome:  "sucesso",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`).
-					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true).
+				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`).
+					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(101, 1))
 			},
 		},
@@ -385,8 +385,8 @@ func TestClienteService_CreateCliente(t *testing.T) {
 				return in
 			},
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`).
-					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true).
+				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`).
+					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), true, nil, nil, nil, nil, nil).
 					WillReturnResult(sqlmock.NewResult(101, 1))
 			},
 		},
@@ -394,7 +394,7 @@ func TestClienteService_CreateCliente(t *testing.T) {
 			nome:  "erro no Create é propagado",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`).
+				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`).
 					WillReturnError(sql.ErrConnDone)
 			},
 			wantErr: sql.ErrConnDone,
@@ -403,7 +403,7 @@ func TestClienteService_CreateCliente(t *testing.T) {
 			nome:  "erro no LastInsertId é propagado",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo\)`).
+				mock.ExpectExec(`INSERT INTO clientes \(cnpj, razao_social, segmento, cidade, uf, bairro, data_cadastro, ativo, cpf, endereco, numero, complemento, cep\)`).
 					WillReturnResult(sqlmock.NewErrorResult(sql.ErrConnDone))
 			},
 			wantErr: sql.ErrConnDone,
@@ -452,8 +452,8 @@ func TestClienteService_UpdateCliente(t *testing.T) {
 			nome:  "sucesso",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
-					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(1)).
+				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
+					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectQuery(`SELECT ` + clienteColunasRegex + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`).
 					WithArgs(int64(1)).
@@ -541,8 +541,8 @@ func TestClienteService_UpdateCliente(t *testing.T) {
 			nome:  "id inexistente retorna ErrClienteNaoEncontrado",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
-					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(999)).
+				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
+					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(999)).
 					WillReturnResult(sqlmock.NewResult(0, 0))
 			},
 			wantErr:   comercial.ErrClienteNaoEncontrado,
@@ -552,7 +552,7 @@ func TestClienteService_UpdateCliente(t *testing.T) {
 			nome:  "erro no Update é propagado",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
+				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
 					WillReturnError(sql.ErrConnDone)
 			},
 			wantErr: sql.ErrConnDone,
@@ -561,8 +561,8 @@ func TestClienteService_UpdateCliente(t *testing.T) {
 			nome:  "erro no GetByID pós-update é propagado",
 			input: validClienteInput,
 			mock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?\s+WHERE cliente_id_origem = \?`).
-					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), int64(1)).
+				mock.ExpectExec(`UPDATE clientes\s+SET cnpj = \?, razao_social = \?, segmento = \?, cidade = \?, uf = \?, bairro = \?, data_cadastro = \?,\s+cpf = \?, endereco = \?, numero = \?, complemento = \?, cep = \?\s+WHERE cliente_id_origem = \?`).
+					WithArgs("11222333000181", "Empresa Teste LTDA", "varejo", "São Paulo", "SP", "Centro", sqlmock.AnyArg(), nil, nil, nil, nil, nil, int64(1)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectQuery(`SELECT ` + clienteColunasRegex + ` FROM clientes WHERE cliente_id_origem = \? LIMIT 1`).
 					WithArgs(int64(1)).
