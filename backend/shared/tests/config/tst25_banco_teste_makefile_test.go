@@ -139,6 +139,7 @@ func TestTST25_Makefile_Contrato(t *testing.T) {
 	assert.True(t, mk.phony["db-guard-banco-teste"])
 	assert.Equal(t, "DB_TESTE := rotaperfumes_teste", strings.TrimSpace(mk.linhaDaVariavel(t, "DB_TESTE")))
 	receita := strings.Join(mk.regras["test-integration"].receita, "\n")
+	receita = strings.ReplaceAll(receita, "RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' ", "") // sentinela do BUG-29 (lote-42)
 	for _, v := range []string{"CONFIRMAR", "CONFIRMO_PRODUCAO", "ENV_ARQUIVO"} {
 		assert.NotContains(t, receita, v, "%s não é repassado à mão (BUG-27)", v)
 	}

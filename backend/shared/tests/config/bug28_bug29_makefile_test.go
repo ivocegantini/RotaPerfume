@@ -24,8 +24,9 @@ func TestBUG28_Makefile_DbUpNaReceitaDoSeed(t *testing.T) {
 	assert.Equal(t, []string{"db-guard-producao", "db-guard-sem-producao", "db-check-env"}, r.prereqs,
 		"db-seed: só guardas e db-check-env como pré-requisitos (db-up na receita)")
 	require.NotEmpty(t, r.receita)
-	assert.Equal(t, "$(MAKE) db-up", strings.TrimSpace(r.receita[0]), "db-up é a 1a linha da receita")
-	receita := strings.Join(r.receita, " ")
+	// A sentinela do BUG-29 (lote-42) vai em todo $(MAKE) recursivo.
+	assert.Equal(t, "$(MAKE) RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' db-up", strings.TrimSpace(r.receita[0]), "db-up é a 1a linha da receita")
+	receita := strings.ReplaceAll(strings.Join(r.receita, " "), "RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' ", "")
 	for _, v := range []string{"CONFIRMAR", "CONFIRMO_PRODUCAO", "ENV_ARQUIVO"} {
 		assert.NotContains(t, receita, v, "db-seed: %s não é repassado à mão", v)
 	}
@@ -83,7 +84,7 @@ func TestBUG29_Makefile_MakeflagsNaLinhaDeComandoRecusado(t *testing.T) {
 				args := append(bug27Args(cliente, "DB_HOST=127.0.0.1", "DB_PORT=3306", "ENV_ARQUIVO=/dev/null"), v)
 				out, err := makeAlvo(t, dir, alvo, []string{path}, args...)
 				require.Error(t, err, out)
-				assert.Contains(t, out, "BUG-29: MAKEFLAGS/MAKEOVERRIDES na linha de comando")
+				assert.Contains(t, out, "BUG-29: MAKEFLAGS/MAKEOVERRIDES/GNUMAKEFLAGS na linha de comando")
 				assert.Empty(t, lerSeExiste(t, log), "nada roda")
 			})
 		}
