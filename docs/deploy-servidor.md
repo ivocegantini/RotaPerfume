@@ -733,7 +733,7 @@ SELECT COUNT(*) AS nao_admin, SUM(ativo <> 0) AS nao_admin_ativos FROM usuarios 
 SQL
 ```
 
-Esperado: `tabelas` = 13; uma linha de admin (`admin@rotaperfumes.com.br`) com `ativo` = 1, `deve_trocar_senha` = 1 e `hash` começando com `$argon2id$`; `vendedores` = 42; `nao_admin` = 42 e `nao_admin_ativos` = 0. Qualquer diferença: **não** siga para o push; veja a saída do `seed-producao.sh`.
+Esperado: `tabelas` = 14 (um por `CREATE TABLE` dos arquivos de `sql/ordem-ddl.txt`; era 13 antes do ECOM-03); uma linha de admin (`admin@rotaperfumes.com.br`) com `ativo` = 1, `deve_trocar_senha` = 1 e `hash` começando com `$argon2id$`; `vendedores` = 42; `nao_admin` = 42 e `nao_admin_ativos` = 0. Qualquer diferença: **não** siga para o push; veja a saída do `seed-producao.sh`.
 
 ### Passo 8. Checklist pré-push
 

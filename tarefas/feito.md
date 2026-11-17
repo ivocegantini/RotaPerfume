@@ -12,6 +12,9 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: TST-17 real com 14 tabelas
+- Testes reais rodados pelo usuário fora da produção: TST15 PASS; TST17 falhava esperando 13 tabelas (o ECOM-03 pôs `confirmacoes_email` no `sql/ordem-ddl.txt`). Esperado agora contado dos `CREATE TABLE` da ordem DDL; guia (Passo 7) diz 14. BACKUP01 pulou (usuário sem acesso ao Docker).
+
 ## Avulso de 2026-11-17: SEC-78, SEC-77 e DEP-07
 - SEC-78: fechado pelo usuário: as contas `gerente_admin`/`rh_admin` foram extintas (funções passaram ao `admin`).
 - SEC-77: `deps-audit-imagens` tira o digest da linha `Digest:` (buildx 0.30 ignora o `--format`); teste com o docker falso nas duas saídas.
