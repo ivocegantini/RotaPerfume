@@ -15,11 +15,9 @@ package deploy_test
 //   - TST17_DOCKER=1, root (os dois scripts recusam outro EUID) e Docker;
 //   - `script` do util-linux (o --forcar exige terminal);
 //   - o seed-producao.sh com as opções de isolamento abaixo
-//     (opcoesIsolamentoTST17). Hoje o script fixa o container
-//     rotaperfumes-mariadb, a rede rotaperfumes-db, o IP 172.30.42.20,
-//     /root/rotaperfumes-mariadb, /etc/mysql/ssl/ca.pem e o mktemp em /root:
-//     sem elas o teste mexeria na instalação real e por isso é pulado
-//     (pendência do TST-17, encaminhada ao 🔵 SubBrain).
+//     (opcoesIsolamentoTST17; implementadas no Lote 37, TST-17 item 1).
+//     Sem elas o teste mexeria na instalação real; a checagem do --help
+//     continua como guarda contra regressão.
 // Ex.: sudo -E env TST17_DOCKER=1 go test -count=1 -run
 // TestTST17_SeedProducao_Real ./tests/deploy/
 //
@@ -213,7 +211,7 @@ func TestTST17_SeedProducao_Real(t *testing.T) {
 		rootSQL("UPDATE usuarios SET ativo = 1 WHERE role <> 'admin' LIMIT 1")
 		senha3 := filepath.Join(seg, "admin-app-3.senha")
 		linha := "bash"
-		for _, a := range append(append([]string{}, base...), "--admin-senha-arquivo", senha3, "--forcar") {
+		for _, a := range append(append([]string{}, base...), "--admin-senha-arquivo", senha3, "--forcar", "--sem-backup-motivo", "teste real sem rotina de backup") {
 			linha += " '" + a + "'"
 		}
 		cmd := exec.Command("script", "-qec", linha, "/dev/null")

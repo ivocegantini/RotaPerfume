@@ -38,7 +38,8 @@ func TestDEPLOY08_PortaPublicada(t *testing.T) {
 			} else {
 				e.setState("porta_resposta", string(*c.resposta))
 			}
-			r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.105")
+			e.instalarComPortaPublicada()
+			r := e.rodar("--dev-ip", "192.168.168.105")
 			assert.Contains(t, r.out, c.msg)
 			if c.passa {
 				require.NoError(t, r.err, r.out)
@@ -65,7 +66,8 @@ func TestDEPLOY08_CertificadoEmUsoDiferenteAborta(t *testing.T) {
 func TestDEPLOY08_HealthcheckDaImagem(t *testing.T) {
 	t.Run("so USAGE: sem aviso", func(t *testing.T) {
 		e := novoEnsaio(t)
-		r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.105")
+		e.instalarComPortaPublicada()
+		r := e.rodar("--dev-ip", "192.168.168.105")
 		require.NoError(t, r.err, r.out)
 		assert.NotContains(t, r.out, "contas fora do esperado")
 		assert.NotContains(t, r.out, "healthcheck locais com privilegios")
@@ -80,7 +82,8 @@ func TestDEPLOY08_HealthcheckDaImagem(t *testing.T) {
 	t.Run("alem de USAGE: aviso", func(t *testing.T) {
 		e := novoEnsaio(t)
 		e.setState("healthcheck_alem_usage", "healthcheck@127.0.0.1\n")
-		r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.105")
+		e.instalarComPortaPublicada()
+		r := e.rodar("--dev-ip", "192.168.168.105")
 		require.NoError(t, r.err, r.out)
 		assert.Contains(t, r.out, "contas healthcheck locais com privilegios ALEM de USAGE: healthcheck@127.0.0.1")
 		assert.NotContains(t, e.state("sql"), "DROP USER IF EXISTS 'healthcheck'")

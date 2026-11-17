@@ -28,7 +28,8 @@ func TestDEPLOY08_Firewall_SaltoComCtdirOriginal(t *testing.T) {
 				e.setState("ctorigdst_com_32", "")
 			}
 			e.setState("chain_DOCKER-USER", saltoSemCtdir+"\n-A DOCKER-USER -j RETURN\n")
-			r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.105")
+			e.instalarComPortaPublicada()
+			r := e.rodar("--dev-ip", "192.168.168.105")
 			require.NoError(t, r.err, r.out)
 
 			assert.Equal(t, saltoFW+"\n-A DOCKER-USER -j RETURN\n", e.state("chain_DOCKER-USER"),

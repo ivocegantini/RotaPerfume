@@ -79,12 +79,13 @@ func TestDEPLOY07_SeedProducao_Contrato(t *testing.T) {
 	} {
 		assert.Contains(t, codigo, s)
 	}
-	// Padrões da produção (TST-17: viraram opções, travadas com readonly
-	// depois da validação).
-	for _, s := range []string{`IP_ADMIN="172.30.42.20"`, `REDE_NOME="rotaperfumes-db"`,
-		`CONTAINER="rotaperfumes-mariadb"`, `SSL_DIR="/etc/mysql/ssl"`, `SEGREDOS_DIR="/root/rotaperfumes-mariadb"`,
-		`TRABALHO_DIR="/root"`, `readonly CONTAINER REDE_NOME IP_ADMIN SEGREDOS_DIR SSL_DIR TRABALHO_DIR`,
-		`readonly CA_HOST="$SSL_DIR/ca.pem"`,
+	// TST-17 (Lote 37): os padrões viram *_PADRAO; os valores ficam readonly
+	// depois de validados na etapa 1.
+	for _, s := range []string{`readonly IP_ADMIN_PADRAO="172.30.42.20"`, `readonly REDE_NOME_PADRAO="rotaperfumes-db"`,
+		`readonly CONTAINER_PADRAO="rotaperfumes-mariadb"`, `readonly SSL_DIR_PADRAO="/etc/mysql/ssl"`,
+		`readonly SEGREDOS_DIR_PADRAO="/root/rotaperfumes-mariadb"`, `readonly TRABALHO_DIR_PADRAO="/root"`,
+		`readonly CA_HOST="$SSL_DIR/ca.pem"`, `readonly C_CA="/etc/mysql/ssl/ca.pem"`,
+		`readonly CONTAINER REDE_NOME IP_ADMIN SEGREDOS_DIR SSL_DIR TRABALHO_DIR ADMIN_SENHA_ARQ`,
 		`readonly SENHA_DB_ARQ="$SEGREDOS_DIR/$DB_ADMIN.senha"`, `readonly DB_ADMIN="rotaperfumes_admin"`} {
 		assert.Contains(t, codigo, s)
 	}
@@ -158,15 +159,8 @@ func TestDEPLOY07_SeedProducao_Opcoes(t *testing.T) {
 		{"opcao desconhecida", []string{"--all-users"}, 2, "Opcao desconhecida: --all-users"},
 		{"--pepper-file sem valor", []string{"--pepper-file"}, 1, "a opcao --pepper-file exige um valor"},
 		{"--admin-senha-arquivo vazio", []string{"--admin-senha-arquivo", ""}, 1, "a opcao --admin-senha-arquivo exige um valor"},
-		// SEC-52: sem senha digitada; TST-17: opções de isolamento validadas.
+		// SEC-52: sem senha digitada (isolamento: tst17_seed_producao_opcoes_test.go).
 		{"--admin-senha-prompt saiu", []string{"--admin-senha-prompt"}, 1, "a opcao --admin-senha-prompt saiu (SEC-52)"},
-		{"--container inválido", []string{"--container", "a;b"}, 1, "--container invalido: a;b"},
-		{"--rede-nome inválido", []string{"--rede-nome", "-x"}, 1, "--rede-nome invalido: -x"},
-		{"--ip-admin octeto > 255", []string{"--ip-admin", "172.30.42.256"}, 1, "--ip-admin invalido"},
-		{"--ip-admin com zero à esquerda", []string{"--ip-admin", "172.30.042.20"}, 1, "--ip-admin invalido"},
-		{"--segredos-dir relativo", []string{"--segredos-dir", "seg"}, 1, "precisam de caminho absoluto: seg"},
-		{"--ssl-dir relativo", []string{"--ssl-dir", "ssl"}, 1, "precisam de caminho absoluto: ssl"},
-		{"--trabalho-dir relativo", []string{"--trabalho-dir", "t"}, 1, "precisam de caminho absoluto: t"},
 		{"--ip-admin sem valor", []string{"--ip-admin"}, 1, "a opcao --ip-admin exige um valor"},
 	}
 	for _, c := range casos {
@@ -203,17 +197,18 @@ func TestDEPLOY07_Jenkinsfile_FingerprintVazioFalhaClaro(t *testing.T) {
 	assert.NotContains(t, jf, "grep -Ev '^[[:space:]]*(#|$)' deploy/db-ca.fingerprint | sed", "grep sem || true sob pipefail")
 }
 
-// DEPLOY-07 / SecBrain: o fingerprint da CA de DEV (CasaOS) nunca está no
-// deploy/db-ca.fingerprint, e o mariadb-docker.sh não manda copiar a CA de
-// produção para deploy/ca-cert.pem.
+// DEPLOY-07 / SecBrain / SEC-71: nenhum fingerprint das CAs de DEV (CasaOS)
+// está no deploy/db-ca.fingerprint, a guarda do mariadb-docker.sh conhece
+// todos, e o script não manda copiar a CA de produção para deploy/ca-cert.pem.
 func TestDEPLOY07_CADevNuncaEmProducao(t *testing.T) {
-	for _, caDev := range fpsCADev {
-		assert.NotContains(t, linhasUteis(lerRaiz(t, "deploy", "db-ca.fingerprint")), caDev)
-	}
+	fps := linhasUteis(lerRaiz(t, "deploy", "db-ca.fingerprint"))
 	md := lerRaiz(t, "deploy", "mariadb-docker.sh")
+	for _, caDev := range fpsCADev {
+		assert.NotContains(t, fps, caDev)
+		assert.Contains(t, codigoSemComentarios(md), `"`+caDev+`"`, "CA_DEV_FPS não conhece esta CA de dev")
+	}
 	assert.Contains(t, md, "NAO copie esta CA para deploy/ca-cert.pem")
 	assert.NotRegexp(t, `copie \$SSL_DIR/ca\.pem para\s+deploy/ca-cert\.pem`, md)
-	assert.Contains(t, md, "deploy/ca-producao.pem")
 	assert.Contains(t, md, "sudo bash deploy/seed-producao.sh")
 	assert.NotContains(t, codigoSemComentarios(md), "rotaperfumes\\\\_%", "sem GRANT em bancos de teste")
 	gi := lerRaiz(t, ".gitignore")

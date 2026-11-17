@@ -8,7 +8,7 @@
 # BANCO (DEPLOY-06): este script NAO instala nem configura banco. O unico
 # caminho oficial do banco em producao e o deploy/mariadb-docker.sh (MariaDB
 # 11.4 em Docker, rede rotaperfumes-db, TLS e contas ed25519). Rode-o ANTES:
-#   sudo bash deploy/mariadb-docker.sh --ca-key <midia>/ca-key.pem [--dev-ip IP ...]
+#   sudo bash deploy/mariadb-docker.sh --ca-key <midia>/ca-key.pem
 # Aqui so se confere que o container esta no ar e se le a senha do
 # rotaperfumes_app gerada por ele (para o api.env).
 #
@@ -107,7 +107,7 @@ uso() {
   cat <<'EOF'
 Uso: sudo bash setup-servidor.sh --env ARQUIVO [opcoes]
 
-Antes (banco, DEPLOY-06): sudo bash deploy/mariadb-docker.sh [--ca-key ...] [--dev-ip ...]
+Antes (banco, DEPLOY-06): sudo bash deploy/mariadb-docker.sh [--ca-key ...]
 Este script nao instala nem configura banco.
 
 Obrigatorio:
@@ -607,8 +607,8 @@ ufw_ativo() {
 
 etapa_firewall() {
   etapa "Firewall (ufw)"
-  info "Banco: nada a fazer aqui. A porta do MariaDB so e publicada com --dev-ip do"
-  info "  deploy/mariadb-docker.sh e e restringida na chain DOCKER-USER (o ufw nao ve portas do Docker)."
+  info "Banco: nada a fazer aqui. A porta do MariaDB nao e publicada (DEPLOY-10). So um container antigo"
+  info "  a mantem, ate o --recriar, restrita na chain DOCKER-USER (o ufw nao ve portas do Docker)."
   if ufw_ativo; then
     ufw allow "$HTTPS_PORT/tcp" >/dev/null
     ok "ufw: $HTTPS_PORT/tcp liberada"

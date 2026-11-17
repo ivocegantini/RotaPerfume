@@ -29,7 +29,7 @@ import (
 )
 
 // ProducaoHostsLAN: IP/hostname do servidor de produção. É produção com
-// DB_PORT vazio ou 3306 (a porta publicada com --dev-ip); o MariaDB de dev
+// DB_PORT vazio ou 3306 (a porta de um container antigo, até o --recriar: DEPLOY-10); o MariaDB de dev
 // do CasaOS roda no mesmo host, porta 3307. Igual a PRODUCAO_HOSTS_LAN do
 // Makefile (teste de paridade em shared/tests/config).
 var ProducaoHostsLAN = []string{"192.168.168.106", "ivo-inspiron-15-3530"}

@@ -12,6 +12,11 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: MERGE-01 etapa 2 (backup, DBA e restauração da `lote-42`)
+- BACKUP-01/02: `backup-banco.sh` (timer + `rotaperfumes-backup-banco`) substitui o `backup-mariadb.sh`; `verificar-backup.sh` e `restaurar-maquina.sh` portados; guia com a remoção do timer antigo.
+- DEPLOY-10: conta DBA `rotaperfumes-admin` (.22); sem porta publicada na LAN: `casaos` e `casaos_ro` removidas no `--recriar` (decisão do usuário; a .105 perde as consultas). SEC-60 sem efeito; SEC-71 já coberto.
+- `seed-producao.sh` sem senha digitada (SEC-52) e `--cap-drop ALL`. `make test` rc=0 (13200 PASS, 0 FAIL), `test-integration` (CasaOS :3307), `lint` e `shellcheck` ok.
+
 ## Avulso de 2026-11-17: testes reais de deploy (BACKUP-01, TST-15, TST-17) verdes
 - Rodados pelo usuário na `residentivo-MS-7E28` (fora da produção), com `sudo` e Docker: `TestBACKUP01_RestauracaoReal_Docker`, `TestTST15_MariadbDocker_Real` e `TestTST17_SeedProducao_Real` (3 subtestes) PASS.
 - TST-17: falhava esperando 13 tabelas (o ECOM-03 pôs `confirmacoes_email` no `sql/ordem-ddl.txt`); o esperado agora vem dos `CREATE TABLE` da ordem DDL (14) e o guia (Passo 7) diz 14.

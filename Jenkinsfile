@@ -58,8 +58,12 @@ pipeline {
         //   (node: idem com node:26.13-alpine; versao do Node = frontend/.nvmrc,
         //   a mesma linha 26 do NODE_VERSION do frontend/Dockerfile)
         //   -> trocar "<tag com patch>@sha256:<digest>" aqui; o do mariadb TAMBEM
-        //   no IMAGEM_BASE do deploy/mariadb-docker.sh (mesma string) -> make test
-        //   -> sudo bash deploy/mariadb-docker.sh --recriar --backup-agora (BACKUP-01).
+        //   no IMAGEM_BASE dos deploy/mariadb-docker.sh, deploy/backup-banco.sh,
+        //   deploy/verificar-backup.sh e deploy/restaurar-maquina.sh e no
+        //   DB_CLIENT_IMAGE do deploy/seed-producao.sh (mesma string) -> make test
+        //   -> no servidor: sudo bash deploy/backup-banco.sh --instalar
+        //   -> sudo rotaperfumes-backup-banco --agora
+        //   -> sudo bash deploy/mariadb-docker.sh --recriar.
         // "make deps-audit-imagens" mostra se ha digest novo (so informa).
         GO_IMAGE             = 'golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280'
         // CI-02: estagio "Testes Go". Debian porque os testes de tests/deploy

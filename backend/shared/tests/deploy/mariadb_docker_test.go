@@ -8,7 +8,7 @@ package deploy_test
 //   - ensaio com docker/iptables/systemctl FALSOS (stubs no PATH) rodando o
 //     script REAL num user namespace (EUID 0) com binds dos caminhos fixos
 //     (/root, /opt, /usr/local/sbin, /etc/systemd/system) para um TempDir:
-//     rede, contas por IP, convergência, firewall (--dev-ip), CA (--ca-key,
+//     rede, contas por IP, convergência, firewall (transição do --dev-ip), CA (--ca-key,
 //     --nova-ca, --novo-cert com FLUSH SSL), reexecução;
 //   - Docker real: só com root + Docker acessível + opt-in (TST15_DOCKER=1),
 //     senão skip (pendência registrada no TST-15).
@@ -77,6 +77,11 @@ func TestTST15_ScriptsDeploy_Shellcheck(t *testing.T) {
 func TestTST17_ShellcheckDisableComMotivo(t *testing.T) {
 	extras, err := filepath.Glob(caminhoRaiz(t, "scripts", "*.sh"))
 	require.NoError(t, err)
+	if emCI() {
+		// CI-01: no CI o scripts/ vai no tar do "Testes Go"; lista vazia
+		// passaria em silêncio.
+		require.NotEmpty(t, extras, "scripts/*.sh ausente no CI (CI-01)")
+	}
 	re := regexp.MustCompile(`#\s*shellcheck\s+disable=(SC\d+(?:,SC\d+)*)(.*)$`)
 	for _, s := range append(scriptsDeploy(t), extras...) {
 		b, err := os.ReadFile(s)
@@ -139,13 +144,13 @@ func TestSEC39_CreateUserEmDeploy_Ed25519ERequireSSL(t *testing.T) {
 			}
 		}
 	}
-	assert.GreaterOrEqual(t, total, 3, "app, admin e casaos (o teste não pode ficar verde vazio)")
+	assert.GreaterOrEqual(t, total, 3, "app, admin, backup e DBA (o teste não pode ficar verde vazio)")
 	_, err := os.Stat(caminhoRaiz(t, "deploy", "mariadb-setup.sql"))
 	assert.True(t, os.IsNotExist(err), "deploy/mariadb-setup.sql saiu (SEC-39)")
 }
 
-// SEC-45: nenhum -p/--publish do Docker sem IP (nunca 0.0.0.0); no
-// mariadb-docker.sh, uma única publicação, só com --dev-ip.
+// SEC-45: nenhum -p/--publish do Docker sem IP (nunca 0.0.0.0). DEPLOY-10: o
+// mariadb-docker.sh não publica porta nenhuma, nem na transição do --dev-ip.
 func TestSEC45_DockerPublishSempreComIP(t *testing.T) {
 	rePub := regexp.MustCompile(`(?:^|[\s(])(?:-p|--publish)(?:=|\s+)"?([^\s")]+)`)
 	alvos := map[string]string{"Jenkinsfile": lerRaiz(t, "Jenkinsfile")}
@@ -175,8 +180,8 @@ func TestSEC45_DockerPublishSempreComIP(t *testing.T) {
 			mapeamentos = append(mapeamentos, m[1])
 		}
 	}
-	assert.Equal(t, []string{"$SITE_IP:$PORTA:3306"}, mapeamentos)
-	assert.Contains(t, md, `$PUBLICAR && RUN_ARGS+=(-p "$SITE_IP:$PORTA:3306")`, "só publica com --dev-ip")
+	assert.Empty(t, mapeamentos, "DEPLOY-10: nenhuma publicação no mariadb-docker.sh")
+	assert.NotContains(t, md, "RUN_ARGS+=(-p")
 }
 
 var reImagemMariaDB = regexp.MustCompile(`^mariadb:11\.4\.\d+@sha256:[0-9a-f]{64}$`)
@@ -218,11 +223,14 @@ func TestSEC45_SanSemHostDockerInternal(t *testing.T) {
 	assert.NotRegexp(t, `(?m)^[^#]*-p "?0\.0\.0\.0`, md)
 }
 
-// fpsCADev: fingerprints SHA-256 das CAs de DEV (MariaDB do CasaOS, porta
-// 3307, deploy/ca-cert.pem): a atual (CN=MariaDB_CA, 2026-11) e a aposentada
-// (CN=RotaPerfumes_MySQL_CA). DEPLOY-07: nunca no deploy/db-ca.fingerprint
-// (roda também no Jenkins, onde o ca-cert.pem não existe).
-var fpsCADev = []string{"d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2", "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"}
+// fpsCADev lista os fingerprints SHA-256 das CAs de DEV (MariaDB do CasaOS,
+// porta 3307, deploy/ca-cert.pem). DEPLOY-07 / SEC-71: nenhum pode estar no
+// deploy/db-ca.fingerprint (roda também no Jenkins, onde o ca-cert.pem não
+// existe).
+var fpsCADev = []string{
+	"ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b", // CN=RotaPerfumes_MySQL_CA (antiga)
+	"d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2", // CN=MariaDB_CA (em uso)
+}
 
 // DEPLOY-07 / SEC-45: deploy/db-ca.fingerprint lista só a CA de PRODUCAO.
 // Zero fingerprints é o estado pré-instalação (o Jenkins falha fechado, ver
@@ -236,17 +244,112 @@ func TestSEC45_FingerprintVersionadoConfereComCA(t *testing.T) {
 	for _, fp := range fps {
 		assert.Regexp(t, `^[0-9a-f]{64}$`, fp)
 	}
-	for _, dev := range fpsCADev {
-		assert.NotContains(t, fps, dev, "a CA de dev (CasaOS) não pode estar no db-ca.fingerprint")
+	for _, fpDev := range fpsCADev {
+		assert.NotContains(t, fps, fpDev, "a CA de dev (CasaOS) não pode estar no db-ca.fingerprint")
 	}
-	assert.Contains(t, lerRaiz(t, "deploy", "mariadb-docker.sh"), fpsCADev[0], "o mariadb-docker.sh avisa sobre a CA de dev atual")
 	ca := caminhoRaiz(t, "deploy", "ca-cert.pem")
 	if _, err := os.Stat(ca); err != nil {
-		t.Log("deploy/ca-cert.pem ausente nesta máquina (Jenkins): só as constantes fpsCADev foram conferidas")
+		t.Log("deploy/ca-cert.pem ausente nesta máquina (Jenkins): só a lista fpsCADev foi conferida")
 		return
 	}
 	precisaOpenSSL(t)
-	assert.NotContains(t, fps, fingerprint(t, ca), "deploy/ca-cert.pem é a CA de dev; não pode estar no db-ca.fingerprint")
+	fpLocal := fingerprint(t, ca)
+	assert.NotContains(t, fps, fpLocal, "deploy/ca-cert.pem é a CA de dev; não pode estar no db-ca.fingerprint")
+	assert.Contains(t, fpsCADev, fpLocal, "SEC-71: deploy/ca-cert.pem mudou; confira a origem no servidor (pode ser interceptação ou cópia errada) e, se legítimo, inclua o fingerprint novo em CA_DEV_FPS (mariadb-docker.sh) e em fpsCADev")
+}
+
+// SEC-71: a guarda do mariadb-docker.sh avisa, citando a linha a remover,
+// quando o deploy/db-ca.fingerprint do checkout traz uma CA de dev. Roda o
+// script real a partir de uma cópia, com um db-ca.fingerprint ao lado dele.
+func TestSEC71_Ensaio_GuardaCADevNoFingerprint(t *testing.T) {
+	const fpAntiga = "ef31b6565518b18bbd5ababf94db6bca76de356f8e0f013491dbec7f5aedb37b"
+	const fpAtual = "d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2"
+	aviso := func(fp string) string {
+		return "contem o fingerprint da CA de DEV (" + fp + "): remova essa linha (a CA de dev nunca vale em producao)."
+	}
+	fpProd := strings.Repeat("ab", 32)
+	casos := []struct {
+		nome, conteudo string
+		avisa, cala    []string
+	}{
+		{"so a CA nova", fpAtual + "\n", []string{fpAtual}, []string{fpAntiga}},
+		{"so a CA antiga", fpAntiga + "\n", []string{fpAntiga}, []string{fpAtual}},
+		{"as duas", fpAntiga + "\n" + fpAtual + "\n", []string{fpAntiga, fpAtual}, nil},
+		{"CA nova com producao e CRLF", fpProd + "\r\n" + fpAtual + "\r\n", []string{fpAtual}, []string{fpAntiga}},
+		{"so comentario e producao", "# nunca " + fpAtual + "\n# nem " + fpAntiga + "\n" + fpProd + "\n", nil, []string{fpAntiga, fpAtual}},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			e := novoEnsaio(t)
+			e.usarCheckout(lerRaiz(t, "deploy", "mariadb-docker.sh"), c.conteudo)
+			r := e.rodar("--nova-ca")
+			require.NoError(t, r.err, r.out)
+			for _, fp := range c.avisa {
+				assert.Contains(t, r.out, aviso(fp))
+			}
+			for _, fp := range c.cala {
+				assert.NotContains(t, r.out, aviso(fp))
+			}
+		})
+	}
+}
+
+// SEC-71: com uma CA de dev em $SSL_DIR/ca.pem, o script avisa e não manda
+// gravar esse fingerprint, sem abortar. A chave das CAs de dev não existe aqui:
+// a cópia do script passa a tratar uma CA descartável como CA de dev.
+func TestSEC71_Ensaio_CADevNoHost(t *testing.T) {
+	const fpAtual = "d150ee67f22336406ea5f91957b6935009a163fc4727b537a00d15da01fe85d2"
+	fpProd := strings.Repeat("ab", 32)
+	preparar := func(t *testing.T, listarComoDev bool, lista string) (*ensaio, string, string) {
+		t.Helper()
+		e := novoEnsaio(t)
+		ca, key := gerarCA(t, filepath.Join(e.dir, "offline"), "MariaDB_CA")
+		escrever(t, filepath.Join(e.dir, "ssl", "ca.pem"), mustRead(t, ca), 0o644)
+		fp := fingerprint(t, ca)
+		script := lerRaiz(t, "deploy", "mariadb-docker.sh")
+		if listarComoDev {
+			require.Contains(t, script, `"`+fpAtual+`"`)
+			script = strings.ReplaceAll(script, `"`+fpAtual+`"`, `"`+fp+`"`)
+		}
+		e.usarCheckout(script, strings.ReplaceAll(lista, "<fp>", fp))
+		return e, key, fp
+	}
+	const avisoHost = "e uma CA de DEV ("
+	for nome, lista := range map[string]string{
+		"lista vazia":        "# so comentario\n",
+		"lista de producao":  fpProd + "\n",
+		"lista com essa CA":  "<fp>\n",
+		"lista com as duas":  fpProd + "\n<fp>\n",
+		"comentario com ela": "# <fp>\n",
+	} {
+		t.Run("CA de dev/"+nome, func(t *testing.T) {
+			e, key, fp := preparar(t, true, lista)
+			r := e.rodar("--ca-key", key)
+			require.NoError(t, r.err, "avisa, não aborta: %s", r.out)
+			assert.Contains(t, r.out, avisoHost+fp+"): NAO grave esse fingerprint")
+			assert.Contains(t, r.out, "2. NAO grave o fingerprint desta CA")
+			assert.NotContains(t, r.out, "Grave "+fp)
+			assert.NotContains(t, r.out, "grave "+fp)
+			assert.NotContains(t, r.out, "ja contem "+fp)
+			assert.NotContains(t, r.out, "NAO contem "+fp)
+		})
+	}
+	t.Run("CA de producao segue mandando gravar", func(t *testing.T) {
+		e, key, fp := preparar(t, false, "# so comentario\n")
+		r := e.rodar("--ca-key", key)
+		require.NoError(t, r.err, r.out)
+		assert.NotContains(t, r.out, avisoHost)
+		assert.NotContains(t, r.out, "2. NAO grave")
+		assert.Contains(t, r.out, "2. Grave "+fp)
+		assert.Contains(t, r.out, "ainda nao tem fingerprint: grave "+fp)
+	})
+	t.Run("CA de producao ja listada", func(t *testing.T) {
+		e, key, fp := preparar(t, false, "<fp>\n")
+		r := e.rodar("--ca-key", key)
+		require.NoError(t, r.err, r.out)
+		assert.NotContains(t, r.out, avisoHost)
+		assert.Contains(t, r.out, "ja contem "+fp+": OK.")
+	})
 }
 
 func linhasUteis(s string) []string {
@@ -271,7 +374,7 @@ func TestSEC45_MariadbDocker_OpcoesRemovidasEInvalidas(t *testing.T) {
 		msg  string
 	}{
 		{"--versao saiu", []string{"--versao", "11.4"}, 1, "--versao saiu (SEC-31): use --imagem-base"},
-		{"--rede-lan saiu", []string{"--rede-lan", "192.168.168.0/24"}, 1, "--rede-lan saiu (SEC-45): use --dev-ip"},
+		{"--rede-lan saiu", []string{"--rede-lan", "192.168.168.0/24"}, 1, "--rede-lan saiu (SEC-45): o banco nao aceita conexao da LAN"},
 		{"--rede-lan depois de outra opcao", []string{"--dev-ip", "192.168.168.50", "--rede-lan", "x"}, 1, "--rede-lan saiu"},
 		{"opcao desconhecida", []string{"--skip-mysql"}, 2, "Opcao desconhecida: --skip-mysql"},
 		{"--dev-ip sem valor", []string{"--dev-ip"}, 1, "a opcao --dev-ip exige um valor"},
@@ -318,8 +421,9 @@ func TestSEC45_MariadbDocker_OpcoesRemovidasEInvalidas(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type ensaio struct {
-	t   *testing.T
-	dir string
+	t      *testing.T
+	dir    string
+	script string // vazio: o deploy/mariadb-docker.sh do repositório
 }
 
 const (
@@ -354,7 +458,7 @@ func novoEnsaio(t *testing.T) *ensaio {
 	// Lote 36: o TempDir sai com 0777 &^ umask (775 com umask 002) e é
 	// ancestral do --segredos-dir/--ca-dir dos ensaios: sem escrita de grupo.
 	require.NoError(t, os.Chmod(e.dir, 0o700))
-	for _, d := range []string{"root", "opt", "sbin", "systemd", "state", "bin"} {
+	for _, d := range []string{"root", "opt", "sbin", "systemd", "state", "bin", "varlog"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(e.dir, d), 0o755))
 	}
 	bins := map[string]string{
@@ -366,12 +470,6 @@ func novoEnsaio(t *testing.T) *ensaio {
 		escrever(t, filepath.Join(e.dir, "bin", nome), conteudo, 0o755)
 	}
 	escrever(t, filepath.Join(e.dir, "runner.sh"), runnerEnsaio, 0o755)
-	// BACKUP-01: copia byte a byte do deploy/backup-mariadb.sh num caminho do
-	// "root" (o checkout do repositorio e do usuario e o /home aparece com o
-	// overflow uid no namespace; o script exige dono root sem escrita g/o).
-	escrever(t, filepath.Join(e.dir, "bk", "backup-mariadb.sh"), lerRaiz(t, "deploy", "backup-mariadb.sh"), 0o755)
-	require.NoError(t, os.Chmod(filepath.Join(e.dir, "bk"), 0o755))
-	require.NoError(t, os.Chmod(filepath.Join(e.dir, "bk", "backup-mariadb.sh"), 0o755))
 	e.setState("chain_DOCKER-USER", "-A DOCKER-USER -j RETURN\n")
 	// DEPLOY-08: do próprio servidor a porta publicada responde com o erro
 	// 1130 (origem pelo DNAT sem conta), como no servidor real.
@@ -393,6 +491,15 @@ func pacoteGreeting() []byte {
 	payload = append(payload, make([]byte, 40)...)
 	n := len(payload)
 	return append([]byte{byte(n), byte(n >> 8), byte(n >> 16), 0x00}, payload...)
+}
+
+// usarCheckout faz o ensaio rodar esta versão do script, com o
+// db-ca.fingerprint dado ao lado dela (nunca o arquivo real do repositório).
+func (e *ensaio) usarCheckout(script, fingerprints string) {
+	e.t.Helper()
+	e.script = filepath.Join(e.dir, "checkout", "mariadb-docker.sh")
+	escrever(e.t, e.script, script, 0o755)
+	escrever(e.t, filepath.Join(e.dir, "checkout", "db-ca.fingerprint"), fingerprints, 0o644)
 }
 
 func (e *ensaio) setState(nome, conteudo string) {
@@ -435,16 +542,19 @@ func (e *ensaio) rodar(args ...string) saidaEnsaio {
 	e.t.Helper()
 	_ = os.Remove(filepath.Join(e.dir, "log"))
 	base := []string{"-rm", "bash", filepath.Join(e.dir, "runner.sh"),
-		"--ssl-dir", filepath.Join(e.dir, "ssl"), "--dados", filepath.Join(e.dir, "dados"), "--host-nome", hostTeste,
-		"--backup-script", filepath.Join(e.dir, "bk", "backup-mariadb.sh")}
+		"--ssl-dir", filepath.Join(e.dir, "ssl"), "--dados", filepath.Join(e.dir, "dados"), "--host-nome", hostTeste}
 	cmd := exec.Command("unshare", append(base, args...)...)
-	cmd.Env = append(ambienteLimpo(), "FAKE="+e.dir, "SCRIPT="+mariadbDocker(e.t))
+	script := e.script
+	if script == "" {
+		script = mariadbDocker(e.t)
+	}
+	cmd.Env = append(ambienteLimpo(), "FAKE="+e.dir, "SCRIPT="+script)
 	out, err := cmd.CombinedOutput()
 	return saidaEnsaio{out: string(out), err: err}
 }
 
-// senhas lê os arquivos de senha que existem (CHORE-17: casaos.senha só com
-// --dev-ip; arquivo ausente fica fora do mapa).
+// senhas lê os arquivos de senha que existem (DEPLOY-10: o casaos.senha nunca é
+// criado; arquivo ausente fica fora do mapa).
 func (e *ensaio) senhas() map[string]string {
 	out := map[string]string{}
 	for _, u := range []string{"root", "rotaperfumes_app", "rotaperfumes_admin", "casaos"} {
@@ -455,6 +565,19 @@ func (e *ensaio) senhas() map[string]string {
 		out[u] = strings.TrimSpace(e.arq(rel))
 	}
 	return out
+}
+
+// instalarComPortaPublicada simula a produção anterior ao DEPLOY-10: container
+// já criado e publicando a porta. É o único estado em que o --dev-ip vale. Limpa
+// os rastros da instalação, para o teste enxergar só a execução seguinte.
+func (e *ensaio) instalarComPortaPublicada() {
+	e.t.Helper()
+	r := e.rodar("--nova-ca")
+	require.NoError(e.t, r.err, r.out)
+	e.setState("portas", `{"3306/tcp":[{"HostIp":"`+siteIP+`","HostPort":"3306"}]}`+"\n")
+	for _, nome := range []string{"run_args", "sql", "dba_argv", "dba_env", "dba_stdin"} {
+		_ = os.Remove(filepath.Join(e.dir, "state", nome))
+	}
 }
 
 // gerarCA cria ca.pem/ca-key.pem (RSA 2048) em dir.
@@ -571,11 +694,11 @@ func TestTST15_Ensaio_PrimeiraInstalacaoSemDevIP(t *testing.T) {
 	// DEPLOY-07: a CA de produção nunca vai para deploy/ca-cert.pem (CA de dev).
 	assert.Contains(t, r.out, "NAO copie esta CA para deploy/ca-cert.pem")
 	assert.NotRegexp(t, `(?i)cop(ie|iar)[^\n]*para\s+deploy/ca-cert\.pem`, strings.ReplaceAll(r.out, "NAO copie esta CA para deploy/ca-cert.pem", ""))
-	// Sem --dev-ip: o resumo final não cita a conta casaos nem o bloco de
-	// .env para a máquina do admin. CHORE-17: nem gera o casaos.senha.
+	// DEPLOY-10: o resumo final não cita a conta casaos nem o bloco de .env
+	// para a máquina do admin, e o casaos.senha nunca é gerado.
 	assert.NoFileExists(t, filepath.Join(e.dir, segredos, "casaos.senha"), "sem --dev-ip não há conta casaos")
 	assert.NotContains(t, s, "casaos")
-	assert.Len(t, s, 3, "root, app e admin")
+	assert.Len(t, s, 3, "root, app e admin (mapa de ensaio.senhas)")
 	assert.NotContains(t, r.out, "casaos.senha")
 	iResumo := strings.Index(r.out, "\nPronto. MariaDB")
 	require.GreaterOrEqual(t, iResumo, 0, r.out)
@@ -590,8 +713,9 @@ func TestTST15_Ensaio_PrimeiraInstalacaoSemDevIP(t *testing.T) {
 	assert.NotContains(t, r.out, "BEGIN PRIVATE KEY")
 }
 
-// --dev-ip: chain com RETURN por IP + DROP, salto em DOCKER-USER (salto
-// antigo removido), unit systemd, porta só no IP da LAN, casaos por IP.
+// Transição do --dev-ip (DEPLOY-10): chain com RETURN por IP + DROP, salto em
+// DOCKER-USER (salto antigo removido) e unit systemd continuam protegendo a porta
+// já publicada; o container não é recriado e não há conta para a LAN.
 // DEPLOY-08: roda com o "iptables -S" nas duas formas do --ctorigdst (sem
 // /32, como o iptables real imprime, e com /32).
 func TestTST15_Ensaio_DevIPFirewallEContas(t *testing.T) {
@@ -606,6 +730,7 @@ func TestTST15_Ensaio_DevIPFirewallEContas(t *testing.T) {
 
 func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
 	e := novoEnsaio(t)
+	e.instalarComPortaPublicada()
 	if com32 {
 		e.setState("ctorigdst_com_32", "")
 	}
@@ -613,7 +738,7 @@ func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
 	e.setState("chain_DOCKER-USER", "-A DOCKER-USER -p tcp -m conntrack --ctorigdst 192.168.168.106/32 --ctorigdstport 3307 -j ROTAPERFUMES-DB\n"+
 		"-A DOCKER-USER -p tcp -m conntrack --ctorigdst 192.168.168.99/32 --ctorigdstport 3306 -j ROTAPERFUMES-DB\n"+
 		saltoSemCtdir+"\n-A DOCKER-USER -j RETURN\n")
-	r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.50", "--dev-ip", "192.168.168.51", "--dev-ip", "192.168.168.50")
+	r := e.rodar("--dev-ip", "192.168.168.50", "--dev-ip", "192.168.168.51", "--dev-ip", "192.168.168.50")
 	require.NoError(t, r.err, r.out)
 
 	assert.Equal(t, "-A ROTAPERFUMES-DB -s 192.168.168.50/32 -j RETURN\n-A ROTAPERFUMES-DB -s 192.168.168.51/32 -j RETURN\n-A ROTAPERFUMES-DB -j DROP\n",
@@ -631,13 +756,11 @@ func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
 	}
 	log := e.log()
 	assert.Contains(t, log, "systemctl enable rotaperfumes-db-firewall.service")
-	iFW := strings.Index(log, "systemctl restart rotaperfumes-db-firewall.service")
-	iRun := strings.Index(log, "docker run -d ")
-	require.GreaterOrEqual(t, iFW, 0)
-	require.GreaterOrEqual(t, iRun, 0)
-	assert.Less(t, iFW, iRun, "firewall ativo ANTES de publicar a porta")
-
-	assert.Contains(t, e.state("run_args"), "-p "+siteIP+":3306:3306")
+	assert.Contains(t, log, "systemctl restart rotaperfumes-db-firewall.service")
+	// DEPLOY-10: o container não reinicia nem ganha nova publicação.
+	assert.NotContains(t, log, "docker run -d ")
+	assert.NotContains(t, log, "docker rm ")
+	assert.Empty(t, e.state("run_args"))
 	// DEPLOY-08: sem s_client na porta publicada (do servidor nunca há
 	// handshake); lê os primeiros bytes da porta e confere o cert offline.
 	assert.NotContains(t, log, "s_client")
@@ -646,38 +769,24 @@ func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
 	assert.Contains(t, r.out, "Certificado valido pela CA para o IP "+siteIP+" (openssl verify -verify_ip): OK.")
 	assert.Contains(t, r.out, "Porta publicada "+siteIP+":3306: mariadbd respondeu (erro 1130")
 	assert.Contains(t, r.out, "Certificado em uso = ")
-	assert.Contains(t, r.out, "openssl s_client -starttls mysql -connect "+siteIP+":3306 -CAfile deploy/ca-producao.pem -verify_return_error -verify_ip "+siteIP)
-	assert.Contains(t, r.out, `"Cipher is" com uma cifra`)
-	assert.Contains(t, r.out, "NUNCA \"(NONE)\"")
+	// DEPLOY-10: sem conta para a LAN, a maquina de dev também leva o erro 1130;
+	// o resumo não manda testar o TLS de lá.
+	assert.NotContains(t, r.out, "s_client")
 
 	sql := e.state("sql")
-	s := e.senhas()
-	for _, ip := range []string{"192.168.168.50", "192.168.168.51"} {
-		assert.Contains(t, sql, "CREATE USER IF NOT EXISTS 'casaos'@'"+ip+"' IDENTIFIED VIA ed25519 USING PASSWORD('"+s["casaos"]+"') REQUIRE SSL;")
-		assert.Contains(t, sql, "GRANT ALL PRIVILEGES ON `rotaperfumes`.* TO 'casaos'@'"+ip+"';")
-		// DEPLOY-07: sem GRANT em rotaperfumes\_% (bancos de teste não existem em produção).
-		assert.NotContains(t, sql, "GRANT ALL PRIVILEGES ON `rotaperfumes\\_%`.* TO 'casaos'@'"+ip+"';")
-	}
-	assert.Equal(t, 1, strings.Count(sql, "CREATE USER IF NOT EXISTS 'casaos'@'192.168.168.50'"))
+	assert.NotContains(t, sql, "'casaos'@", "nenhuma conta para os IPs de --dev-ip")
+	assert.NotContains(t, sql, "192.168.168.5")
 	assert.NotContains(t, sql, "mysql_native_password")
 
-	// DEPLOY-07: com --dev-ip o resumo manda a CA para deploy/ca-producao.pem
-	// e o .env para .env.producao (nunca o .env de dev nem o ca-cert.pem).
-	assert.Contains(t, r.out, ".env.producao")
-	assert.Contains(t, r.out, "deploy/ca-producao.pem")
-	assert.Contains(t, r.out, "DB_TLS_CA=deploy/ca-producao.pem")
-	assert.Contains(t, r.out, "casaos.senha")
-	assert.Contains(t, r.out, "DB_USUARIO=casaos")
-	assert.Contains(t, r.out, "CONFIRMO_PRODUCAO="+siteIP+"/rotaperfumes")
+	// DEPLOY-10: saídas de .env.producao removidas; a CA de produção continua
+	// sem ir para o deploy/ca-cert.pem (DEPLOY-07).
+	assert.NotContains(t, r.out, ".env.producao")
+	assert.NotContains(t, r.out, "deploy/ca-producao.pem")
+	assert.NotContains(t, r.out, "DB_USUARIO=casaos")
+	assert.NotContains(t, r.out, "CONFIRMO_PRODUCAO=")
 	assert.Contains(t, r.out, "NAO copie esta CA para deploy/ca-cert.pem")
 	assert.NotContains(t, r.out, "DB_TLS_CA=deploy/ca-cert.pem")
-	assert.NotContains(t, r.out, s["casaos"], "senha do casaos nunca na saída")
-	// CHORE-17: com --dev-ip o casaos.senha existe, 600, no formato do script.
-	assert.Regexp(t, `^[A-Za-z0-9]{32}$`, s["casaos"])
-	st, err = os.Stat(filepath.Join(e.dir, segredos, "casaos.senha"))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), st.Mode().Perm())
-	assert.NotContains(t, e.log(), s["casaos"], "senha do casaos nunca no argv do docker")
+	assert.False(t, e.existe(filepath.Join(segredos, "casaos.senha")), "o casaos.senha nunca é criado")
 
 	// Reexecução: salto não duplica, chain igual, senhas iguais.
 	antes := e.senhas()
@@ -691,31 +800,37 @@ func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
 }
 
 // Convergência (SEC-45 item 2): contas do projeto com host fora do desejado
-// saem; host fora do padrão só gera aviso; contas estranhas geram aviso.
+// saem; host fora do padrão só gera aviso (Lote 42: menos na casaos, que sai
+// pelo DROP gerado com QUOTE no servidor); contas estranhas geram aviso.
 func TestTST15_Ensaio_ConvergenciaDeContas(t *testing.T) {
 	casos := []struct {
 		nome      string
-		args      []string
+		transicao bool
 		removidas []string
 		mantidas  []string
 	}{
-		{"com --dev-ip", []string{"--dev-ip", "192.168.168.50"},
-			[]string{"'casaos'@'192.168.168.0/255.255.255.0'", "'rotaperfumes_app'@'172.16.0.0/255.240.0.0'", "'rotaperfumes_admin'@'%'"},
-			[]string{"'casaos'@'192.168.168.50'", "'rotaperfumes_app'@'172.30.42.10'", "'rotaperfumes_admin'@'172.30.42.20'"}},
-		{"sem --dev-ip remove casaos", nil,
+		{"transicao do --dev-ip remove casaos", true,
+			[]string{"'casaos'@'192.168.168.0/255.255.255.0'", "'casaos'@'192.168.168.50'", "'rotaperfumes_app'@'172.16.0.0/255.240.0.0'", "'rotaperfumes_admin'@'%'"},
+			[]string{"'rotaperfumes_app'@'172.30.42.10'", "'rotaperfumes_admin'@'172.30.42.20'"}},
+		{"sem --dev-ip remove casaos", false,
 			[]string{"'casaos'@'192.168.168.0/255.255.255.0'", "'casaos'@'192.168.168.50'", "'rotaperfumes_app'@'172.16.0.0/255.240.0.0'", "'rotaperfumes_admin'@'%'"},
 			[]string{"'rotaperfumes_app'@'172.30.42.10'", "'rotaperfumes_admin'@'172.30.42.20'"}},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
 			e := novoEnsaio(t)
+			args := []string{"--nova-ca"}
+			if c.transicao {
+				e.instalarComPortaPublicada()
+				args = []string{"--dev-ip", "192.168.168.50"}
+			}
 			e.setState("contas", strings.Join([]string{
 				"casaos\t192.168.168.0/255.255.255.0", "casaos\t192.168.168.50", "casaos\tx'y",
 				"rotaperfumes_admin\t%", "rotaperfumes_admin\t172.30.42.20",
-				"rotaperfumes_app\t172.16.0.0/255.240.0.0", "rotaperfumes_app\t172.30.42.10",
+				"rotaperfumes_app\t172.16.0.0/255.240.0.0", "rotaperfumes_app\t172.30.42.10", "rotaperfumes_app\ta'b",
 			}, "\n")+"\n")
 			e.setState("outras", "intruso@%\n")
-			r := e.rodar(append([]string{"--nova-ca"}, c.args...)...)
+			r := e.rodar(args...)
 			require.NoError(t, r.err, r.out)
 			sql := e.state("sql")
 			for _, u := range c.removidas {
@@ -724,8 +839,11 @@ func TestTST15_Ensaio_ConvergenciaDeContas(t *testing.T) {
 			for _, u := range c.mantidas {
 				assert.NotContains(t, sql, "DROP USER IF EXISTS "+u+";")
 			}
-			assert.NotContains(t, sql, "x'y", "host fora do padrão não vai para o SQL")
-			assert.Contains(t, r.out, "conta casaos com host fora do padrao NAO removida")
+			assert.NotContains(t, sql, "a'b", "host fora do padrão não vai para o SQL")
+			assert.Contains(t, r.out, "conta rotaperfumes_app com host fora do padrao NAO removida")
+			// Lote 42: a casaos sai em qualquer host, pelo texto do QUOTE do servidor.
+			assert.Contains(t, sql, `DROP USER IF EXISTS 'casaos'@'x\'y';`)
+			assert.NotContains(t, r.out, "conta casaos com host fora do padrao NAO removida")
 			assert.Contains(t, r.out, "contas fora do esperado (root@localhost, mariadb.sys, healthcheck locais e as do projeto): intruso@%")
 			iCreate := strings.Index(sql, "CREATE USER")
 			iDrop := strings.Index(sql, "DROP USER")
@@ -838,7 +956,7 @@ func TestTST15_Ensaio_FalhasFechadas(t *testing.T) {
 		msg   string
 		subiu bool
 	}{
-		{"--dev-ip sem DOCKER-USER", func(e *ensaio) { e.setState("sem_docker_user", "") }, []string{"--nova-ca", "--dev-ip", "192.168.168.50"}, "chain DOCKER-USER nao encontrada", false},
+		{"--dev-ip sem DOCKER-USER", func(e *ensaio) { e.instalarComPortaPublicada(); e.setState("sem_docker_user", "") }, []string{"--dev-ip", "192.168.168.50"}, "chain DOCKER-USER nao encontrada", false},
 		{"--dev-ip com faixa", nil, []string{"--nova-ca", "--dev-ip", "192.168.168.0/24"}, "--dev-ip invalido", false},
 		{"--dev-ip loopback", nil, []string{"--nova-ca", "--dev-ip", "127.0.0.1"}, "--dev-ip nao pode ser 127.0.0.1", false},
 		{"--dev-ip com outro container", nil, []string{"--nova-ca", "--dev-ip", "192.168.168.50", "--container", "teste-db"}, "--dev-ip so com o container padrao", false},
@@ -847,7 +965,11 @@ func TestTST15_Ensaio_FalhasFechadas(t *testing.T) {
 		{"--ip loopback", nil, []string{"--nova-ca", "--ip", "127.0.0.1"}, "--ip precisa ser o IP da LAN", false},
 		{"--rede-docker /16", nil, []string{"--nova-ca", "--rede-docker", "172.30.0.0/16"}, "--rede-docker invalida", false},
 		{"rede existente com outra subnet", func(e *ensaio) { e.setState("rede", "172.30.99.0/24\n") }, []string{"--nova-ca"}, "ja existe com outra subnet ('172.30.99.0/24', esperado 172.30.42.0/24)", false},
-		{"porta ocupada por outro", func(e *ensaio) { e.setState("porta_ocupada", "") }, []string{"--nova-ca", "--dev-ip", "192.168.168.50"}, "porta 3306 ocupada por outro servico", false},
+		{"porta ocupada por outro", func(e *ensaio) {
+			e.instalarComPortaPublicada()
+			e.setState("porta_ocupada", "")
+			e.setState("rodando", "false\n") // container parado: quem ocupa a porta é outro
+		}, []string{"--dev-ip", "192.168.168.50"}, "porta 3306 ocupada por outro servico", false},
 		{"conexao sem TLS aceita", func(e *ensaio) { e.setState("aceita_sem_tls", "") }, []string{"--nova-ca"}, "conexao SEM TLS foi aceita", true},
 	}
 	for _, c := range casos {
@@ -867,62 +989,66 @@ func TestTST15_Ensaio_FalhasFechadas(t *testing.T) {
 	}
 }
 
-// Container existente sem a porta e pedido de --dev-ip: só com --recriar.
+// DEPLOY-10: container que publica a porta e pedido sem --dev-ip diverge; só o
+// --recriar, sem --dev-ip, muda o estado, e o container novo não publica nada.
 func TestTST15_Ensaio_DivergenciaExigeRecriar(t *testing.T) {
 	e := novoEnsaio(t)
-	require.NoError(t, e.rodar("--nova-ca").err)
-	r := e.rodar("--dev-ip", "192.168.168.50")
+	e.instalarComPortaPublicada()
+	r := e.rodar()
 	require.Error(t, r.err, r.out)
 	assert.Contains(t, r.out, "portas publicadas")
-	assert.Contains(t, r.out, "rode de novo com --recriar")
+	assert.Contains(t, r.out, "rode de novo com --recriar, sem --dev-ip")
 	assert.NotContains(t, e.log(), "iptables-restore", "nada mudado antes do --recriar")
+	assert.NotContains(t, e.log(), "docker rm ")
 
-	r = e.rodar("--dev-ip", "192.168.168.50", "--recriar")
-	require.NoError(t, r.err, r.out)
-	assert.Contains(t, e.log(), "docker rm -f rotaperfumes-mariadb")
-	assert.Contains(t, e.state("run_args"), "-p "+siteIP+":3306:3306")
-}
-
-// CHORE-17: reexecução sem --dev-ip depois de uma com --dev-ip remove a conta
-// casaos, mas mantém o casaos.senha com a mesma senha (reaproveitada se o
-// --dev-ip voltar) e avisa como descartar.
-func TestCHORE17_Ensaio_SemDevIPMantemCasaosSenha(t *testing.T) {
-	e := novoEnsaio(t)
-	r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.50")
-	require.NoError(t, r.err, r.out)
-	antes := e.senhas()
-	require.Regexp(t, `^[A-Za-z0-9]{32}$`, antes["casaos"])
-
-	e.setState("contas", "casaos\t192.168.168.50\nrotaperfumes_admin\t172.30.42.20\nrotaperfumes_app\t172.30.42.10\n")
-	// O estado "sql" acumula as execuções: confere só o trecho desta.
-	inicio := len(e.state("sql"))
 	r = e.rodar("--recriar")
 	require.NoError(t, r.err, r.out)
-	assert.Equal(t, antes, e.senhas(), "casaos.senha mantido, com a mesma senha")
-	st, err := os.Stat(filepath.Join(e.dir, segredos, "casaos.senha"))
+	assert.Contains(t, e.log(), "docker rm -f rotaperfumes-mariadb")
+	assert.NotRegexp(t, `(^|\s)-p\s`, e.state("run_args"))
+	assert.Equal(t, "{}\n", e.state("portas"))
+}
+
+// DEPLOY-10: o casaos.senha existente fica intacto, sem reaproveitar a senha; a
+// conta sai e o aviso manda levar o arquivo ao pendrive (antes do DEPLOY-10, o
+// CHORE-17 o mantinha para o --dev-ip voltar e sugeria shred).
+func TestCHORE17_Ensaio_SemDevIPMantemCasaosSenha(t *testing.T) {
+	e := novoEnsaio(t)
+	e.instalarComPortaPublicada()
+	const sentinela = "SentinelaCasaosNaoReaproveitada0"
+	rel := filepath.Join(segredos, "casaos.senha")
+	escrever(t, filepath.Join(e.dir, rel), sentinela, 0o600)
+
+	e.setState("contas", "casaos\t192.168.168.50\nrotaperfumes_admin\t172.30.42.20\nrotaperfumes_app\t172.30.42.10\n")
+	r := e.rodar("--recriar")
+	require.NoError(t, r.err, r.out)
+	assert.Equal(t, sentinela, e.arq(rel), "casaos.senha mantido, com a mesma senha")
+	st, err := os.Stat(filepath.Join(e.dir, rel))
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), st.Mode().Perm())
-	assert.Contains(t, r.out, "Sem --dev-ip: conta casaos removida; /"+segredos+"/casaos.senha mantido (reaproveitado se --dev-ip voltar). Para descartar: shred -u.")
-	sql := e.state("sql")[inicio:]
+	assert.Contains(t, r.out, "/"+segredos+"/casaos.senha mantido; leve ao pendrive seguro.")
+	assert.NotContains(t, r.out, "Para descartar")
+	assert.NotContains(t, r.out, "reaproveitado se --dev-ip voltar")
+	sql := e.state("sql")
 	assert.NotContains(t, sql, "CREATE USER IF NOT EXISTS 'casaos'@")
 	assert.Contains(t, sql, "DROP USER IF EXISTS 'casaos'@'192.168.168.50';")
-	assert.NotContains(t, r.out, antes["casaos"], "senha do casaos nunca na saída")
+	assert.NotContains(t, sql, sentinela, "a senha antiga não é reaproveitada")
+	assert.NotContains(t, r.out, sentinela, "senha do casaos nunca na saída")
+	assert.NotContains(t, e.log(), sentinela)
 	assert.NotContains(t, r.out, "DB_USUARIO=casaos")
 
-	// --dev-ip de volta: a mesma senha é reaproveitada.
-	inicio = len(e.state("sql"))
-	r = e.rodar("--dev-ip", "192.168.168.50", "--recriar")
-	require.NoError(t, r.err, r.out)
-	assert.Equal(t, antes, e.senhas())
-	assert.Contains(t, e.state("sql")[inicio:], "CREATE USER IF NOT EXISTS 'casaos'@'192.168.168.50' IDENTIFIED VIA ed25519 USING PASSWORD('"+antes["casaos"]+"') REQUIRE SSL;")
-	assert.NotContains(t, r.out, "Sem --dev-ip: conta casaos removida")
+	// --dev-ip não volta depois do --recriar: a porta fica fechada.
+	r = e.rodar("--dev-ip", "192.168.168.50")
+	require.Error(t, r.err, r.out)
+	assert.Contains(t, r.out, "--dev-ip recusado (DEPLOY-10)")
+	assert.Equal(t, sentinela, e.arq(rel))
 }
 
 // Sem --dev-ip, mas com a unit de uma execução anterior: chain recarregada só
 // com DROP (fail closed); com --container de teste, nunca mexe no firewall.
 func TestTST15_Ensaio_SemDevIPComUnitAnterior(t *testing.T) {
 	e := novoEnsaio(t)
-	require.NoError(t, e.rodar("--nova-ca", "--dev-ip", "192.168.168.50", "--recriar").err)
+	e.instalarComPortaPublicada()
+	require.NoError(t, e.rodar("--dev-ip", "192.168.168.50").err)
 	require.True(t, e.existe("systemd/rotaperfumes-db-firewall.service"))
 
 	r := e.rodar("--recriar")
@@ -944,20 +1070,27 @@ func TestTST15_Ensaio_SemDevIPComUnitAnterior(t *testing.T) {
 	})
 }
 
-// SEC-30: saída de emergência só para casaos, com motivo registrado.
+// DEPLOY-10: a saída de emergência do SEC-30 saiu: recusa própria, sem mudar nada,
+// e o casaos-native.motivo existente fica como histórico. Nenhuma conta do script
+// usa mysql_native_password.
 func TestTST15_Ensaio_CasaosNativeMotivo(t *testing.T) {
+	assert.NotContains(t, lerRaiz(t, "deploy", "mariadb-docker.sh"), "mysql_native_password")
 	e := novoEnsaio(t)
-	r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.50", "--casaos-native-motivo", "cliente do Windows sem ed25519")
-	require.NoError(t, r.err, r.out)
-	sql := e.state("sql")
-	assert.Contains(t, sql, "ALTER USER 'casaos'@'192.168.168.50' IDENTIFIED VIA mysql_native_password USING PASSWORD('")
-	assert.Equal(t, 1, strings.Count(sql, "mysql_native_password"), "só casaos")
-	assert.Contains(t, e.arq(filepath.Join(segredos, "casaos-native.motivo")), "cliente do Windows sem ed25519")
-	assert.Contains(t, r.out, "SEC-30: casaos com mysql_native_password")
-
-	r = e.rodar("--dev-ip", "192.168.168.50", "--casaos-native-motivo", "curto")
-	require.Error(t, r.err)
-	assert.Contains(t, r.out, "precisa de 10 a 300 caracteres")
+	rel := filepath.Join(segredos, "casaos-native.motivo")
+	escrever(t, filepath.Join(e.dir, rel), "historico\n", 0o600)
+	for _, args := range [][]string{
+		{"--casaos-native-motivo", "cliente do Windows sem ed25519"},
+		{"--nova-ca", "--dev-ip", "192.168.168.50", "--casaos-native-motivo", "cliente do Windows sem ed25519"},
+		{"--casaos-native-motivo"},
+	} {
+		r := e.rodar(args...)
+		require.Error(t, r.err, r.out)
+		assert.Contains(t, r.out, "--casaos-native-motivo saiu (DEPLOY-10)")
+		assert.NotContains(t, r.out, "=== [1/", "falha antes da primeira etapa")
+		assert.Empty(t, e.log(), "nenhuma chamada")
+		assert.Empty(t, e.state("sql"))
+	}
+	assert.Equal(t, "historico\n", e.arq(rel))
 }
 
 // ---------------------------------------------------------------------------
@@ -981,7 +1114,7 @@ func baseRootPrivada(t *testing.T, prefixo string) string {
 // TestTST15_MariadbDocker_Real roda o script de verdade com container, rede,
 // datadir, ssl-dir, segredos e CA de teste (TST-16: --segredos-dir e
 // --ca-dir num diretório 700 do root criado pelo teste em /root e removido
-// no fim, ver baseRootPrivada), sem --dev-ip. Exige root (o script
+// no fim, ver baseRootPrivada). Exige root (o script
 // recusa outro EUID e grava com dono root/mysql) e por isso só roda com
 // TST15_DOCKER=1. O único caminho fixo que sobra é o diretório de build
 // (/opt/rotaperfumes/mariadb-imagem, removido no fim se o teste o criou).
@@ -1032,13 +1165,19 @@ func TestTST15_MariadbDocker_Real(t *testing.T) {
 	require.NoError(t, err, out)
 	assert.Contains(t, out, "TLS com verificacao do certificado")
 	assert.Contains(t, out, "Conexao sem TLS recusada: OK.")
-	assert.Equal(t, "rotaperfumes_admin@172.30.243.20 ed25519\nrotaperfumes_app@172.30.243.10 ed25519",
+	assert.Contains(t, out, "Comando do DBA conectado como rotaperfumes-admin@172.30.243.22: OK.")
+	assert.Contains(t, out, "Conexao sem TLS do DBA recusada: OK.")
+	assert.Equal(t, "rotaperfumes-admin@172.30.243.22 ed25519\nrotaperfumes_admin@172.30.243.20 ed25519\nrotaperfumes_app@172.30.243.10 ed25519\nrotaperfumes_backup@172.30.243.21 ed25519",
 		rootSQL("SELECT CONCAT(User,'@',Host,' ',JSON_VALUE(Priv,'$.plugin')) FROM mysql.global_priv WHERE User LIKE 'rotaperfumes%' OR User='casaos' ORDER BY User"))
+	assert.Contains(t, rootSQL("SHOW GRANTS FOR 'rotaperfumes_backup'@'172.30.243.21'"), "GRANT SELECT ON `rotaperfumes`.* TO", "BACKUP-01: conta só com SELECT")
+	stCnf, errCnf := os.Stat(filepath.Join(segredosDir, "backup-cliente", "rotaperfumes_backup.cnf"))
+	require.NoError(t, errCnf)
+	assert.Equal(t, os.FileMode(0o400), stCnf.Mode().Perm(), "BACKUP-01: option file 400")
 	assert.Equal(t, "0", rootSQL("SELECT COUNT(*) FROM mysql.global_priv WHERE User='root' AND Host<>'localhost'"), "root sem host remoto")
 	assert.Equal(t, sqlModeDB07, rootSQL("SELECT @@GLOBAL.sql_mode"), "DB-07: sql_mode do cnf com ONLY_FULL_GROUP_BY")
 	assert.Equal(t, "0", rootSQL("SELECT COUNT(*) FROM mysql.global_priv WHERE User LIKE 'rotaperfumes%' AND JSON_VALUE(Priv,'$.ssl_type')<>'1'"))
 	portas, _ := exec.Command("docker", "inspect", "-f", "{{json .HostConfig.PortBindings}}", nome).Output()
-	assert.Contains(t, []string{"{}", "null"}, strings.TrimSpace(string(portas)), "sem --dev-ip nenhuma porta")
+	assert.Contains(t, []string{"{}", "null"}, strings.TrimSpace(string(portas)), "DEPLOY-10: nenhuma porta")
 
 	assert.FileExists(t, filepath.Join(caDir, "ca-key.pem"), "chave da CA no --ca-dir")
 	senha1, err := os.ReadFile(filepath.Join(segredosDir, "rotaperfumes_app.senha"))

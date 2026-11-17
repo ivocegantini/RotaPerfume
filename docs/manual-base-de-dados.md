@@ -2,7 +2,7 @@
 
 **Banco:** MariaDB 11.4 LTS (desde o DB-03; antes, MySQL), schema `rotaperfumes` (padrão do `Makefile`: `DB_NAME?=rotaperfumes`), charset `utf8mb4`, collation `utf8mb4_unicode_ci` (definidos no `make db-create`).
 **Requisitos:** cliente `mariadb` (MariaDB ≥ 11.4) no `PATH` para todos os alvos `make db-*`, inclusive o `make db-seed` (o `seedusers` em Go chama o binário `mariadb`, sem fallback para `mysql`). A API e os importadores usam o driver Go `go-sql-driver/mysql`, compatível com o MariaDB; por isso os pacotes de adapter continuam com o sufixo `mysql` (`<contexto>mysql`).
-**Servidor (Lote 30, DOC-08, 2026-11-02):** somente MariaDB. Em produção, o container `rotaperfumes-mariadb` (imagem `mariadb:11.4` fixada por digest) criado pelo `deploy/mariadb-docker.sh`, na rede Docker `rotaperfumes-db`, com TLS obrigatório e contas `ed25519` + `REQUIRE SSL` (`rotaperfumes_app`, só DML, para a API; `rotaperfumes_admin` para import e migrações; `casaos`, só com `--dev-ip`, para a máquina do admin, pelo `.env.producao`). O `sql_mode` do servidor é `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION` (DB-07, Lote 36: `ONLY_FULL_GROUP_BY` ligado; antes desligado, DB-04/DB-06; vale numa instalação existente depois do `--recriar`). **DEPLOY-07 (Lote 33, 2026-11-04):** a produção nasce vazia, sem migração de dados: o `deploy/seed-producao.sh` aplica a DDL de `sql/ordem-ddl.txt`, os seeds 02 e 03 (os 42 vendedores **inativos**) e cria o admin com troca obrigatória. O banco de **dev** é o MariaDB 11.8 do CasaOS (porta 3307, CA `deploy/ca-cert.pem`). Detalhes: `docs/deploy-servidor.md` (seções 3 e 11) e `docs/Instal_SSL.md`. **Integração e recriação de banco (`INTEGRATION=1`, `make db-down`/`db-reset`/`db-rebuild`/`db-seed`) só em banco de dev ou descartável**, nunca contra a produção (a guarda `db-guard-producao` do `Makefile` recusa).
+**Servidor (Lote 30, DOC-08, 2026-11-02):** somente MariaDB. Em produção, o container `rotaperfumes-mariadb` (imagem `mariadb:11.4` fixada por digest) criado pelo `deploy/mariadb-docker.sh`, na rede Docker `rotaperfumes-db`, com TLS obrigatório e contas `ed25519` + `REQUIRE SSL` (`rotaperfumes_app`, só DML, para a API; `rotaperfumes_admin` para import e migrações; `rotaperfumes_backup`, só `SELECT`, para o dump, seção 24; `rotaperfumes-admin`, em `172.30.42.22`, para o DBA, só local, por SSH no servidor com `sudo rotaperfumes-dba`, que **não é** a `rotaperfumes_admin`; DEPLOY-10, Lote 42: a antiga `casaos` é removida com qualquer host, e o `--dev-ip` fica só como transição, sem conta). O `sql_mode` do servidor é `ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION` (DB-07, Lote 36: `ONLY_FULL_GROUP_BY` ligado; antes desligado, DB-04/DB-06; vale numa instalação existente depois do `--recriar`). **DEPLOY-07 (Lote 33, 2026-11-04):** a produção nasce vazia, sem migração de dados: o `deploy/seed-producao.sh` aplica a DDL de `sql/ordem-ddl.txt`, os seeds 02 e 03 (os 42 vendedores **inativos**) e cria o admin com troca obrigatória. O banco de **dev** é o MariaDB 11.8 do CasaOS (porta 3307, CA `deploy/ca-cert.pem`). Detalhes: `docs/deploy-servidor.md` (seções 3 e 11) e `docs/Instal_SSL.md`. **Integração e recriação de banco (`INTEGRATION=1`, `make db-down`/`db-reset`/`db-rebuild`/`db-seed`) só em banco de dev ou descartável**, nunca contra a produção (a guarda `db-guard-producao` do `Makefile` recusa).
 **Fonte da verdade:** os scripts em `sql/` (DDLs mais as migrações de alteração, em ordem numérica). Em caso de divergência entre este manual e um script, vale o script.
 **Autor:** SubBrain (2026-09-25, card DOC-02; atualizado no Lote 5 com o NEG-02, CNPJ alfanumérico, no Lote 6 com a migração 21 e `refresh_tokens.revoked_reason`, no Lote 8 com a migração 22 e `usuarios.tokens_validos_desde` e, no Lote 11, 2026-09-26, card DOC-04, com o detalhamento de todas as tabelas; no Lote 12, 2026-09-27, com DB-01 (`estoque` no `db-up`), SEC-11 (credenciais do banco), SEC-12 (migração 23, `refresh_tokens.reuso_detectado_em`) e CHORE-02 (limpeza de `refresh_tokens`); no Lote 26, 2026-10-31, com o IMG-01 (migração 26, `produtos.imagem`, seção 13.1)).
 
@@ -24,13 +24,14 @@
 8. Migração 19 e backups: [migração 19](#18-migração-19-unificação-dos-cnpjs-duplicados), [tabelas de backup](#19-tabelas-de-backup-da-migração-19), [reversão](#20-reversão-make-db-revert-cnpj-unique), [consultas](#21-consultas-de-verificação-da-migração-19)
 9. [Pontos a confirmar](#22-pontos-a-confirmar)
 10. [Credenciais do banco e uso do cliente `mariadb` (SEC-11; DB-03)](#23-credenciais-do-banco-e-uso-do-cliente-mariadb-sec-11-lote-12-2026-09-27-db-03)
+11. [Backup e restauração do banco e das imagens (BACKUP-01)](#24-backup-e-restauração-do-banco-e-das-imagens-backup-01-lote-42-2026-11-06)
 
 ---
 
 ## 1. Visão geral e convenções
 
-- **Engine:** InnoDB em todas as tabelas com `ENGINE` explícito. `senha_historico` não declara engine, charset nem collation: herda os padrões do servidor e do banco (a confirmar, seção 22).
-- **Controle:** quase todas as tabelas têm `created_at` (`TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`) e `updated_at` (`TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`). Nas tabelas abaixo eles aparecem numa linha só. Exceção: `senha_historico` tem só `created_at`, e ele aceita NULL.
+- **Engine:** InnoDB em todas as tabelas com `ENGINE` explícito. `senha_historico` também declara `ENGINE=InnoDB`, `utf8mb4` e `utf8mb4_unicode_ci` (`sql/07_ddl_senha_historico.sql`, linha 20).
+- **Controle:** quase todas as tabelas têm `created_at` (`TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`) e `updated_at` (`TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`). Nas tabelas abaixo eles aparecem numa linha só. Exceção: `senha_historico` tem só `created_at` (sem `updated_at`); ele é `NOT NULL` desde o DB-09 (Lote 39), e bancos anteriores recebem a mudança pela migração 27 (seção 8).
 - **`*_id_origem` promovido a PK (atualização de 2026-09-15):** em `clientes`, `pedidos`, `itens_pedido` e `carteiras`, o id do CSV de origem deixou de ser uma coluna auxiliar e virou a própria PK `BIGINT AUTO_INCREMENT`. A antiga PK interna `id` foi removida. `pagamentos`, `oportunidades` e `visitas` seguem o mesmo princípio, mas com o nome do CSV (`pagamento_id`, `oportunidade_id`, `visita_id`). Os importadores gravam o id explicitamente (upsert na PK). `vendedores`, `usuarios`, `produtos` e `estoque` têm PK `id` própria.
 - **Colunas de FK para clientes:** `cliente_id` das tabelas filhas guarda o `clientes.cliente_id_origem`. Todas as FKs para `clientes` apontam para `cliente_id_origem`.
 - **Booleanos:** `TINYINT(1)` com 0/1. No CSV vêm como S/N.
@@ -47,18 +48,70 @@
 | `refresh_tokens` | Revogação (`revoked_at` + `revoked_reason`). Limpeza física periódica pela própria API desde o CHORE-02 (Lote 12): apaga tokens com `expires_at` anterior a agora menos `REFRESH_TOKEN_RETENCAO` (seção 7.2). |
 | `estoque`, `senha_historico` | Não há DELETE no repositório. |
 
+### 1.1 Fuso horário das colunas de data (DB-08, Lote 38, 2026-11-05)
+
+**Decisão (opção c, aprovada no Lote 38):** a API fixa o `time_zone` da **sessão** em `'-03:00'` pelo DSN (`&time_zone=%27-03%3A00%27`, a partir de `tz.OffsetSQL` em `backend/shared/config/config.go`), junto do `loc=Local` (o `time.Local` do Go já é `-03:00`, pacote `tz`). **O DDL não muda** e o `time_zone` global do servidor não é alterado.
+
+**Por quê:** antes, com a sessão no fuso do servidor (UTC no descartável), o `DEFAULT CURRENT_TIMESTAMP`/`ON UPDATE` gravava o instante verdadeiro, mas o Go gravava a hora de parede de `-03` que a sessão UTC interpretava como UTC, uma diferença de 3 h. Com a sessão em `-03:00`, o DEFAULT, o ON UPDATE e o Go ficam coerentes, em qualquer servidor (UTC ou `-03`). As linhas antigas gravadas pelo DEFAULT passam a aparecer certas. Efeito colateral aceito: o `usuarios.ultimo_login_at` antigo do CasaOS aparece 3 h mais cedo (só dev).
+
+**Regras:**
+
+- **`TIMESTAMP` guarda o instante** (UTC internamente) e é convertido de/para o `time_zone` da sessão na leitura e na escrita. **`DATETIME` e `DATE` são "naive"**: guardam o valor literal, sem conversão de fuso.
+- **API (DB-08):** toda sessão aberta pela API, pelos importadores e pelas CLIs Go que usam `config` roda com `@@session.time_zone = '-03:00'`.
+- **Cliente `mariadb` e seeds:** a sessão da CLI usa o `time_zone` do servidor (`SYSTEM`; UTC no descartável). Ali um `TIMESTAMP` aparece e é gravado **em UTC**, 3 h à frente da hora de `-03`, salvo `SET time_zone = '-03:00';` no início da sessão ou do script (o `sql/25_seed_movimentacoes_mes_atual.sql` faz isso na linha 61, antes do `CURDATE()` da linha 65). Ao conferir um horário pela CLI, rode o `SET` antes.
+- **Nenhum SQL de produção usa o relógio do servidor** (`NOW()`, `CURDATE()`, `CURRENT_TIMESTAMP()` em expressão etc.; TST-23 e BUG-30): as datas e os instantes são calculados no Go e passados como parâmetro `?`. A única exceção aceita é o `DEFAULT CURRENT_TIMESTAMP [ON UPDATE CURRENT_TIMESTAMP]` das colunas de auditoria abaixo, coerente por causa da sessão `-03:00` (catraca de DDL do DB-08 em `backend/shared/tests/arquitetura/`).
+
+**Colunas `TIMESTAMP` afetadas** (`created_at`/`updated_at` com `DEFAULT CURRENT_TIMESTAMP [ON UPDATE CURRENT_TIMESTAMP]`):
+
+| Tabela | Script | Observação |
+| --- | --- | --- |
+| `vendedores` | `sql/01_ddl_usuarios.sql` | |
+| `usuarios` | `sql/01_ddl_usuarios.sql` | Também `ultimo_login_at TIMESTAMP NULL`, gravado pelo Go |
+| `pedidos` | `sql/04_ddl_pedidos.sql` | |
+| `refresh_tokens` | `sql/06_ddl_refresh_tokens.sql` | |
+| `senha_historico` | `sql/07_ddl_senha_historico.sql` | Só `created_at`, `NOT NULL` desde o DB-09 (migração 27; seção 22, item 7) |
+| `clientes` | `sql/09_ddl_clientes.sql` | |
+| `produtos` | `sql/10_ddl_produtos.sql` | |
+| `itens_pedido` | `sql/11_ddl_itens_pedido.sql` | |
+| `pagamentos` | `sql/12_ddl_pagamentos.sql` | |
+| `carteiras` | `sql/14_ddl_carteiras.sql` | |
+| `oportunidades` | `sql/15_ddl_oportunidades.sql` | |
+| `visitas` | `sql/16_ddl_visitas.sql` | |
+| `estoque` | `sql/17_ddl_estoque.sql` | |
+| `clientes_merge_backup_20260925_vinculos` | `sql/19_alter_clientes_cnpj_unique.sql`, linha 143 | Tabela de backup (seção 19) |
+
+**Não afetadas (`DATETIME`, naive, gravadas pelo Go em `-03`):** `usuarios.tokens_validos_desde` (seção 6.1), `refresh_tokens.expires_at`, `revoked_at` e `reuso_detectado_em` (seções 7 e 7.1).
+
+**Levantamento no banco descartável** (`rp-descartavel-l36`, `127.0.0.1:33306`, MariaDB `11.4.13-MariaDB-ubu2404`, 2026-11-05 18:08 UTC, pelo cliente `mariadb`, sem o DSN da API):
+
+| Variável / função | Sessão da CLI | Depois de `SET time_zone = '-03:00'` |
+| --- | --- | --- |
+| `@@global.time_zone` | `SYSTEM` | `SYSTEM` |
+| `@@system_time_zone` | `UTC` | `UTC` |
+| `@@session.time_zone` | `SYSTEM` | `-03:00` |
+| `NOW()` | `2026-11-05 18:08:01` | `2026-11-05 15:08:01` |
+| `UTC_TIMESTAMP()` | `2026-11-05 18:08:01` | `2026-11-05 18:08:01` |
+
+Ou seja: o servidor do descartável roda em UTC, e só o `SET` da sessão (ou o DSN da API) traz `NOW()`/`TIMESTAMP` para `-03`.
+
+**Pendência informativa do usuário (CasaOS e produção):** os agentes não consultam o CasaOS nem a produção para este levantamento. Como a decisão vale com o servidor em UTC ou em `-03`, o resultado é só informativo. Para registrar, rode a consulta abaixo. No CasaOS (`192.168.168.106:3307`), use o cliente `mariadb` com `--ssl-ca deploy/ca-cert.pem --ssl-verify-server-cert` e a senha em `MYSQL_PWD` (seção 23.2). Na produção, rode só localmente no servidor, pelo `admin_sql` do Passo 7 da §11 de `docs/deploy-servidor.md`.
+
+```sql
+SELECT @@global.time_zone, @@system_time_zone, @@session.time_zone, NOW(), UTC_TIMESTAMP();
+```
+
 ---
 
 ## 2. Índice das tabelas
 
-A ordem é a do `make db-up`, que cria o schema vazio. O `make db-seed` roda o `db-up` e depois os seeds. O `make db-reset` apaga o banco e roda o `db-seed`. O `make db-rebuild` faz o mesmo e roda todos os importadores. **BUG-27:** as etapas rodam em cadeia (`$(MAKE) db-down && $(MAKE) db-seed && $(MAKE) db-import-...`), uma depois da outra mesmo com `make -j`; se o DROP for recusado ou falhar, nada mais roda, mesmo com `make -k`.
+A ordem é a do `make db-up`, que cria o schema vazio. O `make db-seed` roda o `db-up` (por sub-make na receita, depois das guardas: BUG-28, Lote 37) e depois os seeds. O `make db-reset` apaga o banco e roda o `db-seed`. O `make db-rebuild` faz o mesmo e roda todos os importadores. **BUG-27:** as etapas rodam em cadeia (`$(MAKE) db-down && $(MAKE) db-seed && $(MAKE) db-import-...`), uma depois da outra mesmo com `make -j`; se o DROP for recusado ou falhar, nada mais roda, mesmo com `make -k`. **BUG-29 (Lote 37):** use `make -k ...` (ou `MAKEFLAGS=-k make ...` no ambiente), nunca `make ... MAKEFLAGS=-k`: o `Makefile` recusa `MAKEFLAGS`/`MAKEOVERRIDES`/`GNUMAKEFLAGS` na linha de comando e `ENV_ARQUIVO` vindo do ambiente, que fariam as etapas lerem o `.env` padrão no lugar do `ENV_ARQUIVO` (detalhes em `docs/deploy-servidor.md`, seção 3).
 
 | Tabela | Script de criação | Migrações que alteram | Seção |
 | --- | --- | --- | --- |
 | `vendedores` | `sql/01_ddl_usuarios.sql` | - | 5 |
 | `usuarios` | `sql/01_ddl_usuarios.sql` | 08 (`deve_trocar_senha`), 22 (`tokens_validos_desde`) | 6 |
 | `refresh_tokens` | `sql/06_ddl_refresh_tokens.sql` | 21 (`revoked_reason`), 23 (`reuso_detectado_em`) | 7 |
-| `senha_historico` | `sql/07_ddl_senha_historico.sql` | 13 (ENUM `tipo_reset`) | 8 |
+| `senha_historico` | `sql/07_ddl_senha_historico.sql` | 13 (ENUM `tipo_reset`), 27 (`created_at` NOT NULL) | 8 |
 | `clientes` | `sql/09_ddl_clientes.sql` | 19 (`uq_clientes_cnpj`), 20 (COMMENT de `cnpj`) | 9 |
 | `produtos` | `sql/10_ddl_produtos.sql` (já com `imagem` desde o IMG-01) | 26 (`imagem`, `uk_produtos_imagem`, `chk_produtos_imagem`) | 13 |
 | `pedidos` | `sql/04_ddl_pedidos.sql` | 19 (transferência de `cliente_id`, só dados) | 14 |
@@ -154,7 +207,7 @@ As tabelas de backup da migração 19 (seção 19) não têm FK e ficam fora do 
 | 04 | `04_ddl_pedidos.sql` | Cria `pedidos` | `db-up` | Não (DDL base) |
 | 05 | `05_seed_pedidos.sql` | Descontinuado: só comentários, sem SQL | nenhum | - |
 | 06 | `06_ddl_refresh_tokens.sql` | Cria `refresh_tokens` (já com `revoked_reason` e `reuso_detectado_em`) | `db-up` | Não (DDL base) |
-| 07 | `07_ddl_senha_historico.sql` | Cria `senha_historico` (já com o ENUM corrigido) | `db-up` | Não (DDL base) |
+| 07 | `07_ddl_senha_historico.sql` | Cria `senha_historico` (já com o ENUM corrigido e `created_at` NOT NULL) | `db-up` | Não (DDL base) |
 | 08 | `08_alter_usuarios_deve_trocar_senha.sql` | Adiciona `usuarios.deve_trocar_senha` (idempotente) | `db-fix-deve-trocar-senha` | Não (sem script) |
 | 09 | `09_ddl_clientes.sql` | Cria `clientes` (já com `uq_clientes_cnpj` e o COMMENT novo) | `db-up` | Não (DDL base) |
 | 10 | `10_ddl_produtos.sql` | Cria `produtos` (já com `imagem`, `uk_produtos_imagem` e `chk_produtos_imagem` desde o IMG-01) | `db-up` | Não (DDL base) |
@@ -180,8 +233,8 @@ As tabelas de backup da migração 19 (seção 19) não têm FK e ficam fora do 
 | 32 | `32_alter_senha_historico_created_at_not_null.sql` | `senha_historico.created_at` NOT NULL (DB-09, da branch lote-42; idempotente; aborta sem alterar dados se houver `created_at` NULL, remédio no cabeçalho) | `db-fix-historico-created-at` | Sim: `32_revert_...`, `db-revert-historico-created-at` |
 | 33 | `33_alter_pedidos_canal_loja.sql` | `pedidos.canal` ganha `Loja` e entra o vendedor "Loja Online" (sem login; id pelo AUTO_INCREMENT), usados pelo checkout da loja (ECOM-06, idempotente; o 04 e o 03 já nascem com eles) | `db-fix-pedidos-canal-loja` | Sim: `33_revert_...`, `db-revert-pedidos-canal-loja` (aborta se houver pedido `Loja`; só apaga o vendedor sem pedidos/carteiras/usuário) |
 
-- As migrações de alteração (08, 13, 18 a 24 e 26) **não** fazem parte do `db-up`/`db-seed`/`db-reset`. Servem para bancos criados antes da mudança. Desde o DB-01 (Lote 12), **todos** os DDLs base nascem com o resultado delas, inclusive o 17 (sem `estoque.origem`).
-- Todos os alvos que chamam o cliente `mariadb` (`db-create`, `db-down`, `db-fix-*`, `db-revert-*`; `db-up`/`db-seed` herdam via `db-create`; `db-reset`/`db-rebuild` chamam `db-down` e `db-seed` por sub-make, BUG-27) dependem de `db-check-env` e exigem `DB_USUARIO`/`DB_SENHA` no `.env` (SEC-11, seção 23) e o `mariadb` (MariaDB ≥ 11.4) no `PATH` (DB-03). O `Makefile` passa `--local-infile=0` (SEC-28). Os cabeçalhos dos scripts ensinam a execução manual com `MYSQL_PWD="$DB_SENHA" mariadb -u $DB_USUARIO -h ...`, sem `-p` no argv.
+- As migrações de alteração (08, 13, 18 a 24, 26 e 27) **não** fazem parte do `db-up`/`db-seed`/`db-reset`. Servem para bancos criados antes da mudança. Desde o DB-01 (Lote 12), **todos** os DDLs base nascem com o resultado delas, inclusive o 17 (sem `estoque.origem`).
+- Todos os alvos que chamam o cliente `mariadb` (`db-create`, `db-down`, `db-seed`, `db-fix-*`, `db-revert-*`; `db-up` herda via `db-create`; o `db-seed` chama o `db-up` por sub-make, BUG-28; `db-reset`/`db-rebuild` chamam `db-down` e `db-seed` por sub-make, BUG-27) dependem de `db-check-env` e exigem `DB_USUARIO`/`DB_SENHA` no `.env` (SEC-11, seção 23) e o `mariadb` (MariaDB ≥ 11.4) no `PATH` (DB-03). O `Makefile` passa `--local-infile=0` (SEC-28). Os cabeçalhos dos scripts ensinam a execução manual com `MYSQL_PWD="$DB_SENHA" mariadb -u $DB_USUARIO -h ...`, sem `-p` no argv.
 - Depois do `db-seed`, o Makefile roda `resetpassword -list`, `-create-admin` e `-all-users` (`backend/shared`), que trocam os hashes placeholder dos seeds 02 e 03 por Argon2id real (com o `PASSWORD_PEPPER` do `.env`).
 - **Seeds em produção (DEPLOY-07, Lote 33, 2026-11-04):** em produção o seed é feito **só** pelo `deploy/seed-producao.sh`, **nunca** pelo `make db-seed` (que roda `-all-users` e daria a mesma senha a todos os vendedores). O script aplica o `02_seed_admin.sql`, depois o `03_seed_vendedores.sql`, inativa todos os usuários não-admin (`UPDATE usuarios SET ativo = 0` fora do `role = 'admin'`: os 42 vendedores são reais e entram inativos) e roda o `resetpassword -create-admin`. Ele não roda o `-all-users`: os vendedores ficam com o hash placeholder (ninguém loga com ele) até o admin ativá-los e resetar a senha pela API.
 - **Regras dos seeds 02 e 03 (DEPLOY-07):**
@@ -261,7 +314,7 @@ Corte de sessão por usuário. Revogar refresh tokens não invalida os access to
 
 #### Quando o corte é gravado
 
-O valor vem do Go (`time.Now().Truncate(time.Second)`), nunca do `NOW()` do MariaDB (o DSN usa `loc=Local`, fuso fixo `-03:00`).
+O valor vem do Go (`time.Now().Truncate(time.Second)`), nunca do `NOW()` do MariaDB (o DSN usa `loc=Local`, fuso fixo `-03:00`, e, desde o DB-08, `time_zone='-03:00'` na sessão; seção 1.1). A coluna é `DATETIME` (naive): não sofre conversão de fuso.
 
 | Evento | Onde no código |
 | --- | --- |
@@ -428,7 +481,7 @@ Auditoria das trocas de senha. Cada linha guarda o hash **anterior** e quem fez 
 | `ip_origem` | VARCHAR(45) | **sim** | NULL | IP de quem fez a troca. |
 | `user_agent` | TEXT | **sim** | NULL | User-Agent de quem fez a troca. |
 | `tipo_reset` | ENUM('usuario','admin','primeiro_acesso','esquecimento') | não | - | Tipo da troca (ver abaixo). |
-| `created_at` | TIMESTAMP | **sim** | CURRENT_TIMESTAMP | Data da troca. Não tem `NOT NULL` nem `updated_at`. |
+| `created_at` | TIMESTAMP | não (desde o DB-09) | CURRENT_TIMESTAMP | Data da troca. Não tem `updated_at`. |
 
 **Índices:** `PRIMARY` (`id`), `idx_usuario` (`usuario_id`), `idx_data` (`created_at`).
 
@@ -444,10 +497,18 @@ Auditoria das trocas de senha. Cada linha guarda o hash **anterior** e quem fez 
 | `esquecimento` | Recuperação por esquecimento. | Constante definida, sem uso fora dos testes (a confirmar) |
 
 **Regras de negócio e histórico:**
-- **Colunas anuláveis (BUG-12, Lote 10):** `ip_origem`, `user_agent` e `created_at` aceitam NULL. Um registro com NULL derrubava a listagem com `500`. Desde o BUG-12 o repositório lê essas colunas como `sql.Null*`: NULL sai como `""` (texto) ou data zero `"0001-01-01T00:00:00Z"` (`created_at`), e a tela mostra `-`. O contrato JSON não mudou e não houve migração.
+- **Colunas anuláveis (BUG-12, Lote 10):** `ip_origem` e `user_agent` aceitam NULL (e `created_at` aceitava, até o DB-09). Um registro com NULL derrubava a listagem com `500`. Desde o BUG-12 o repositório lê essas colunas como `sql.Null*`: NULL sai como `""` (texto) ou data zero `"0001-01-01T00:00:00Z"` (`created_at`), e a tela mostra `-`. O contrato JSON não mudou. O scan de `created_at` continua como `sql.NullTime`, como defesa para bancos ainda sem a migração 27.
+- **`created_at` NOT NULL (DB-09, Lote 39, 2026-11-05):** o `sql/07` já nasce com `NOT NULL`. A migração 27 serve para bancos anteriores. A migração não entra no `db-up` nem no `sql/ordem-ddl.txt`. Regras:
+  - `make db-fix-historico-created-at` aplica `sql/27_alter_senha_historico_created_at_not_null.sql` (torna `senha_historico.created_at` NOT NULL; aborta sem alterar dados se houver linha NULL, remédio no cabeçalho do arquivo). `make db-revert-historico-created-at` aplica `sql/27_revert_senha_historico_created_at_not_null.sql`. Ambos passam por `db-guard-producao` e `db-check-env`.
+  - **Produção:** o `make` não alcança esse banco, e o seed pode ter rodado com o `sql/07` antigo. Use o `admin_sql` do Passo 7 da §11 de `docs/deploy-servidor.md`: primeiro o `SELECT COUNT(*) FROM senha_historico WHERE created_at IS NULL;`, depois `admin_sql rotaperfumes < sql/27_alter_senha_historico_created_at_not_null.sql`. A execução é do usuário, no servidor.
+  - Se houver linha com `created_at` NULL, ela aborta com `SIGNAL SQLSTATE '45000'` e a quantidade, sem alterar nada. Levantamento: `SELECT COUNT(*) FROM senha_historico WHERE created_at IS NULL;`.
+  - Essas linhas **não** devem ser apagadas, porque alimentam o bloqueio de reuso de senha. O remédio é manual, e a data real não é recuperável: `SET time_zone = '-03:00'; UPDATE senha_historico SET created_at = '1970-01-01 00:00:01' WHERE created_at IS NULL;` (sem o `SET`, numa sessão UTC, a API lê `1969-12-31 21:00:01`). Depois disso, rode a migração de novo. Com a sentinela, a tela passa a mostrar essa data em vez de `-`.
+  - O `ALTER` fica dentro do bloco, depois do `SIGNAL`: no MariaDB 11.4, o `MODIFY` para `NOT NULL` não recusa os NULL, mesmo em modo estrito, e os preenche em silêncio com a hora da migração (conferido no descartável).
+  - Com a coluna `NOT NULL`, um `INSERT` com `created_at` NULL explícito não dá erro: grava o valor padrão (conferido no descartável, modo estrito).
+  - Risco residual: o `IMPORTAR_DUMP` do Jenkinsfile recria as tabelas pelo DDL do dump, então um dump antigo volta a coluna para anulável. Rode a migração de novo depois de importar um dump assim.
 - **ENUM corrigido (migração 13):** o DDL original tinha `ENUM('proprio','admin','primeiro_login')`, mas o código grava `usuario`/`admin`/`primeiro_acesso`/`esquecimento`. Isso causava o erro 1265 e travava a troca de senha obrigatória. O `07_ddl_senha_historico.sql` já foi corrigido; bancos antigos recebem a correção por `make db-fix-tipo-reset`. Não há script de reversão.
 
-**Migrações:** 13.
+**Migrações:** 13, 27.
 
 ---
 
@@ -909,8 +970,8 @@ Levantados no DOC-04 só pela leitura dos arquivos (sem consulta ao banco). Deve
 | 3 | `estoque` | ~~A migração 18 não é idempotente e não tem alvo no Makefile.~~ **Resolvido no DB-01:** idempotente, com `db-fix-estoque-origem` e reversão `db-revert-estoque-origem`. | `sql/18_*.sql` |
 | 4 | `estoque` | ~~`postman/README.md` diz que o `db-up` cria `estoque`; o Makefile não criava.~~ **Resolvido no DB-01:** agora o `db-up` cria, e o README foi revisto no Lote 12. | `postman/README.md` |
 | 5 | `estoque` | **Aberto.** `ruptura`: o DDL diz que vem do S/N do CSV; o card de criação diz "derivado de `saldo <= 0`". Regra efetiva a confirmar no código. | `sql/17`, `tarefas/feito.md` |
-| 6 | `senha_historico` | Sem `ENGINE`/charset/collation explícitos: herda do servidor e do banco (esperado InnoDB e `utf8mb4_unicode_ci`). Nomes das FKs gerados pelo MariaDB. | `sql/07_ddl_senha_historico.sql` |
-| 7 | `senha_historico` | `created_at` aceita NULL (sem `NOT NULL`); o BUG-12 confirmou `timestamp NULL DEFAULT CURRENT_TIMESTAMP` no banco local. Um `NOT NULL` exigiria migração (decisão de negócio). | BUG-12 em `tarefas/feito.md` |
+| 6 | `senha_historico` | ~~Sem `ENGINE`/charset/collation explícitos.~~ **Corrigido no DB-09 (Lote 39):** o `sql/07`, linha 20, declara `ENGINE=InnoDB`, `utf8mb4` e `utf8mb4_unicode_ci`. **Aberto:** nomes das FKs gerados pelo MariaDB. | `sql/07_ddl_senha_historico.sql` |
+| 7 | `senha_historico` | ~~`created_at` aceita NULL (sem `NOT NULL`); o BUG-12 confirmou `timestamp NULL DEFAULT CURRENT_TIMESTAMP` no banco local.~~ **Resolvido no DB-09 (Lote 39, 2026-11-05):** `sql/07` com `NOT NULL` e migração 27 para bancos anteriores, que aborta se houver NULL (seção 8). | `sql/07_ddl_senha_historico.sql`, `sql/27_*.sql` |
 | 8 | `senha_historico` | O teste de integração do BUG-12 usa um "registro órfão" (`usuario_id` sem usuário), o que a FK `ON DELETE CASCADE` não deveria permitir. Confirmar se a FK existe no banco local ou se o teste desliga `FOREIGN_KEY_CHECKS`. | `backend/shared/tests/repositories/bug12_senha_historico_null_test.go` |
 | 9 | `senha_historico` | `tipo_reset` `primeiro_acesso` e `esquecimento` estão no ENUM, mas nenhum código fora dos testes os grava. A troca de primeiro acesso é gravada como `usuario`. | `backend/shared/identidade/historico.go`, `backend/shared/identidade/identidadeapp/senha.go` (até o Lote 21, `senha_historico_service.go` e `auth_handler.go`) |
 | 10 | `usuarios` | ~~Valor de `deve_trocar_senha` gravado pelo CLI `resetpassword` (`-all-users`, `-create-admin`) no `db-seed`.~~ **Resolvido no DEPLOY-07 (Lote 33, 2026-11-04):** `UpsertAdmin` (`-create-admin`) e `UpsertByEmail` (`-email`) gravam `deve_trocar_senha = 1` no INSERT e no UPDATE; o `-all-users` não altera a coluna (mantém o valor do seed 03, que já é `1`). | `backend/shared/tools/resetpassword` |
@@ -931,7 +992,7 @@ Levantados no DOC-04 só pela leitura dos arquivos (sem consulta ao banco). Deve
 - `DB_USUARIO` e `DB_SENHA` são **obrigatórios** no `.env` da raiz. Não existe mais o default `golang/golang` em nenhum lugar: nem no `Makefile` (sem `DB_USUARIO?=`/`DB_SENHA?=`), nem no `config.Load()`, nem no `resetpassword`/`seedusers` (já desde o SEC-10), nem nos testes de integração (que dão `t.Skip` sem as variáveis).
 - **API e importadores:** `config.Load()` devolve `config: defina DB_USUARIO/DB_SENHA no .env` (`ErrCredenciaisDB`) se faltar um dos dois (usuário só com espaços também conta como vazio). A mensagem nunca traz os valores. A checagem roda depois das demais validações: sem `JWT_SECRET` e sem DB, o erro citado é o do `JWT_SECRET`. A API loga `[server] config: ...` e não sobe.
 - **`seedusers` com `-dry-run`/`-no-exec`:** usa `config.LoadSemCredenciaisDB()` e funciona sem credenciais (não toca no banco).
-- **Makefile:** o alvo `db-check-env` falha com `SEC-11: defina DB_USUARIO/DB_SENHA no .env`. É pré-requisito de `db-create`, `db-down` e de todos os `db-fix-*`/`db-revert-*`; `db-up` e `db-seed` herdam via `db-create`; `db-reset` e `db-rebuild` chamam `db-down` e `db-seed` por sub-make (BUG-27). `help`, `build`, `test`, `lint` e `dev-frontend` não exigem credenciais.
+- **Makefile:** o alvo `db-check-env` falha com `SEC-11: defina DB_USUARIO/DB_SENHA no .env`. É pré-requisito de `db-create`, `db-down` e de todos os `db-fix-*`/`db-revert-*`; `db-seed` também depende dele direto (BUG-28) e `db-up` herda via `db-create`; `db-reset` e `db-rebuild` chamam `db-down` e `db-seed` por sub-make (BUG-27). `help`, `build`, `test`, `lint` e `dev-frontend` não exigem credenciais.
 
 ### 23.2 Senha fora da linha de comando (`MYSQL_PWD`)
 
@@ -970,3 +1031,190 @@ Registradas para lotes futuros (não corrigidas no SEC-11):
 | 4 | `MYSQL_PWD` é considerado obsoleto (inseguro) pelo cliente MySQL e pode sair em versões futuras. Com o MariaDB (DB-03), o cliente `mariadb` continua lendo `MYSQL_PWD`; a alternativa futura é um arquivo de opções (`--defaults-extra-file`), já descartado na seção 23.2 pelo risco de senha em disco. | `Makefile` |
 | 5 | Opcional: `cmd/cleanuprefresh` em Go para rodar a limpeza de `refresh_tokens` sob demanda (hoje só a API faz, seção 7.2). | `backend/shared/cmd` |
 | 6 | ~~A receita do `db-check-env` era `@test -n "$(DB_USUARIO)" -a -n "$(DB_SENHA)"`: o `make` expandia a senha no argv do `test` e no `make -n`.~~ **Resolvido no Lote 12 (commit `069d708`, conferido em 2026-10-07):** a receita testa as variáveis de ambiente já exportadas (`@test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD"`, `Makefile` linha 48), então a senha não aparece no argv nem no eco do `make -n`. | `Makefile`, alvo `db-check-env` |
+
+---
+
+## 24. Backup e restauração do banco e das imagens (BACKUP-01, Lote 42, 2026-11-06)
+
+A rotina de backup (`deploy/backup-banco.sh`, instalada em `/usr/local/sbin/rotaperfumes-backup-banco`, com o timer `rotaperfumes-backup-banco.timer`) está em `docs/deploy-servidor.md`. Esta seção cobre a conta, o conteúdo do dump, a verificação e a restauração. Nenhum alvo do `Makefile` grava o backup em produção, e nenhum script grava sobre o **servidor em uso**: nele, a restauração é só o runbook da seção 24.5, executado por você. Em **máquina nova**, use o `deploy/restaurar-maquina.sh` (seção 24.6), que recusa qualquer sinal de produção ativa.
+
+### 24.1 Conta `rotaperfumes_backup`
+
+- **Conta:** `rotaperfumes_backup@172.30.42.21`, criada e convergida pelo `deploy/mariadb-docker.sh`, com `ed25519`, `REQUIRE SSL` e somente `GRANT SELECT ON rotaperfumes.*`.
+- **Senha:** `/root/rotaperfumes-mariadb/rotaperfumes_backup.senha` (600). Reexecutar o script não a troca.
+- **Option file:** `/root/rotaperfumes-mariadb/backup-cliente/rotaperfumes_backup.cnf` (400, root; diretório 700, root). Nunca em `container/`, que é montado no container do banco. O dono precisa ser root: o cliente roda como root com `--cap-drop ALL`, sem `CAP_DAC_OVERRIDE`, e não lê um arquivo 400 de outro dono.
+- **Sem `TRIGGER` nem `EVENT`:** esses privilégios permitem criar objetos. Por isso o dump usa `--skip-triggers`. Hoje o `sql/` não tem trigger, view, rotina nem evento; se algum surgir, o `GRANT` e as flags precisam de revisão.
+
+### 24.2 O que o dump leva e o que não leva
+
+**Comando do cliente** (validado no Lote 42, na imagem fixada 11.4.13):
+
+```bash
+docker run --rm -i --network rotaperfumes-db --ip 172.30.42.21 \
+  --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  --mount type=bind,source=/etc/mysql/ssl/ca.pem,target=/run/backup/ca.pem,readonly \
+  --mount type=bind,source=/root/rotaperfumes-mariadb/backup-cliente/rotaperfumes_backup.cnf,target=/run/backup/cliente.cnf,readonly \
+  --entrypoint mariadb-dump "$IMG" --defaults-extra-file=/run/backup/cliente.cnf \
+  -h rotaperfumes-mariadb -P 3306 --ssl-ca=/run/backup/ca.pem --ssl-verify-server-cert \
+  --single-transaction --skip-lock-tables --no-tablespaces --skip-add-drop-table --skip-triggers \
+  --hex-blob --default-character-set=utf8mb4 rotaperfumes
+```
+
+- `--defaults-extra-file` precisa ser o primeiro argumento do `mariadb-dump`.
+- O dump não seleciona banco (sem `USE`) e não apaga tabela (sem `DROP TABLE`). Restaurar sobre uma tabela existente falha com o erro 1050, sem alterar os dados.
+- Os `TIMESTAMP` saem em UTC (`SET TIME_ZONE='+00:00'` no próprio dump) e voltam ao mesmo instante, em qualquer fuso de servidor. `DATETIME` e `DATE` não são convertidos (seção 1.1).
+- **Formato na 11.4.13:** a primeira linha é `/*M!999999\- enable the sandbox mode */`. Cada lote de dados começa com a linha ``INSERT INTO `tabela` VALUES``, e cada registro fica em uma linha que começa com `(`. As quebras de linha dos dados saem escapadas, então um dado de cliente nunca começa linha.
+
+**Fora do dump (guarde separado):**
+
+| Item | Onde fica | Sem ele |
+| --- | --- | --- |
+| `PASSWORD_PEPPER` | cofre e Secret file `rotaperfumes-api-env` | **nenhum login funciona** (seção 24.4) |
+| `JWT_SECRET` | Secret file `rotaperfumes-api-env` | gere outro; só as sessões em aberto caem |
+| Secret do Turnstile e senha do SMTP | Secret file; o original fica nos painéis da Cloudflare e do provedor de e-mail | obtenha de novo nos painéis; sem eles a API não sobe ou o e-mail não sai |
+| Contas e senhas do banco | `mysql.*` e `/root/rotaperfumes-mariadb` | o `mariadb-docker.sh` recria, com senhas novas |
+| CA e certificados | `/etc/mysql/ssl`; chave da CA em mídia offline | gere outra CA (`--nova-ca`) e troque o fingerprint |
+| Certificado e CA interna do Caddy | volumes `caddy_data` e `caddy_config` | o Caddy gera outros; a raiz nova precisa ser instalada de novo nos clientes |
+| Configuração do Jenkins | servidor (job, parâmetros, credenciais `rotaperfumes-api-env` e `rotaperfumes-db-admin`) | refaça pelas seções 5 e 6 de `docs/deploy-servidor.md` |
+
+**As imagens de produto (IMG-01) têm arquivo próprio:** cada backup bom é o par dump + `rotaperfumes-imagens-*.tar.gz`, do volume `rotaperfumes_produto_imagens`. Só os dois restauram o site. A rotina está em `docs/deploy-servidor.md`, seção 9.
+
+### 24.3 Verificar um backup sem tocar na produção
+
+```bash
+sudo bash deploy/verificar-backup.sh /var/backups/rotaperfumes/ARQUIVO.sql.gz
+```
+
+O script sobe um container descartável com `--network none`, sem volume e sem credencial; os dados ficam em tmpfs e somem com ele. Ele não tem opção de host, porta, usuário, senha, rede ou container, e a saída traz só contagens.
+
+- **Recusa antes de subir o container:** arquivo que não seja regular, gzip inválido, última linha sem `-- Dump completed`, `USE` ou `CREATE`/`DROP DATABASE` no início de linha.
+- **Aprova com:** importação com código 0, nenhum banco além do temporário, pelo menos 13 tabelas, `usuarios`, `vendedores` e `clientes` presentes, um admin e linhas em `vendedores`.
+- **Clientes vazia gera só `AVISO`:** a produção nasce sem clientes (seed do DEPLOY-07). Quando a produção já tiver clientes, trate esse aviso como reprovação.
+- **Códigos de saída:** 0 aprovado, 1 reprovado ou falha, 2 uso incorreto.
+- **Memória:** os dados ocupam memória até o limite do tmpfs (`--tmpfs-mb`, padrão 2048). Se ele encher, a importação falha com o erro 1114; repita com um valor maior, se o servidor tiver memória livre.
+- **Registro:** ao aprovar, grava `.ultima-verificacao` ao lado do arquivo (modo 600; data, nome e sha256).
+- **Quando rodar:** depois do `--instalar`, uma vez por mês e antes de trocar o digest da imagem.
+
+Aprovado significa que o arquivo restaura e tem o mínimo esperado. Só as contagens, comparadas por você com o que espera, indicam se o conteúdo é o certo.
+
+### 24.4 Pré-requisito: o mesmo `PASSWORD_PEPPER`
+
+Os hashes de `usuarios.password_hash` dependem do `PASSWORD_PEPPER` da API (`deploy/api.env.example`), que não está no banco. Antes de apagar qualquer coisa, confirme que o valor do cofre é o mesmo da API, sem imprimi-lo. Guarde o pepper longe dos backups: junto do dump, ele perde a função.
+
+Com outro pepper, os dados voltam, mas nenhum login funciona e todas as senhas precisam ser redefinidas (`backend/shared/tools/resetpassword`). Não troque o pepper para "resolver" um login.
+
+### 24.5 Restaurar no servidor em uso
+
+> **Risco:** os passos 4 e 5 apagam e regravam o banco de produção, e os dados gravados depois do backup se perdem. Leia até o fim antes de começar. Se quiser só recuperar um registro, não use este runbook: restaure numa cópia descartável e copie o dado à mão.
+
+Faça tudo como root no servidor, sem push na `main` durante o processo, pois um push dispara o deploy. Defina antes o `admin_sql` de `docs/deploy-servidor.md`, seção 11, passo 7, que já traz o `IMG` da imagem fixada.
+
+**1. Pare a API e o timer do backup.** Sem isso, um dump agendado disputaria o IP `.21` e pegaria o banco pela metade.
+
+```bash
+sudo -i
+umask 077
+set -o pipefail
+systemctl stop rotaperfumes-backup-banco.timer
+cd /root/rotaperfumes/deploy && API_ENV_FILE=/dev/null docker compose -p rotaperfumes stop api
+```
+
+**2. Guarde o estado atual, mesmo danificado.** Use o comando direto: o `rotaperfumes-backup-banco --agora` recusa um banco que não passe nos critérios de conteúdo. O nome `pre-restauracao-*` fica fora da retenção automática.
+
+```bash
+PRE="/var/backups/rotaperfumes/pre-restauracao-$(date -u +%Y%m%d-%H%M%SZ).sql.gz"
+docker run --rm -i --network rotaperfumes-db --ip 172.30.42.21 \
+  --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  --mount type=bind,source=/etc/mysql/ssl/ca.pem,target=/run/backup/ca.pem,readonly \
+  --mount type=bind,source=/root/rotaperfumes-mariadb/backup-cliente/rotaperfumes_backup.cnf,target=/run/backup/cliente.cnf,readonly \
+  --entrypoint mariadb-dump "$IMG" --defaults-extra-file=/run/backup/cliente.cnf \
+  -h rotaperfumes-mariadb -P 3306 --ssl-ca=/run/backup/ca.pem --ssl-verify-server-cert \
+  --single-transaction --skip-lock-tables --no-tablespaces --skip-add-drop-table --skip-triggers \
+  --hex-blob --default-character-set=utf8mb4 rotaperfumes | gzip > "$PRE"
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+zcat "$PRE" | tail -n 1              # esperado: -- Dump completed ...
+```
+
+Se o banco estiver danificado a ponto de o dump falhar, pare e avalie: copie o datadir (`/var/lib/rotaperfumes/mariadb`) com o container parado antes de prosseguir.
+
+**3. Verifique o arquivo que será restaurado.** Só siga com `APROVADO`.
+
+```bash
+ARQ=/var/backups/rotaperfumes/ARQUIVO.sql.gz
+bash /root/rotaperfumes/deploy/verificar-backup.sh "$ARQ"
+```
+
+**4. Esvazie o banco, conscientemente.** O dump não apaga tabelas, então restaurar sobre elas falha com o erro 1050. Os `GRANT` ficam em `mysql.*` e continuam valendo depois do `DROP DATABASE`.
+
+```bash
+admin_sql -e "DROP DATABASE rotaperfumes; CREATE DATABASE rotaperfumes CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+```
+
+**5. Importe.** O cliente para no primeiro erro. Se falhar, repita os passos 4 e 5 depois de entender a causa; se o arquivo for o problema, use outro backup.
+
+```bash
+gzip -dc "$ARQ" | admin_sql rotaperfumes
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+```
+
+**6. Derrube as sessões antigas.**
+
+```bash
+admin_sql rotaperfumes -e 'TRUNCATE TABLE refresh_tokens'
+```
+
+**6a. Devolva as imagens ao volume, com a API ainda parada.** Use o `rotaperfumes-imagens-*` com o mesmo carimbo do dump. A conferência recusa gzip inválido, entrada com caminho absoluto ou `..`, link e dispositivo, e imprime só contagens: só siga com `APROVADO`. O primeiro `docker run` guarda as imagens atuais, porque o segundo apaga o conteúdo do volume antes de extrair.
+
+```bash
+IMAGENS=/var/backups/rotaperfumes/rotaperfumes-imagens-CARIMBO.tar.gz
+bash /root/rotaperfumes/deploy/backup-banco.sh --conferir-imagens "$IMAGENS"
+PRE_IMG="/var/backups/rotaperfumes/pre-restauracao-imagens-$(date -u +%Y%m%d-%H%M%SZ).tar.gz"
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --user 65532:65532 \
+  --mount type=volume,source=rotaperfumes_produto_imagens,target=/imagens,readonly \
+  --entrypoint tar "$IMG" -C /imagens --numeric-owner -cf - . | gzip > "$PRE_IMG"
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+gzip -dc "$IMAGENS" | docker run --rm -i --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --user 65532:65532 \
+  --mount type=volume,source=rotaperfumes_produto_imagens,target=/imagens \
+  --entrypoint bash "$IMG" -c 'find /imagens -mindepth 1 -delete && tar -xf - -C /imagens --no-same-owner --no-overwrite-dir'
+echo "codigos: ${PIPESTATUS[*]}"     # esperado: 0 0
+```
+
+Os dois dados precisam combinar: dump de uma data e imagens de outra deixam `produtos.imagem` apontando para arquivos que não existem. Se quiser restaurar só o banco, porque o volume está íntegro, pule este passo.
+
+**7. Aplique as migrações mais novas que o dump.** Compare a data do backup com as migrações de `sql/` (seção 4), sempre as `*_alter_*`, nunca as `*_revert_*`. Se a produção já tinha a migração quando o dump foi gerado, não há nada a fazer.
+
+**8. Confira e volte ao ar.** Rode as consultas do passo 7 da seção 11 de `docs/deploy-servidor.md`. Lá, os valores de vendedores ativos e de `deve_trocar_senha` são os do seed: vale o que o backup continha. Depois:
+
+```bash
+cd /root/rotaperfumes/deploy && API_ENV_FILE=/dev/null docker compose -p rotaperfumes start api
+systemctl start rotaperfumes-backup-banco.timer
+rotaperfumes-backup-banco --agora
+```
+
+Teste um login no site e abra um produto com imagem. Quando estiver tudo certo, apague os `pre-restauracao-*`: o do dump tem hashes de senha, e a retenção não os remove. Um dump restaurado bem menor que o último pode exigir `--agora --aceitar-reducao`.
+
+### 24.6 Perda do servidor
+
+**Use o script:** `sudo bash deploy/restaurar-maquina.sh`, de um clone limpo da `main`, descrito em `docs/deploy-servidor.md`, seção 12 (DEPLOY-09). Ele faz os passos abaixo na ordem, recusa o servidor em uso e um banco com dados, e pede as confirmações digitadas. O passo a passo a seguir fica como referência, para entender o que o script faz ou para terminar à mão uma etapa que ele não conseguiu.
+
+As contas não estão no dump, então o banco precisa nascer antes da importação. Tenha em mãos a cópia externa do par dump + imagens (o backup local se perde com o disco), o `PASSWORD_PEPPER` do cofre e, se houver, a chave da CA em mídia offline.
+
+1. **Prepare a máquina nova:** `docs/deploy-servidor.md`, seção 11, passo 1.
+2. **Instale o banco:** `sudo bash deploy/mariadb-docker.sh` com `--nova-ca` (ou `--ca-key`, com o `ca.pem` original copiado para `/etc/mysql/ssl`), mais `--ip` se o IP mudou. O script cria o banco vazio e as contas, inclusive `rotaperfumes_backup`, com **senhas novas**.
+3. **Atualize o que depende disso** (seção 11, passos 3 a 5): fingerprint em `deploy/db-ca.fingerprint`, se a CA mudou, `DB_SENHA` do Secret file `rotaperfumes-api-env` e a credencial `rotaperfumes-db-admin`.
+4. **Use o mesmo `PASSWORD_PEPPER`** no Secret file (seção 24.4). **Não** gere um novo, como faz o passo 5 da seção 11 numa instalação limpa.
+5. **Não rode o `seed-producao.sh`:** ele criaria as tabelas, e a importação falharia com o erro 1050.
+6. **Restaure o banco:** rode os passos 3, 5, 6, 7 e 8 da seção 24.5, sem o `docker compose start` e os comandos do timer, que ainda não existem aqui. O banco já está vazio, então o passo 4 não se aplica.
+7. **Suba a aplicação** pelo Jenkins, com `IMPORTAR_DUMP` desmarcado (seção 11, passo 9). É esse deploy que cria o volume `rotaperfumes_produto_imagens`; não o crie à mão, porque o backup confere as labels do compose.
+8. **Devolva as imagens:** pare a API (`API_ENV_FILE=/dev/null docker compose -p rotaperfumes stop api`), rode o passo 6a da seção 24.5, sem a cópia `PRE_IMG`, pois o volume está vazio, e religue-a (`start api`).
+9. **Reinstale a rotina:** `sudo bash deploy/backup-banco.sh --instalar`. Ela recusa enquanto o volume não existir.
+
+### 24.7 O que foi testado
+
+**Testado no Lote 42**, em descartável local (rede própria sem porta publicada, conta criada pelo SQL real do script, schema real, dados sintéticos): dump com a conta só `SELECT`, negações, TLS, ida e volta, `verificar-backup.sh` e os passos 2, 4, 5, 6 e 8 (só a conferência) do runbook, pelo mesmo comando do `admin_sql`. Também o `deploy/backup-banco.sh --agora` real, com volume sintético (dono 65532, modos 750/640): par com o mesmo carimbo, `--conferir-imagens`, `--status`, volume vazio, volume ausente, SIGTERM durante o tar, retenção por par e os dois comandos do passo 6a, com a devolução sobre um volume com lixo (nomes, dono, modos e sha256 idênticos).
+
+**DEPLOY-09:** o que foi e o que não foi validado no `deploy/restaurar-maquina.sh` está em `docs/deploy-servidor.md`, seção 12.
+
+**Não testado:** a execução em produção; o `docker compose stop`/`start` da API; o timer e o sandbox da unit (só a sintaxe, com `systemd-analyze verify`); o `--exigir-montagem` num disco real (ensaio com tmpfs); o passo 7, que depende das migrações do momento; a seção 24.6 de ponta a ponta. Antes de confiar neste runbook num incidente, faça um ensaio completo numa máquina que não seja a de produção.

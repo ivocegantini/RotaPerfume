@@ -7,14 +7,18 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| MERGE-01 | MÉDIA | portar os cards da `lote-42` que ficaram fora do merge (BUG-30/31 e DB-08 feitos) | 🔵 SubBrain |
+| MERGE-01 | MÉDIA | código portado; faltam testes reais e o servidor (execução assistida) | 🔵 SubBrain |
+| LOTE-43 | MÉDIA | BACKUP-03/04/05/07, SEC-73, TST-28 (`tarefas/lote-43-spec.md`) | 🟣 SecBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
 
-## MERGE-01: cards da branch `lote-42` fora do merge de 2026-11-16 — MÉDIA
-**Contexto:** a `lote-42` refez os Lotes 37–41 em paralelo; no merge venceu a versão atual (decisão do usuário). Entraram: DB-09 (migração renumerada para `sql/32`, `make db-fix-historico-created-at`), CI-01 (helper), specs `tarefas/lote-42-*.md`/`lote-43-spec.md`.
-**Ação:** portar sobre a versão atual, card a card, com testes: BACKUP-01/02 (`backup-banco.sh`, `verificar-backup.sh`, `restaurar-maquina.sh` sem paridade com o `mariadb-docker.sh` atual), DEPLOY-10 (conta DBA, sem `--dev-ip`), BUG-32, CI-02, SEC-61/62/63/71 da lote-42 (SEC-58 já existe na versão atual). BUG-30, BUG-31 e DB-08 já portados (2026-11-17). Base dos scripts atuais validada em máquina real (BACKUP01/TST15/TST17 PASS, 2026-11-17): repetir esses testes depois de portar BACKUP-01/02 e a conta DBA. Fonte: `git show origin/lote-42:<arquivo>`. Os números SEC-60 a 75 da lote-42 colidem com os daqui: renumerar ao portar.
+## MERGE-01: finalizar o porte da `lote-42` — MÉDIA
+**Feito:** etapas 1 e 2 na branch `lote-43-merge-01` (ver `feito.md`).
+**Falta:** (1) usuário roda na MS-7E28 os testes reais BACKUP01, TST15, TST17, DEPLOY-09/10; (2) execução assistida no servidor: desligar o `rotaperfumes-backup.timer` antigo, `backup-banco.sh --instalar`, `rotaperfumes-backup-banco --agora`, `verificar-backup.sh`, `mariadb-docker.sh --recriar` (fecha a porta da LAN e remove `casaos`/`casaos_ro`); (3) PR para a `main`.
+
+## LOTE-43: spec da `lote-42` ainda não implementada — MÉDIA
+**Ação:** implementar conforme `tarefas/lote-43-spec.md`: BACKUP-03 (tolerância de relógio 300 s), BACKUP-04 (`parcial-*` na guarda), BACKUP-05 (retenção relê os pares), BACKUP-07 (`--trocar-dados`), SEC-73 (fingerprint da chave apt da Cloudflare por 2º canal), TST-28 (`-timeout=30m`). Depois do MERGE-01.
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 
