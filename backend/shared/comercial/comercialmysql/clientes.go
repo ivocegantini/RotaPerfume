@@ -2,10 +2,12 @@ package comercialmysql
 
 import (
 	"context"
+	"time"
 
 	"github.com/rotaperfumes/shared/comercial"
 	"github.com/rotaperfumes/shared/db"
 	"github.com/rotaperfumes/shared/kernel"
+	"github.com/rotaperfumes/shared/tz"
 	"github.com/rotaperfumes/shared/vlog"
 )
 
@@ -195,13 +197,14 @@ const uqClientesCPF = "uq_clientes_cpf"
 // InserirClienteLoja grava o cliente pessoa física do autocadastro, ligado
 // ao login (ECOM-05): cnpj NULL, segmento "Loja Online", data de hoje. O
 // 1062 do CPF vira ErrCPFDuplicado sem o erro do driver (traz o CPF).
+// BUG-30: a data vem do Go em -03, não do CURDATE() do servidor (UTC).
 func (r *Clientes) InserirClienteLoja(ctx context.Context, usuarioID int64, c *comercial.ClienteLoja) (int64, error) {
 	const q = `
 		INSERT INTO clientes (cnpj, cpf, razao_social, segmento, cidade, uf, bairro, endereco, numero, complemento, cep, data_cadastro, ativo, usuario_id)
-		VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), 1, ?)`
+		VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
 	id, err := db.Inserir(ctx, r.q, "comercialmysql: inserir cliente loja", q,
 		c.CPF, c.Nome, comercial.SegmentoLojaOnline, c.Cidade, c.UF, nuloSeVazio(c.Bairro), c.Endereco, c.Numero,
-		nuloSeVazio(c.Complemento), nuloSeVazio(c.CEP), usuarioID)
+		nuloSeVazio(c.Complemento), nuloSeVazio(c.CEP), time.Now().In(tz.Local).Format(time.DateOnly), usuarioID)
 	if db.ChaveDuplicada(err, uqClientesCPF) {
 		return 0, comercial.ErrCPFDuplicado
 	}

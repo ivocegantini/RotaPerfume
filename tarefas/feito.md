@@ -12,6 +12,17 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: decisões do usuário (DB-08, SEC-60, SEC-76, DEPLOY-10)
+- DB-08 (MERGE-01): DSN com `time_zone='-03:00'` (`tz.OffsetSQL`); `DEFAULT`/`ON UPDATE CURRENT_TIMESTAMP` coerentes com o Go. TIMESTAMP antigos gravados pelo Go na sessão UTC passam a aparecer 3 h mais cedo (ex.: `ultimo_login_at`). Integração `TestIntegracaoDB08_*` verde no CasaOS :3307.
+- SEC-60: decisão do usuário: a `casaos_ro` mantém o SELECT em `clientes` (com CPF/endereço).
+- SEC-76: aceito pelo usuário: a porta 48110 do Redis está fechada no firewall (o tunnel da Cloudflare não a expõe); `REDIS_PASSWORD` segue suportado e a API avisa sem ele.
+- DEPLOY-10 (parte de código): estágio `Migracoes` no `Jenkinsfile` e `GOOGLE_CLIENT_ID` no `Build`; teste `tests/deploy/deploy10_jenkinsfile_migracoes_test.go`. Card segue em `afazer.md` até o deploy.
+
+## Avulso de 2026-11-17: MERGE-01 parcial (BUG-30 e BUG-31 da `lote-42`)
+- BUG-30: analytics sem `CURDATE()`; datas de hoje/semana/mês/funil/série calculadas no Go em -03 (`analyticsmysql/datas.go`, relógio injetado em `NovoClientes`/`NovoOportunidades`); testes da `lote-42` adaptados ao ARQ-09. O INSERT do cliente da loja (ECOM-06) também passou a gravar `data_cadastro` com a data do Go. Exceção obsoleta tirada da catraca TST-23.
+- BUG-31: `-P $(or $(DB_PORT),3306)` no `MYSQL_OPTS` (porta vazia engolia o `--default-character-set`); teste com mutação.
+- `make test`, `make lint` e `make test-integration` (CasaOS :3307) rc=0.
+
 ## Avulso de 2026-11-17: ECOM-06 cliente PF no CRM e base do checkout
 - ECOM-06: o admin cria/edita cliente pessoa física (CPF + rua/número obrigatórios, complemento/CEP opcionais; PJ igual); API devolve `cpf`/`endereco`/`numero`/`complemento`/`cep`; 1062 do CPF → 409. `sql/33` (`make db-fix-pedidos-canal-loja`): canal `Loja` e vendedor "Loja Online"; aplicado no CasaOS :3307 (id 168). `make test`, `test-integration` e `test-frontend` rc=0.
 

@@ -16,7 +16,7 @@
 //     pelo daemon direto do host, nunca passa pelo workspace.
 // Credenciais Jenkins:
 //   - rotaperfumes-api-env   (Secret file)              -> deploy/api.env (ver deploy/api.env.example)
-//   - rotaperfumes-db-admin  (Username with password)   -> so para IMPORTAR_DUMP
+//   - rotaperfumes-db-admin  (Username with password)   -> IMPORTAR_DUMP e Migracoes (DEPLOY-10)
 //
 // Regras: nunca "set -x", nunca cat de segredo, nunca "-e SEGREDO=valor".
 // Todo "sh" comeca com #!/bin/bash: com shebang o Jenkins NAO aplica o
@@ -148,11 +148,22 @@ pipeline {
 
         stage('Build') {
             steps {
-                dir('deploy') {
-                    sh '''#!/bin/bash
-                        set -euo pipefail
-                        API_ENV_FILE=/dev/null docker compose -p "$COMPOSE_PROJECT_NAME" build --pull
-                    '''
+                // DEPLOY-10: o frontend embute o GOOGLE_CLIENT_ID (publico) no
+                // bundle; so essa linha e lida do api.env, nunca os segredos.
+                withCredentials([file(credentialsId: 'rotaperfumes-api-env', variable: 'API_ENV')]) {
+                    dir('deploy') {
+                        sh '''#!/bin/bash
+                            set -euo pipefail
+                            GOOGLE_CLIENT_ID=$(sed -n 's/^GOOGLE_CLIENT_ID=//p' "$API_ENV" | tail -n 1 | tr -d '\\r"' | tr -d "'")
+                            case "$GOOGLE_CLIENT_ID" in
+                              ''|*.apps.googleusercontent.com) ;;
+                              *) echo "GOOGLE_CLIENT_ID do api.env fora do formato <id>.apps.googleusercontent.com" >&2; exit 1 ;;
+                            esac
+                            [ -n "$GOOGLE_CLIENT_ID" ] || echo "AVISO: GOOGLE_CLIENT_ID vazio no api.env: login com Google desligado no frontend."
+                            export GOOGLE_CLIENT_ID
+                            API_ENV_FILE=/dev/null docker compose -p "$COMPOSE_PROJECT_NAME" build --pull
+                        '''
+                    }
                 }
             }
         }
@@ -252,6 +263,41 @@ pipeline {
                             echo "Import concluido."
                         '''
                     }
+                }
+            }
+        }
+
+        stage('Migracoes') {
+            // DEPLOY-10: migracoes da loja (ECOM-01/03/05/06/09), idempotentes,
+            // antes de subir a API nova (sem elas o cadastro falha no INSERT).
+            // Depois do "Importar dump": um dump antigo volta o schema.
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'rotaperfumes-db-admin',
+                                                  usernameVariable: 'DB_ADMIN_USER',
+                                                  passwordVariable: 'MYSQL_PWD')]) {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        [ -r deploy/db-ca.sha256 ] || { echo "Estagio CA do banco nao validou a CA" >&2; exit 1; }
+                        MIGRACOES="27_alter_usuarios_role_usuario.sql 28_ddl_confirmacoes_email.sql 29_alter_usuarios_email_confirmacao.sql 30_alter_clientes_loja.sql 31_alter_clientes_numero_complemento.sql 33_alter_pedidos_canal_loja.sql"
+                        for f in $MIGRACOES; do
+                          [ -r "sql/$f" ] || { echo "Migracao ausente: sql/$f" >&2; exit 1; }
+                        done
+                        for f in $MIGRACOES; do
+                          echo "Migracao sql/$f em $DB_NAME..."
+                          # Mesmo cliente do "Importar dump" (DEPLOY-06): rede
+                          # rotaperfumes-db, IP da conta admin, TLS verificado,
+                          # senha so por MYSQL_PWD no ambiente.
+                          docker run --rm -i \
+                            --network "$DB_REDE" --ip "$DB_CLIENTE_IP" \
+                            --mount "type=bind,source=$DB_TLS_CA_HOST_PATH,target=/etc/rotaperfumes/db-ca.pem,readonly" \
+                            -e MYSQL_PWD \
+                            "$DB_CLIENT_IMAGE" \
+                            mariadb --local-infile=0 -h "$DB_HOST_INTERNO" -P "$DB_HOST_PORT" -u "$DB_ADMIN_USER" \
+                                  --ssl-ca=/etc/rotaperfumes/db-ca.pem --ssl-verify-server-cert \
+                                  --default-character-set=utf8mb4 "$DB_NAME" < "sql/$f"
+                        done
+                        echo "Migracoes concluidas."
+                    '''
                 }
             }
         }
