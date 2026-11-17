@@ -7,15 +7,10 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| DEPLOY-10 | ALTA | estágio `Migracoes` pronto; falta o push na `main` e conferir o 1º deploy | usuário |
 | MERGE-01 | MÉDIA | portar os cards da `lote-42` que ficaram fora do merge (BUG-30/31 e DB-08 feitos) | 🔵 SubBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
-
-## DEPLOY-10: migrações da loja na produção — ALTA
-**Feito (2026-11-17):** estágio `Migracoes` do `Jenkinsfile` (depois do `Importar dump`, antes do `Deploy`) aplica `sql/27`, `28/29`, `30`, `31` e `33` (idempotentes) com a `rotaperfumes-db-admin`; o `Build` lê só o `GOOGLE_CLIENT_ID` do `api.env` (credencial já atualizada no Jenkins) para o frontend.
-**Falta (usuário):** 1º run deu `ERROR 1045` do `rotaperfumes_admin`: atualizar a credencial `rotaperfumes-db-admin` com `/root/rotaperfumes-mariadb/rotaperfumes_admin.senha` (`docs/deploy-servidor.md` §5.2), rodar o job de novo e conferir `Migracoes concluidas.` e o botão do Google na loja.
 
 ## MERGE-01: cards da branch `lote-42` fora do merge de 2026-11-16 — MÉDIA
 **Contexto:** a `lote-42` refez os Lotes 37–41 em paralelo; no merge venceu a versão atual (decisão do usuário). Entraram: DB-09 (migração renumerada para `sql/32`, `make db-fix-historico-created-at`), CI-01 (helper), specs `tarefas/lote-42-*.md`/`lote-43-spec.md`.

@@ -25,7 +25,7 @@
 - DB-08 (MERGE-01): DSN com `time_zone='-03:00'` (`tz.OffsetSQL`); `DEFAULT`/`ON UPDATE CURRENT_TIMESTAMP` coerentes com o Go. TIMESTAMP antigos gravados pelo Go na sessão UTC passam a aparecer 3 h mais cedo (ex.: `ultimo_login_at`). Integração `TestIntegracaoDB08_*` verde no CasaOS :3307.
 - SEC-60: decisão do usuário: a `casaos_ro` mantém o SELECT em `clientes` (com CPF/endereço).
 - SEC-76: aceito pelo usuário: a porta 48110 do Redis está fechada no firewall (o tunnel da Cloudflare não a expõe); `REDIS_PASSWORD` segue suportado e a API avisa sem ele.
-- DEPLOY-10 (parte de código): estágio `Migracoes` no `Jenkinsfile` e `GOOGLE_CLIENT_ID` no `Build`; teste `tests/deploy/deploy10_jenkinsfile_migracoes_test.go`. Card segue em `afazer.md` até o deploy.
+- DEPLOY-10 (parte de código): estágio `Migracoes` no `Jenkinsfile` e `GOOGLE_CLIENT_ID` no `Build`; teste `tests/deploy/deploy10_jenkinsfile_migracoes_test.go`. Concluído: após a credencial `rotaperfumes-db-admin` corrigida, o estágio `Migracoes` rodou no Jenkins (confirmado pelo usuário).
 
 ## Avulso de 2026-11-17: MERGE-01 parcial (BUG-30 e BUG-31 da `lote-42`)
 - BUG-30: analytics sem `CURDATE()`; datas de hoje/semana/mês/funil/série calculadas no Go em -03 (`analyticsmysql/datas.go`, relógio injetado em `NovoClientes`/`NovoOportunidades`); testes da `lote-42` adaptados ao ARQ-09. O INSERT do cliente da loja (ECOM-06) também passou a gravar `data_cadastro` com a data do Go. Exceção obsoleta tirada da catraca TST-23.
