@@ -18,7 +18,7 @@
 // importoportunidades).
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. Lê o CSV informado via flag -csv (default: dados/crm/visitas.csv,
 //     resolvido a partir da raiz do repositório) ou via env
 //     VISITAS_CSV_PATH.

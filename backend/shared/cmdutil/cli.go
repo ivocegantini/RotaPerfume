@@ -31,7 +31,7 @@ type Ambiente struct {
 	Entrada io.Reader // stdin
 	Saida   io.Writer // stdout (relatórios do comando)
 	Erro    io.Writer // stderr (uso das flags e avisos)
-	// CarregarEnv carrega o .env da raiz do projeto (LoadEnvFromCwd).
+	// CarregarEnv carrega o backend/.env (LoadEnvFromCwd).
 	CarregarEnv func()
 	// Config é o config.Load (exige DB_USUARIO/DB_SENHA, SEC-11).
 	Config func() (*config.Config, error)

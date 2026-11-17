@@ -48,11 +48,11 @@ beforeEach(() => {
 });
 
 describe("Login com Google", () => {
-  it("conta da loja: entra e vai para /loja", async () => {
+  it("conta da loja: entra e vai para a vitrine (/)", async () => {
     api.apiGoogle.mockResolvedValue({ token: "", user: userLoja });
     render(<LoginPage />);
     await userEvent.click(screen.getByRole("button", { name: "Google" }));
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/loja"));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/"));
     expect(api.apiGoogle).toHaveBeenCalledWith("cred-google");
     expect(JSON.parse(localStorage.getItem("auth_user")!)).toMatchObject({ id: 9, role: "usuario" });
   });
@@ -90,7 +90,7 @@ describe("Cadastro com Google", () => {
     await userEvent.type(screen.getByLabelText("Cidade"), "Sao Paulo");
     await userEvent.selectOptions(screen.getByLabelText("UF"), "SP");
     await userEvent.click(screen.getByRole("button", { name: "Criar conta com Google" }));
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/loja"));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/"));
     expect(api.apiGoogleCadastro).toHaveBeenCalledWith({
       credential: "cred-google", cpf: "529.982.247-25", endereco: "Rua A", numero: "10", complemento: "", bairro: "",
       cep: "", cidade: "Sao Paulo", uf: "SP",

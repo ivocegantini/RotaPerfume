@@ -455,7 +455,8 @@ func TestARQ07_Diagnostico_ArquivoEnv(t *testing.T) {
 		require.NoError(t, os.Setenv("SMTP_TLS_SERVER_NAME", "")) // garantido pelo t.Setenv do ambiente
 		require.NoError(t, os.Unsetenv("SMTP_TLS_SERVER_NAME"))
 		t.Cleanup(func() { os.Unsetenv("SMTP_TLS_SERVER_NAME") })
-		require.NoError(t, os.WriteFile(filepath.Join(a.raiz, ".env"), []byte("SMTP_TLS_SERVER_NAME=127.0.0.1\n"), 0o600))
+		require.NoError(t, os.MkdirAll(filepath.Join(a.raiz, "backend"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(a.raiz, "backend", ".env"), []byte("SMTP_TLS_SERVER_NAME=127.0.0.1\n"), 0o600))
 		require.Equal(t, cmdutil.SaidaOK, a.rodar(t))
 		out := a.logs.String()
 		assert.Contains(t, out, ".env carregado com sucesso")

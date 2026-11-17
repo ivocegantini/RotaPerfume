@@ -235,7 +235,7 @@ func (d *diagnostico) enviar(c *smtp.Client) error {
 // ---------------------------------------------------------------------------
 
 func (d *diagnostico) carregarEnv() error {
-	d.iniciar("carregar .env da raiz do repositório")
+	d.iniciar("carregar backend/.env do repositório")
 	if wd, err := os.Getwd(); err == nil {
 		d.logf("diretório atual: %s", wd)
 	}
@@ -253,7 +253,7 @@ func (d *diagnostico) carregarEnv() error {
 		d.logf("seguindo só com as variáveis do ambiente do processo")
 		return nil
 	}
-	caminho := filepath.Join(raiz, ".env")
+	caminho := filepath.Join(raiz, filepath.FromSlash(cmdutil.EnvRelativo))
 	d.logf("raiz do repositório: %s", raiz)
 	d.logf("carregando %s", caminho)
 	if err := godotenv.Load(caminho); err != nil {

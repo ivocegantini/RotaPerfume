@@ -3,7 +3,7 @@
   Gera um dump .sql.gz do banco LOCAL (Windows) para importar no servidor.
 
 .DESCRIPTION
-  Le DB_HOST/DB_PORT/DB_NAME/DB_USUARIO/DB_SENHA/DB_TLS_CA do .env da raiz do
+  Le DB_HOST/DB_PORT/DB_NAME/DB_USUARIO/DB_SENHA/DB_TLS_CA do backend/.env do
   projeto (a senha nunca e exibida; vai para o cliente via variavel MYSQL_PWD,
   nome lido pelo cliente MariaDB), roda o mariadb-dump e compacta em
   deploy/dumps/<db>-<data>.sql.gz. O dump e importado no MariaDB 11.4 do
@@ -42,7 +42,7 @@ Set-StrictMode -Version Latest
 # Defaults relativos ao script (resolvidos aqui: no Windows PowerShell 5.1
 # $PSScriptRoot pode vir vazio no bloco param).
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $EnvFile) { $EnvFile = Join-Path $scriptDir '..\.env' }
+if (-not $EnvFile) { $EnvFile = Join-Path $scriptDir '..\backend\.env' }
 if (-not $OutDir) { $OutDir = Join-Path $scriptDir 'dumps' }
 
 function Read-DotEnv([string]$Path) {

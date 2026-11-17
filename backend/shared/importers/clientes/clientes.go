@@ -13,7 +13,7 @@
 //	make db-import-clientes
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. Lê o CSV informado via flag -csv (default: dados/crm/clientes.csv, resolvido
 //     a partir da raiz do repositório) ou via env CLIENTES_CSV_PATH.
 //  3. Faz parsing linha a linha com TRIM em todos os campos:

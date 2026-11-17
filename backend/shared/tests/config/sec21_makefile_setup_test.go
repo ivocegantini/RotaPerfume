@@ -76,7 +76,7 @@ func sondarCookieSecure(t *testing.T, alvo string, envExtra ...string) string {
 
 func TestSEC21_Makefile_ComportamentoDoMake(t *testing.T) {
 	raiz := raizProjeto(t)
-	if b, err := os.ReadFile(filepath.Join(raiz, ".env")); err == nil &&
+	if b, err := os.ReadFile(filepath.Join(raiz, "backend", ".env")); err == nil &&
 		regexp.MustCompile(`(?m)^\s*(export\s+)?COOKIE_SECURE\s*=`).Match(b) {
 		t.Skip(".env local define COOKIE_SECURE: o valor do .env ganha (comportamento esperado), sonda inconclusiva")
 	}

@@ -94,7 +94,7 @@ export function isAdmin(): boolean {
 export function rotaInicial(role: UserRole | undefined | null = getUser()?.role): string {
   vlog(F, "rotaInicial", "escolhendo tela inicial, papel:", role);
   if (role === "admin") return "/dashboard";
-  if (role === "usuario") return "/loja";
+  if (role === "usuario") return "/"; // ECOM-10: a vitrine e a pagina inicial
   return "/pagamentos";
 }
 

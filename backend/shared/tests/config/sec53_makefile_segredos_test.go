@@ -139,7 +139,7 @@ func sec53Dir(t *testing.T) (dir, pathFalso, envLog string) {
 		"# COMENTADO_SEC53=nao-e-variavel",
 		"",
 	}, "\n")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte(envFalso), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "backend", ".env"), []byte(envFalso), 0o600))
 	envLog = filepath.Join(dir, "env.log")
 	script := "#!/bin/sh\n{ echo \"=== $(basename \"$0\") $*\"; env; } >> '" + envLog + "'\nexit 0\n"
 	for _, b := range []string{"go", "npm"} {

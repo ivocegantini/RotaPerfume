@@ -25,10 +25,10 @@ beforeEach(() => {
 });
 
 describe("ProtectedRoute - ECOM-01", () => {
-  it("area interna com usuario da loja: redireciona para /loja sem renderizar", async () => {
+  it("area interna com usuario da loja: redireciona para a vitrine sem renderizar", async () => {
     refreshSessionUserMock.mockResolvedValue(me("usuario"));
     render(<ProtectedRoute>interno</ProtectedRoute>);
-    await vi.waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/loja"));
+    await vi.waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/"));
     expect(screen.queryByText("interno")).not.toBeInTheDocument();
   });
 

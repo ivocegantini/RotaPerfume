@@ -13,7 +13,7 @@
 //	make db-import-estoque
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. Lê o CSV informado via flag -csv (default: dados/erp/estoque.csv, resolvido
 //     a partir da raiz do repositório) ou via env ESTOQUE_CSV_PATH.
 //  3. O CSV TEM cabeçalho — a primeira linha é descartada. Colunas:

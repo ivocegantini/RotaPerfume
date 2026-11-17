@@ -1,4 +1,4 @@
-.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-role-usuario db-revert-role-usuario db-fix-confirmacao-email db-revert-confirmacao-email db-fix-clientes-loja db-revert-clientes-loja db-fix-clientes-numero db-revert-clientes-numero db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test test-all lint shellcheck \
+.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-role-usuario db-revert-role-usuario db-fix-confirmacao-email db-revert-confirmacao-email db-fix-clientes-loja db-revert-clientes-loja db-fix-clientes-numero db-revert-clientes-numero db-fix-historico-created-at db-revert-historico-created-at db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test test-all lint shellcheck \
 	build build-api run-api dev-api stop-api \
 	test-api cover-api test-shared cover-shared arch-check cover-combinada gen-hash fix-hash \
 	frontend-deps \
@@ -8,8 +8,9 @@
 # =============================================================================
 # Helpers
 # =============================================================================
-# SEC-11: as credenciais do banco vêm do .env (sem default).
-# Precedência: com "-include .env", o valor do .env ganha da variável do
+# SEC-11: as credenciais do banco vêm do backend/.env (sem default; ENV-01:
+# o .env fica em backend/, não mais na raiz).
+# Precedência: com "-include backend/.env", o valor do .env ganha da variável do
 # shell; "make DB_SENHA=x" na linha de comando ganha de tudo.
 # Formato do .env: DB_SENHA sem "$", "#", aspas, espaços nas pontas e sem
 # começar com "/" (o make e o Git Bash interpretariam esses caracteres).
@@ -21,12 +22,12 @@ ifneq ($(filter command line,$(origin MAKEFLAGS) $(origin MAKEOVERRIDES)),)
 $(error BUG-29: MAKEFLAGS/MAKEOVERRIDES na linha de comando nao chegam corretamente aos sub-makes (ENV_ARQUIVO, CONFIRMAR e CONFIRMO_PRODUCAO se perdem). Use a opcao direto (ex.: make -k <alvo>) ou MAKEFLAGS no ambiente (MAKEFLAGS=-k make <alvo>))
 endif
 ifeq ($(origin ENV_ARQUIVO),command line)
-# DEPLOY-07: outro arquivo NO LUGAR do .env (ex.: .env.producao da maquina do
-# admin); o .env NAO e lido. So pela linha de comando:
-#   make db-up ENV_ARQUIVO=.env.producao CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>
+# DEPLOY-07: outro arquivo NO LUGAR do .env (ex.: backend/.env.producao da
+# maquina do admin); o backend/.env NAO e lido. So pela linha de comando:
+#   make db-up ENV_ARQUIVO=backend/.env.producao CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>
 include $(ENV_ARQUIVO)
 else
--include .env
+-include backend/.env
 endif
 
 DB_NAME ?= rotaperfumes
@@ -54,14 +55,14 @@ export
 # O "export" acima continua global (o cliente mariadb dos db-* precisa do
 # MYSQL_PWD e as CLIs Go de db-import-*/fix-*/reset-senhas-* leem o ambiente),
 # mas as receitas de go test/build/vet e npm rodam com $(SEM_SEGREDOS), que
-# tira (env -u) toda variavel declarada no arquivo lido (.env ou ENV_ARQUIVO)
+# tira (env -u) toda variavel declarada no arquivo lido (backend/.env ou ENV_ARQUIVO)
 # e os segredos fixos abaixo, menos NEXT_PUBLIC_* (publicas, o build do
 # frontend precisa). Excecao (so no $(SEM_SEGREDOS_TESTE), SEC-55): "make
 # test-integration" chama o sub-make com INTEGRATION=1 NA LINHA DE COMANDO
 # (passando pelo db-guard-producao e pelo db-guard-integracao); so ai as DB_*
 # chegam ao go test. "INTEGRATION=1 make test" do shell fica sem
 # credenciais: os testes de integracao sao pulados.
-ENV_ARQUIVO_LIDO := $(if $(filter command line,$(origin ENV_ARQUIVO)),$(ENV_ARQUIVO),.env)
+ENV_ARQUIVO_LIDO := $(if $(filter command line,$(origin ENV_ARQUIVO)),$(ENV_ARQUIVO),backend/.env)
 VARS_DO_ENV := $(shell sed -n 's/^[[:space:]]*\(export[[:space:]][[:space:]]*\)\{0,1\}\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*[:?+]\{0,1\}=.*/\2/p' $(ENV_ARQUIVO_LIDO) 2>/dev/null)
 VARS_DB_INTEGRACAO := DB_HOST DB_PORT DB_NAME DB_USUARIO DB_SENHA DB_TLS_CA DB_TLS_SERVER_NAME DB_TLS_REQUIRED
 SEGREDOS_FIXOS := $(VARS_DB_INTEGRACAO) MYSQL_PWD MSYS2_ENV_CONV_EXCL MYSQL_OPTS MYSQL_TLS_OPTS DB_CLI PASSWORD_PEPPER JWT_SECRET SMTP_USER SMTP_PASSWORD TURNSTILE_SECRET_KEY SEED_ADMIN_PASSWORD
@@ -123,15 +124,15 @@ setup-check: ## SETUP-01: só confere versões (inclui covdata e GOTOOLCHAIN, pr
 # db-fix-*, db-revert-*; db-up/db-seed herdam via db-create). Fica depois do
 # "help" para não virar o alvo padrão do make.
 db-check-env: ## Confere DB_USUARIO/DB_SENHA (SEC-11), o TLS exigido para host remoto (SEC-42) e o cliente MariaDB (DB_CLIENTE_BIN)
-	@test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD" || { echo "SEC-11: defina DB_USUARIO/DB_SENHA no .env"; exit 1; }
+	@test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD" || { echo "SEC-11: defina DB_USUARIO/DB_SENHA no backend/.env"; exit 1; }
 	@case "$(DB_TLS_REQUIRED)" in ""|true|false) ;; *) echo "SEC-42: DB_TLS_REQUIRED=$(DB_TLS_REQUIRED) invalido: use true ou false"; exit 1 ;; esac; \
 	$(NORMALIZA_HOST); \
 	if $(HOST_LOOPBACK); then :; \
 	elif [ -n "$(DB_TLS_CA)" ]; then :; \
 	elif [ "$(DB_TLS_REQUIRED)" = false ]; then echo "AVISO (SEC-42): DB_TLS_REQUIRED=false: conexao SEM TLS com DB_HOST=$(DB_HOST) (fora do loopback); usuario e senha em texto claro"; \
-	else echo "SEC-42: DB_HOST=$(DB_HOST) nao e loopback (localhost, 127.x.x.x, ::1) e DB_TLS_CA esta vazio: defina DB_TLS_CA no .env (ou, so sabendo do risco, DB_TLS_REQUIRED=false)"; exit 1; fi
+	else echo "SEC-42: DB_HOST=$(DB_HOST) nao e loopback (localhost, 127.x.x.x, ::1) e DB_TLS_CA esta vazio: defina DB_TLS_CA no backend/.env (ou, so sabendo do risco, DB_TLS_REQUIRED=false)"; exit 1; fi
 	@test -z "$(DB_TLS_CA)" -o -r "$(DB_TLS_CA)" || { echo "SEC-29: DB_TLS_CA=$(DB_TLS_CA) nao encontrado/legivel (caminho relativo vale a partir da raiz do projeto)"; exit 1; }
-	@test -z "$(DB_CLIENTE)" || { echo "CHORE-13: DB_CLIENTE nao existe mais (o projeto usa so o cliente MariaDB): remova do .env; para outro executavel use DB_CLIENTE_BIN"; exit 1; }
+	@test -z "$(DB_CLIENTE)" || { echo "CHORE-13: DB_CLIENTE nao existe mais (o projeto usa so o cliente MariaDB): remova do backend/.env; para outro executavel use DB_CLIENTE_BIN"; exit 1; }
 	@v=$$($(DB_CLIENTE_BIN) --version 2>&1) || { echo "DB_CLIENTE_BIN=$(DB_CLIENTE_BIN) nao encontrado no PATH (instale o cliente MariaDB: make setup)"; exit 1; }; \
 	case "$$v" in *MariaDB*) ;; *) echo "DB_CLIENTE_BIN=$(DB_CLIENTE_BIN) nao e o cliente MariaDB ($$v)"; exit 1 ;; esac
 
@@ -272,7 +273,7 @@ db-seed: db-guard-producao db-guard-sem-producao db-check-env ## Cria o schema, 
 	cd backend/shared && go run ./cmd/resetpassword -all-users
 	@echo ""
 	@echo "=== Seed completo com hashes validos! ==="
-	@echo "=== Admin: admin@rotaperfumes.com.br (senha: SEED_ADMIN_PASSWORD do .env ou a ADMIN_PASSWORD impressa acima; troca obrigatoria no 1o login) ==="
+	@echo "=== Admin: admin@rotaperfumes.com.br (senha: SEED_ADMIN_PASSWORD do backend/.env ou a ADMIN_PASSWORD impressa acima; troca obrigatoria no 1o login) ==="
 
 db-down: db-guard-producao db-guard-sem-producao db-guard-drop db-check-env ## Dropa o banco de dados (CUIDADO!)
 	$(DB_CLI) -e "DROP DATABASE IF EXISTS $(DB_NAME);"
@@ -367,6 +368,12 @@ db-fix-clientes-numero: db-guard-producao db-check-env ## ECOM-09: clientes.nume
 
 db-revert-clientes-numero: db-guard-producao db-check-env ## Reverte db-fix-clientes-numero (perde numero e complemento gravados)
 	$(DB_CLI) $(DB_NAME) < sql/31_revert_clientes_numero_complemento.sql
+
+db-fix-historico-created-at: db-guard-producao db-check-env ## DB-09: senha_historico.created_at NOT NULL (idempotente; aborta sem alterar dados se houver created_at NULL, remedio no cabecalho do sql/32)
+	$(DB_CLI) $(DB_NAME) < sql/32_alter_senha_historico_created_at_not_null.sql
+
+db-revert-historico-created-at: db-guard-producao db-check-env ## Reverte db-fix-historico-created-at (a coluna volta a aceitar NULL; nao altera as linhas)
+	$(DB_CLI) $(DB_NAME) < sql/32_revert_senha_historico_created_at_not_null.sql
 
 # IMG-01: gera um PNG por produto (nome na diagonal) pelo mesmo caso de uso do
 # upload, no PRODUTO_IMAGENS_DIR (padrão backend/rotaperfumes-api/data/produtos-imagens).
@@ -506,8 +513,8 @@ cover-combinada: $(GUARDA_INTEGRACAO) build-shared ## ARQ-01: cobertura combinad
 # No CasaOS a conta so tem GRANT no rotaperfumes_teste (docs/deploy-servidor.md,
 # mapa dos ambientes). Execucao interrompida (Ctrl+C) deixa o banco: a proxima
 # o apaga antes de comecar.
-#   make test-integration                          # .env padrao (CasaOS :3307)
-#   make test-integration ENV_ARQUIVO=integracao.env
+#   make test-integration                          # backend/.env padrao (CasaOS :3307)
+#   make test-integration ENV_ARQUIVO=backend/integracao.env
 # (ver docs/arquitetura-ddd.md §10.9).
 DB_TESTE := rotaperfumes_teste
 db-guard-banco-teste: ## TST-25: DB_TESTE so com minusculas/digitos/_, com "_teste" no nome e diferente do DB_NAME

@@ -3,7 +3,7 @@ package config_test
 // SEC-11 (Lote 12): testes de texto do Makefile e dos sql/*.sql (raiz via
 // cmdutil.FindProjectRoot).
 //   - MYSQL_OPTS sem -p (senha só por MYSQL_PWD no ambiente); sem default
-//     DB_USUARIO?=/DB_SENHA?= nem "golang"; "-include .env" antes do export.
+//     DB_USUARIO?=/DB_SENHA?= nem "golang"; "-include backend/.env" antes do export.
 //   - DB-03/SEC-28: cliente mariadb (nunca o mysql puro) com --local-infile=0.
 //   - Todo alvo que chama o mariadb depende (direta ou transitivamente) de
 //     db-check-env; db-create/db-down/db-fix-*/db-revert-* diretamente.
@@ -201,14 +201,14 @@ func TestSEC11_Makefile_SemDefaultDeCredenciais(t *testing.T) {
 
 func TestSEC11_Makefile_IncludeEnvEMysqlPwd(t *testing.T) {
 	mk := lerMakefile(t)
-	iInclude := mk.indiceLinha(regexp.MustCompile(`^-include \.env\s*$`))
+	iInclude := mk.indiceLinha(regexp.MustCompile(`^-include backend/\.env\s*$`))
 	iSubst := mk.indiceLinha(regexp.MustCompile(`^DB_SENHA\s*:=`))
 	iPwd := mk.indiceLinha(regexp.MustCompile(`^MYSQL_PWD\s*=\s*\$\(DB_SENHA\)\s*$`))
 	iMsys := mk.indiceLinha(regexp.MustCompile(`^MSYS2_ENV_CONV_EXCL\s*=\s*MYSQL_PWD\s*$`))
 	iExport := mk.indiceLinha(regexp.MustCompile(`^export\s*$`))
 	iOpts := mk.indiceLinha(regexp.MustCompile(`^MYSQL_OPTS\s*=`))
 
-	for nome, i := range map[string]int{"-include .env": iInclude, "DB_SENHA :=": iSubst, "MYSQL_PWD = $(DB_SENHA)": iPwd,
+	for nome, i := range map[string]int{"-include backend/.env": iInclude, "DB_SENHA :=": iSubst, "MYSQL_PWD = $(DB_SENHA)": iPwd,
 		"MSYS2_ENV_CONV_EXCL = MYSQL_PWD": iMsys, "export": iExport, "MYSQL_OPTS": iOpts} {
 		require.GreaterOrEqual(t, i, 0, "linha %q ausente", nome)
 	}
@@ -234,7 +234,7 @@ func TestSEC11_Makefile_AlvosDeBancoDependemDeDbCheckEnv(t *testing.T) {
 	assert.Contains(t, receita, `test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD"`)
 	assert.NotContains(t, receita, "$(DB_SENHA)")
 	assert.Contains(t, receita, "exit 1")
-	assert.Contains(t, receita, "SEC-11: defina DB_USUARIO/DB_SENHA no .env")
+	assert.Contains(t, receita, "SEC-11: defina DB_USUARIO/DB_SENHA no backend/.env")
 
 	// Diretos: db-create, db-down e todos os db-fix-*/db-revert-*.
 	var diretos []string
@@ -323,7 +323,7 @@ func TestSEC11_Makefile_HelpContinuaAlvoPadrao(t *testing.T) {
 	assert.Greater(t, mk.regras["db-check-env"].linha, mk.regras["help"].linha, "db-check-env fica depois do help")
 }
 
-// BUG-13: com o "-include .env", $(MAKEFILE_LIST) vale "Makefile .env"; o grep
+// BUG-13: com o "-include backend/.env", $(MAKEFILE_LIST) vale "Makefile backend/.env"; o grep
 // do help com vários arquivos prefixa cada linha com "Makefile:" e o awk
 // mostra o nome do arquivo no lugar do alvo. A receita do help deve ler só o
 // Makefile ($(firstword $(MAKEFILE_LIST))) ou usar grep -h.

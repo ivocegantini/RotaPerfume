@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean;
   /**
    * ECOM-01: "interna" (padrao) e a area da equipe: o cliente da loja
-   * ("usuario") vai para /loja. "loja" aceita qualquer papel.
+   * ("usuario") vai para a vitrine (/). "loja" aceita qualquer papel.
    */
   area?: "interna" | "loja";
 }
@@ -80,9 +80,9 @@ export function ProtectedRoute({ children, requireAdmin = false, area = "interna
         // ECOM-01: o cliente da loja nunca renderiza a area interna (o
         // backend ja responde 403 nas APIs internas).
         if (area === "interna" && freshUser.role === "usuario") {
-          vlog(F, "ProtectedRoute.validate", "usuario da loja na area interna: redirecionando para /loja");
+          vlog(F, "ProtectedRoute.validate", "usuario da loja na area interna: redirecionando para a vitrine");
           setAuthorized(false);
-          router.replace("/loja");
+          router.replace("/");
           return;
         }
 

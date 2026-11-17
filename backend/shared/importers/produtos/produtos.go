@@ -13,7 +13,7 @@
 //	make db-import-produtos
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. Lê o CSV informado via flag -csv (default: dados/erp/produtos.csv, resolvido
 //     a partir da raiz do repositório) ou via env PRODUTOS_CSV_PATH.
 //  3. O CSV TEM cabeçalho (diferente do CSV de clientes) — a primeira linha é

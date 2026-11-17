@@ -13,7 +13,7 @@
 //	make db-import-pagamentos
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. Lê pagamentos.csv (default dados/erp/pagamentos.csv, COM header):
 //     pagamento_id,pedido_id,forma_pagamento,parcelas,valor,taxa_pct,
 //     valor_liquido,data_vencimento,data_pagamento,status_pagamento

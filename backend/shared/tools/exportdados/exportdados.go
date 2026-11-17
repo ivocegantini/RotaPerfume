@@ -13,7 +13,7 @@
 //	make db-export
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. Conecta no banco configurado em config.Load().
 //  3. Para cada tabela, roda uma query que reconstrói as colunas exatamente
 //     como no CSV de origem (mesmos nomes/ordem de dados/crm|erp/*.csv) e

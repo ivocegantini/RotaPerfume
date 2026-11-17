@@ -111,7 +111,7 @@ func TestTST25_Makefile_DbTesteRecusado(t *testing.T) {
 // DB_TESTE no .env (ou no ambiente) não vale: só a linha de comando muda.
 func TestTST25_Makefile_DbTesteDoArquivoIgnorado(t *testing.T) {
 	dir, path, _ := tst25Dir(t, false)
-	f, err := os.OpenFile(filepath.Join(dir, ".env"), os.O_APPEND|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(filepath.Join(dir, "backend", ".env"), os.O_APPEND|os.O_WRONLY, 0o600)
 	require.NoError(t, err)
 	_, err = f.WriteString("DB_TESTE=outro_teste\n")
 	require.NoError(t, err)

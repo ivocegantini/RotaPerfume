@@ -1,7 +1,7 @@
 // Package config carrega configurações do sistema a partir de variáveis de ambiente.
 //
-// O arquivo .env na raiz do projeto é carregado pelos binários (cmdutil /
-// godotenv) ou pelo Makefile ("-include .env") antes de chamar o Load — aqui
+// O arquivo backend/.env é carregado pelos binários (cmdutil /
+// godotenv) ou pelo Makefile ("-include backend/.env") antes de chamar o Load — aqui
 // apenas consumimos via os.Getenv. DB_USUARIO/DB_SENHA são obrigatórios e
 // não têm default (SEC-11): sem eles, Load devolve ErrCredenciaisDB.
 package config
@@ -20,6 +20,8 @@ import (
 	// Fixa time.Local em -03:00 (sem horário de verão) antes de qualquer
 	// sql.Open — ver pacote tz (RISCO-01). Todo binário que usa config.DSN()
 	// herda o fuso por este import.
+	"github.com/rotaperfumes/shared/adapters/rediscache"
+	"github.com/rotaperfumes/shared/cache"
 	_ "github.com/rotaperfumes/shared/tz"
 	"github.com/rotaperfumes/shared/vlog"
 )
@@ -140,6 +142,20 @@ type Config struct {
 	// "Entrar com Google" (audiência do ID token). Vazio: login com Google
 	// desligado.
 	GoogleClientID string
+
+	// Cache (CACHE-01): REDIS_URL vazio desliga o cache. A senha vem só de
+	// REDIS_PASSWORD; CACHE_APPNAME (padrão "rotaperfumes") abre a chave.
+	Redis        RedisConfig
+	CacheAppName string
+}
+
+// RedisConfig é o destino do cache já validado (sem a URL crua nos logs).
+type RedisConfig struct {
+	Ligado   bool
+	Endereco string
+	Usuario  string
+	Senha    string
+	DB       int
 }
 
 // DominiosEmailPadrao são os grandes provedores aceitos quando
@@ -326,6 +342,11 @@ func load(exigirDB bool) (*Config, error) {
 	}
 
 	cfg.GoogleClientID = strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+
+	vlog.Printf("config.go", "load", "lendo REDIS_URL/CACHE_APPNAME (CACHE-01) e verificando erro")
+	if cfg.Redis, cfg.CacheAppName, err = LoadCache(); err != nil {
+		return nil, err
+	}
 
 	vlog.Printf("config.go", "load", "lendo APP_URL e verificando erro")
 	if cfg.AppURL, err = parseAppURL(os.Getenv("APP_URL"), cfg.CORSAllowedOrigins, cfg.CookieSecure); err != nil {
@@ -781,4 +802,22 @@ func dominioSimples(d string) bool {
 		}
 	}
 	return true
+}
+
+// LoadCache lê REDIS_URL, REDIS_PASSWORD e CACHE_APPNAME (CACHE-01). URL
+// vazia = cache desligado; URL ou appname inválidos derrubam a subida.
+func LoadCache() (RedisConfig, string, error) {
+	app := getEnv("CACHE_APPNAME", "rotaperfumes")
+	if err := cache.ValidarAppName(app); err != nil {
+		return RedisConfig{}, "", err
+	}
+	raw := strings.TrimSpace(os.Getenv("REDIS_URL"))
+	if raw == "" {
+		return RedisConfig{}, app, nil
+	}
+	o, err := rediscache.ParseURL(raw)
+	if err != nil {
+		return RedisConfig{}, "", err
+	}
+	return RedisConfig{Ligado: true, Endereco: o.Endereco, Usuario: o.Usuario, Senha: os.Getenv("REDIS_PASSWORD"), DB: o.DB}, app, nil
 }

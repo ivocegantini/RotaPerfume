@@ -15,7 +15,7 @@
 //	make db-import-pedidos
 //
 // Comportamento:
-//  1. O comando carrega .env da raiz do projeto (cmdutil.LoadEnvFromCwd).
+//  1. O comando carrega o backend/.env (cmdutil.LoadEnvFromCwd).
 //  2. FASE 1 — pedidos.csv (default dados/erp/pedidos.csv, COM header):
 //     pedido_id,cliente_id,vendedor_id,data_pedido,canal,status,valor_total
 //     - `cliente_id` do CSV é resolvido via lookup em `clientes.cliente_id_origem`

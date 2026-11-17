@@ -12,11 +12,21 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-17: ENV-01 `.env` em `backend/`
+- ENV-01: `.env`, `.env.example` e `.env.producao.ro` saíram da raiz para `backend/`; Makefile (`-include backend/.env`), `cmdutil.LoadEnvFromCwd` (API usa o mesmo), `testeemail`, `dump-local.ps1`, mensagens dos scripts, testes e docs ajustados. `ENV_ARQUIVO` é relativo à raiz (ex.: `backend/.env.producao`). `make test` rc=0.
+
+## Avulso de 2026-11-16: merge de todas as branches
+- `origin/main`, `lote-37-40` e `lote-42` mescladas na `lote-42-ecommerce-loja` e na `main` local; nos conflitos venceu a versão atual; extras compatíveis entraram (DB-09 como `sql/32`); o resto virou MERGE-01. `make test` e `make lint` rc=0.
+
+## Avulso de 2026-11-16: CACHE-01 cache Redis do e-commerce
+- CACHE-01: cache na API (Redis `192.168.168.106:48110`, cliente RESP próprio, sem dependência nova) das áreas `vitrine`, `filtros` e `imagem_produto`; chave `appname:area:vN:hash`, versão por área (INCR na escrita do produto/imagem e na subida); fail-open; `X-Cache`. `make test` rc=0; teste real MISS→HIT ok. Doc: `docs/cache-redis.md`.
+
 ## Avulso de 2026-11-16: LEGAL-01 páginas legais (não commitado)
 - LEGAL-01: `frontend/public/politica-de-privacidade.html` (LGPD) e `termos-de-servico.html` (CDC), HTML estático com texto genérico. Falta trocar `[e-mail de contato]` e revisão jurídica.
 
 ## Lote 42 de 2026-11-16: ECOM-01 início do e-commerce (não commitado)
 > Testes: `make test` rc=0; `make lint` ok; frontend 1840 ok; `next build` ok (`/cadastro`, `/loja`).
+- ECOM-10: a página inicial (`/`) é a vitrine pública: `GET /api/loja/produtos` e `/api/loja/filtros` viraram Public (só ativos, sem custo, 300 req/min por IP → 429); topo com Entrar/Criar conta ou Olá/Sair (Painel para a equipe), sem mismatch de hydration; `/loja` mostra a mesma vitrine; o cliente da loja volta para `/`. Frontend 1893 ok.
 - ECOM-09: endereço pelo CEP (ViaCEP no navegador, só o CEP sai; preenche rua/bairro/cidade/UF, tudo editável); CEP opcional (endereço sem CEP); rua, número ("s/n") e complemento separados; bairro gravado (migração 31: `numero`, `complemento`). Vale no cadastro normal e no com Google. Frontend 1891 ok.
 - ECOM-02: "Entrar/Criar conta com Google" (Google Identity Services): ID token validado no backend (RS256/JWKS, iss, aud, exp, email_verified; `adapters/googleid`); só cliente da loja entra pelo Google (pendente vira confirmada); sem conta, o cadastro abre preenchido pedindo CPF/endereço; conta nasce confirmada, sem senha utilizável. `GOOGLE_CLIENT_ID`/`NEXT_PUBLIC_GOOGLE_CLIENT_ID` (vazio = desligado). Frontend 1879 ok.
 - ECOM-08: troca e reset de senha bloqueados com o e-mail pendente: própria troca e reset do admin → 409 sem gravar; reset em massa pula a conta (`pulado_email_pendente`, contado no resumo da CLI); botão "Resetar" desabilitado no admin. Só o role `usuario` consulta. Frontend 1873 ok.

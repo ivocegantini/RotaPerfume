@@ -121,16 +121,28 @@ func deploy07Make(t *testing.T, env []string, args ...string) (string, error) {
 }
 
 // copiaDoMakefile copia o Makefile do projeto para um diretório temporário
-// (sem .env, sem sql/, sem backend/): nada ali conecta em banco.
+// (sem backend/.env, sem sql/; backend/ vazio, onde os testes gravam o .env
+// falso, ENV-01): nada ali conecta em banco.
+// dirTempMake (SEC-63): o t.TempDir() carrega o nome do subteste, com "(", "=" e
+// acentos; esse caminho vira DB_CLIENTE_BIN, que o Makefile recusaria.
+func dirTempMake(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "rp-make-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
 func copiaDoMakefile(t *testing.T) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("usa sh")
 	}
-	dir := t.TempDir()
+	dir := dirTempMake(t)
 	dados, err := os.ReadFile(filepath.Join(raizProjeto(t), "Makefile"))
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Makefile"), dados, 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "backend"), 0o755))
 	return dir
 }
 
@@ -212,5 +224,5 @@ func TestDEPLOY07_Makefile_GuardaRecusaProducao(t *testing.T) {
 // ENV_ARQUIVO (só pela linha de comando) troca o .env por outro arquivo.
 func TestDEPLOY07_Makefile_EnvArquivo(t *testing.T) {
 	mk := lerMakefile(t)
-	assert.Regexp(t, regexp.MustCompile(`(?m)^ifeq \(\$\(origin ENV_ARQUIVO\),command line\)\n(#.*\n)*include \$\(ENV_ARQUIVO\)\nelse\n-include \.env\nendif$`), mk.texto)
+	assert.Regexp(t, regexp.MustCompile(`(?m)^ifeq \(\$\(origin ENV_ARQUIVO\),command line\)\n(#.*\n)*include \$\(ENV_ARQUIVO\)\nelse\n-include backend/\.env\nendif$`), mk.texto)
 }
