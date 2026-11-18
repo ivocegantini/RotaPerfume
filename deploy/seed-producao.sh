@@ -72,6 +72,8 @@ FORCAR=false
 BACKUP_DIR="/var/backups/rotaperfumes"
 BACKUP_JANELA_MIN=60
 readonly BACKUP_JANELA_LIVRE_MAX=60
+# BACKUP-03: folga para ajuste de relogio ao julgar "data futura" (igual ao backup-banco.sh).
+readonly TOLERANCIA_RELOGIO_S=300
 SEM_BACKUP_MOTIVO=""
 BACKUP_USADO=""
 PEPPER_FILE=""
@@ -324,32 +326,42 @@ conferir_dir_privado() { # opcao dir [existe]
 }
 
 # BACKUP-01: copia byte a byte da funcao do deploy/mariadb-docker.sh (um teste
-# confere). Vale o que esta la: so o dump, parcial-* e pre-restauracao-* nunca
-# valem, e a idade conta pelo carimbo e pelo mtime.
+# confere). Vale o que esta la: so o dump, parcial-* vale com aviso (BACKUP-04),
+# pre-restauracao-* nunca, e a idade conta pelo carimbo e pelo mtime (folga de
+# TOLERANCIA_RELOGIO_S para o futuro, BACKUP-03).
 conferir_backup_recente() { # dir janela_min -> define BACKUP_USADO
-  local dir=$1 janela=$2 LC_ALL=C arq="" f nome agora mtime carimbo dica
+  local dir=$1 janela=$2 LC_ALL=C arq="" melhor="" chave f nome agora mtime carimbo dica
   dica="gere um com: sudo rotaperfumes-backup-banco --agora (ou use --sem-backup-motivo TEXTO, que fica registrado)"
   command -v gzip >/dev/null || die "comando 'gzip' nao encontrado"
   [[ -d "$dir" && ! -L "$dir" ]] || die "nenhum backup: $dir nao existe. Instale com sudo bash deploy/backup-banco.sh --instalar; $dica"
   conferir_dir_privado --backup-dir "$dir" existe
-  for f in "$dir"/rotaperfumes-*.sql.gz; do
-    [[ "${f##*/}" =~ ^rotaperfumes-[0-9]{8}-[0-9]{6}Z(-manual)?\.sql\.gz$ ]] && arq=$f
+  for f in "$dir"/rotaperfumes-*.sql.gz "$dir"/parcial-rotaperfumes-*.sql.gz; do
+    if [[ "${f##*/}" =~ ^rotaperfumes-([0-9]{8}-[0-9]{6}Z)(-manual)?\.sql\.gz$ ]]; then
+      chave="${BASH_REMATCH[1]}2"
+    elif [[ "${f##*/}" =~ ^parcial-rotaperfumes-([0-9]{8}-[0-9]{6}Z)(-manual)?\.sql\.gz$ ]]; then
+      chave="${BASH_REMATCH[1]}1"
+    else
+      continue
+    fi
+    if [[ -z "$melhor" || $chave > $melhor ]]; then melhor=$chave; arq=$f; fi
   done
   [[ -n "$arq" ]] || die "nenhum backup em $dir; $dica"
   nome=${arq##*/}
   [[ ! -L "$arq" && -f "$arq" ]] || die "o backup mais recente ($nome) nao e arquivo regular; $dica"
   [[ "$(stat -c '%u %a' -- "$arq")" == "0 600" ]] || die "o backup mais recente ($nome) precisa ser do root com modo 600; $dica"
-  [[ "$nome" =~ ^rotaperfumes-([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})Z ]] || die "carimbo invalido em $nome"
-  carimbo=$(date -u -d "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}" +%s) \
+  [[ "$nome" =~ ^(parcial-)?rotaperfumes-([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})Z ]] || die "carimbo invalido em $nome"
+  carimbo=$(date -u -d "${BASH_REMATCH[2]}-${BASH_REMATCH[3]}-${BASH_REMATCH[4]} ${BASH_REMATCH[5]}:${BASH_REMATCH[6]}:${BASH_REMATCH[7]}" +%s) \
     || die "carimbo invalido em $nome"
   agora=$(date +%s)
   mtime=$(stat -c %Y -- "$arq")
   for f in "$carimbo" "$mtime"; do
-    (( f <= agora )) || die "o backup mais recente ($nome) tem data futura; $dica"
+    (( f <= agora + TOLERANCIA_RELOGIO_S )) || die "o backup mais recente ($nome) tem data futura (mais de ${TOLERANCIA_RELOGIO_S} s a frente do relogio); $dica"
     (( agora - f <= janela * 60 )) || die "o backup mais recente ($nome) tem mais de $janela min; $dica"
   done
   gzip -t -- "$arq" 2>/dev/null || die "o backup mais recente ($nome) esta corrompido; $dica"
   [[ "$(gzip -dc -- "$arq" | tail -n 1)" == "-- Dump completed"* ]] || die "o backup mais recente ($nome) nao tem o marcador na ultima linha; $dica"
+  [[ "$nome" != parcial-* ]] \
+    || aviso "o backup usado e parcial ($nome): o dump vale para o banco, mas o tar de imagens desse backup falhou; confira com journalctl -u rotaperfumes-backup-banco.service"
   BACKUP_USADO=$arq
 }
 

@@ -8,7 +8,7 @@ package deploy_test
 //   - ensaio com docker/iptables/systemctl FALSOS (stubs no PATH) rodando o
 //     script REAL num user namespace (EUID 0) com binds dos caminhos fixos
 //     (/root, /opt, /usr/local/sbin, /etc/systemd/system) para um TempDir:
-//     rede, contas por IP, convergência, firewall (transição do --dev-ip), CA (--ca-key,
+//     rede, contas por IP, convergência, remoção do firewall antigo (DEPLOY-11), CA (--ca-key,
 //     --nova-ca, --novo-cert com FLUSH SSL), reexecução;
 //   - Docker real: só com root + Docker acessível + opt-in (TST15_DOCKER=1),
 //     senão skip (pendência registrada no TST-15).
@@ -149,8 +149,8 @@ func TestSEC39_CreateUserEmDeploy_Ed25519ERequireSSL(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "deploy/mariadb-setup.sql saiu (SEC-39)")
 }
 
-// SEC-45: nenhum -p/--publish do Docker sem IP (nunca 0.0.0.0). DEPLOY-10: o
-// mariadb-docker.sh não publica porta nenhuma, nem na transição do --dev-ip.
+// SEC-45: nenhum -p/--publish do Docker sem IP (nunca 0.0.0.0). DEPLOY-10/11: o
+// mariadb-docker.sh não publica porta nenhuma.
 func TestSEC45_DockerPublishSempreComIP(t *testing.T) {
 	rePub := regexp.MustCompile(`(?:^|[\s(])(?:-p|--publish)(?:=|\s+)"?([^\s")]+)`)
 	alvos := map[string]string{"Jenkinsfile": lerRaiz(t, "Jenkinsfile")}
@@ -375,9 +375,11 @@ func TestSEC45_MariadbDocker_OpcoesRemovidasEInvalidas(t *testing.T) {
 	}{
 		{"--versao saiu", []string{"--versao", "11.4"}, 1, "--versao saiu (SEC-31): use --imagem-base"},
 		{"--rede-lan saiu", []string{"--rede-lan", "192.168.168.0/24"}, 1, "--rede-lan saiu (SEC-45): o banco nao aceita conexao da LAN"},
-		{"--rede-lan depois de outra opcao", []string{"--dev-ip", "192.168.168.50", "--rede-lan", "x"}, 1, "--rede-lan saiu"},
+		{"--rede-lan depois de outra opcao", []string{"--recriar", "--rede-lan", "x"}, 1, "--rede-lan saiu"},
 		{"opcao desconhecida", []string{"--skip-mysql"}, 2, "Opcao desconhecida: --skip-mysql"},
-		{"--dev-ip sem valor", []string{"--dev-ip"}, 1, "a opcao --dev-ip exige um valor"},
+		{"--dev-ip saiu", []string{"--dev-ip", "192.168.168.105"}, 1, "--dev-ip saiu (DEPLOY-11): a porta 3306 foi fechada"},
+		{"--dev-ip sem valor", []string{"--dev-ip"}, 1, "--dev-ip saiu (DEPLOY-11)"},
+		{"--porta saiu", []string{"--porta", "3306"}, 1, "--porta saiu (DEPLOY-11)"},
 		{"--ca-key vazia", []string{"--ca-key", ""}, 1, "a opcao --ca-key exige um valor"},
 	}
 	for _, c := range casos {
@@ -398,9 +400,11 @@ func TestSEC45_MariadbDocker_OpcoesRemovidasEInvalidas(t *testing.T) {
 		cmd.Env = ambienteLimpo()
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s", out)
-		for _, s := range []string{"--dev-ip", "--ca-key", "--nova-ca", "--imagem-base", "--rede-docker"} {
+		for _, s := range []string{"--ca-key", "--nova-ca", "--imagem-base", "--rede-docker", "--trocar-dados"} {
 			assert.Contains(t, string(out), s)
 		}
+		assert.NotContains(t, string(out), "--dev-ip")
+		assert.NotContains(t, string(out), "--porta")
 		assert.NotContains(t, string(out), "--rede-lan")
 		assert.NotContains(t, string(out), "--versao")
 	})
@@ -485,14 +489,6 @@ func pacoteErro1130(host string) []byte {
 	return append([]byte{byte(n), byte(n >> 8), byte(n >> 16), 0x00}, payload...)
 }
 
-// pacoteGreeting monta o início de um greeting do protocolo 10.
-func pacoteGreeting() []byte {
-	payload := append([]byte{0x0a}, []byte("5.5.5-11.4.13-MariaDB\x00")...)
-	payload = append(payload, make([]byte, 40)...)
-	n := len(payload)
-	return append([]byte{byte(n), byte(n >> 8), byte(n >> 16), 0x00}, payload...)
-}
-
 // usarCheckout faz o ensaio rodar esta versão do script, com o
 // db-ca.fingerprint dado ao lado dela (nunca o arquivo real do repositório).
 func (e *ensaio) usarCheckout(script, fingerprints string) {
@@ -567,8 +563,19 @@ func (e *ensaio) senhas() map[string]string {
 	return out
 }
 
+// instalarSemPorta instala (--nova-ca) e limpa os rastros, para o teste
+// enxergar só a execução seguinte (DEPLOY-11: a reexecução é sem opção).
+func (e *ensaio) instalarSemPorta() {
+	e.t.Helper()
+	r := e.rodar("--nova-ca")
+	require.NoError(e.t, r.err, r.out)
+	for _, nome := range []string{"run_args", "sql", "dba_argv", "dba_env", "dba_stdin"} {
+		_ = os.Remove(filepath.Join(e.dir, "state", nome))
+	}
+}
+
 // instalarComPortaPublicada simula a produção anterior ao DEPLOY-10: container
-// já criado e publicando a porta. É o único estado em que o --dev-ip vale. Limpa
+// já criado e publicando a porta (DEPLOY-11: só diverge e pede --recriar). Limpa
 // os rastros da instalação, para o teste enxergar só a execução seguinte.
 func (e *ensaio) instalarComPortaPublicada() {
 	e.t.Helper()
@@ -647,8 +654,8 @@ func TestTST15_Ensaio_PrimeiraInstalacaoSemDevIP(t *testing.T) {
 		"--security-opt no-new-privileges:true", "--read-only", "MARIADB_ROOT_HOST=localhost", "-e MARIADB_ROOT_PASSWORD_FILE=/run/rotaperfumes/root.senha"} {
 		assert.Contains(t, run, s)
 	}
-	assert.NotRegexp(t, `(^|\s)-p\s`, run, "sem --dev-ip nenhuma porta publicada")
-	assert.Contains(t, r.out, "sem --dev-ip: nenhuma porta publicada")
+	assert.NotRegexp(t, `(^|\s)-p\s`, run, "nenhuma porta publicada")
+	assert.Contains(t, r.out, "Docker ok; nenhuma porta publicada")
 
 	// Sem firewall nem unit.
 	assert.NotContains(t, log, "iptables")
@@ -709,94 +716,70 @@ func TestTST15_Ensaio_PrimeiraInstalacaoSemDevIP(t *testing.T) {
 	assert.NotContains(t, r.out, "deploy/ca-producao.pem")
 	assert.Contains(t, r.out, "sudo bash deploy/seed-producao.sh")
 	assert.Contains(t, r.out, "Conexao sem TLS recusada: OK.")
-	assert.NotContains(t, log, "timeout ", "sem --dev-ip não há s_client na porta publicada")
+	assert.NotContains(t, log, "timeout ", "sem leitura de porta publicada (DEPLOY-11)")
 	assert.NotContains(t, r.out, "BEGIN PRIVATE KEY")
 }
 
-// Transição do --dev-ip (DEPLOY-10): chain com RETURN por IP + DROP, salto em
-// DOCKER-USER (salto antigo removido) e unit systemd continuam protegendo a porta
-// já publicada; o container não é recriado e não há conta para a LAN.
-// DEPLOY-08: roda com o "iptables -S" nas duas formas do --ctorigdst (sem
-// /32, como o iptables real imprime, e com /32).
-func TestTST15_Ensaio_DevIPFirewallEContas(t *testing.T) {
-	for _, com32 := range []bool{false, true} {
-		nome := "ctorigdst_sem_32_iptables_real"
-		if com32 {
-			nome = "ctorigdst_com_32"
-		}
-		t.Run(nome, func(t *testing.T) { ensaioDevIPFirewallEContas(t, com32) })
+// DEPLOY-11: a unit e a chain do firewall da antiga porta publicada saem, depois
+// de o container estar no ar sem porta; o salto em DOCKER-USER sai e as outras
+// regras ficam. Container de teste nunca mexe no firewall.
+func TestDEPLOY11_Ensaio_RemoveFirewallAntigo(t *testing.T) {
+	prepara := func(e *ensaio) {
+		escrever(t, filepath.Join(e.dir, "systemd", "rotaperfumes-db-firewall.service"), "[Unit]\n", 0o644)
+		escrever(t, filepath.Join(e.dir, "sbin", "rotaperfumes-db-firewall"), "#!/bin/bash\n", 0o700)
+		e.setState("chain_ROTAPERFUMES-DB", "-A ROTAPERFUMES-DB -j DROP\n")
+		e.setState("chain_DOCKER-USER", saltoFW+"\n-A DOCKER-USER -j RETURN\n")
 	}
-}
-
-func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
-	e := novoEnsaio(t)
-	e.instalarComPortaPublicada()
-	if com32 {
-		e.setState("ctorigdst_com_32", "")
-	}
-	// Saltos antigos (outra porta; outro IP) de uma execução anterior.
-	e.setState("chain_DOCKER-USER", "-A DOCKER-USER -p tcp -m conntrack --ctorigdst 192.168.168.106/32 --ctorigdstport 3307 -j ROTAPERFUMES-DB\n"+
-		"-A DOCKER-USER -p tcp -m conntrack --ctorigdst 192.168.168.99/32 --ctorigdstport 3306 -j ROTAPERFUMES-DB\n"+
-		saltoSemCtdir+"\n-A DOCKER-USER -j RETURN\n")
-	r := e.rodar("--dev-ip", "192.168.168.50", "--dev-ip", "192.168.168.51", "--dev-ip", "192.168.168.50")
-	require.NoError(t, r.err, r.out)
-
-	assert.Equal(t, "-A ROTAPERFUMES-DB -s 192.168.168.50/32 -j RETURN\n-A ROTAPERFUMES-DB -s 192.168.168.51/32 -j RETURN\n-A ROTAPERFUMES-DB -j DROP\n",
-		e.state("chain_ROTAPERFUMES-DB"), "IPs repetidos entram uma vez; DROP no fim")
-	assert.Equal(t, saltoFW+"\n-A DOCKER-USER -j RETURN\n", e.state("chain_DOCKER-USER"), "salto novo no topo; antigos (porta 3307, IP .99, sem --ctdir) removidos")
-
-	fw := e.arq("sbin/rotaperfumes-db-firewall")
-	assert.Contains(t, fw, "DEV_IPS=(192.168.168.50 192.168.168.51)")
-	st, err := os.Stat(filepath.Join(e.dir, "sbin", "rotaperfumes-db-firewall"))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o700), st.Mode().Perm())
-	unit := e.arq("systemd/rotaperfumes-db-firewall.service")
-	for _, s := range []string{"After=docker.service", "PartOf=docker.service", "WantedBy=multi-user.target", "ExecStart=/usr/local/sbin/rotaperfumes-db-firewall", "Type=oneshot"} {
-		assert.Contains(t, unit, s)
-	}
-	log := e.log()
-	assert.Contains(t, log, "systemctl enable rotaperfumes-db-firewall.service")
-	assert.Contains(t, log, "systemctl restart rotaperfumes-db-firewall.service")
-	// DEPLOY-10: o container não reinicia nem ganha nova publicação.
-	assert.NotContains(t, log, "docker run -d ")
-	assert.NotContains(t, log, "docker rm ")
-	assert.Empty(t, e.state("run_args"))
-	// DEPLOY-08: sem s_client na porta publicada (do servidor nunca há
-	// handshake); lê os primeiros bytes da porta e confere o cert offline.
-	assert.NotContains(t, log, "s_client")
-	assert.Contains(t, log, "timeout 5 bash -c")
-	assert.Contains(t, log, "_ "+siteIP+" 3306")
-	assert.Contains(t, r.out, "Certificado valido pela CA para o IP "+siteIP+" (openssl verify -verify_ip): OK.")
-	assert.Contains(t, r.out, "Porta publicada "+siteIP+":3306: mariadbd respondeu (erro 1130")
-	assert.Contains(t, r.out, "Certificado em uso = ")
-	// DEPLOY-10: sem conta para a LAN, a maquina de dev também leva o erro 1130;
-	// o resumo não manda testar o TLS de lá.
-	assert.NotContains(t, r.out, "s_client")
-
-	sql := e.state("sql")
-	assert.NotContains(t, sql, "'casaos'@", "nenhuma conta para os IPs de --dev-ip")
-	assert.NotContains(t, sql, "192.168.168.5")
-	assert.NotContains(t, sql, "mysql_native_password")
-
-	// DEPLOY-10: saídas de .env.producao removidas; a CA de produção continua
-	// sem ir para o deploy/ca-cert.pem (DEPLOY-07).
-	assert.NotContains(t, r.out, ".env.producao")
-	assert.NotContains(t, r.out, "deploy/ca-producao.pem")
-	assert.NotContains(t, r.out, "DB_USUARIO=casaos")
-	assert.NotContains(t, r.out, "CONFIRMO_PRODUCAO=")
-	assert.Contains(t, r.out, "NAO copie esta CA para deploy/ca-cert.pem")
-	assert.NotContains(t, r.out, "DB_TLS_CA=deploy/ca-cert.pem")
-	assert.False(t, e.existe(filepath.Join(segredos, "casaos.senha")), "o casaos.senha nunca é criado")
-
-	// Reexecução: salto não duplica, chain igual, senhas iguais.
-	antes := e.senhas()
-	r2 := e.rodar("--dev-ip", "192.168.168.50", "--dev-ip", "192.168.168.51")
-	require.NoError(t, r2.err, r2.out)
-	assert.Equal(t, saltoFW+"\n-A DOCKER-USER -j RETURN\n", e.state("chain_DOCKER-USER"), "reexecução mantém o salto atual")
-	assert.Equal(t, 1, contaLinhas(e.state("chain_DOCKER-USER"), "-j ROTAPERFUMES-DB"))
-	assert.Equal(t, 3, len(linhas(e.state("chain_ROTAPERFUMES-DB"))))
-	assert.Equal(t, antes, e.senhas(), "reexecução não troca senha")
-	assert.Contains(t, r2.out, "Container ja em execucao.")
+	t.Run("instalacao existente sem porta", func(t *testing.T) {
+		e := novoEnsaio(t)
+		require.NoError(t, e.rodar("--nova-ca").err)
+		prepara(e)
+		r := e.rodar()
+		require.NoError(t, r.err, r.out)
+		assert.False(t, e.existe("systemd/rotaperfumes-db-firewall.service"))
+		assert.False(t, e.existe("sbin/rotaperfumes-db-firewall"))
+		assert.Equal(t, "-A DOCKER-USER -j RETURN\n", e.state("chain_DOCKER-USER"), "só o salto para a chain sai")
+		assert.False(t, e.existe("state/chain_ROTAPERFUMES-DB"), "chain removida")
+		log := e.log()
+		assert.Contains(t, log, "systemctl disable --now rotaperfumes-db-firewall.service")
+		assert.Contains(t, log, "systemctl daemon-reload")
+		assert.Less(t, strings.Index(log, "-F ROTAPERFUMES-DB"), strings.Index(log, "-X ROTAPERFUMES-DB"))
+		assert.Contains(t, r.out, "Firewall da antiga porta publicada removido")
+		assert.NotContains(t, log, "iptables-restore")
+		// Reexecução: nada a remover, nada de iptables.
+		r = e.rodar()
+		require.NoError(t, r.err, r.out)
+		assert.NotContains(t, e.log(), "iptables")
+		assert.NotContains(t, e.log(), "systemctl")
+	})
+	t.Run("porta publicada: so depois do --recriar", func(t *testing.T) {
+		e := novoEnsaio(t)
+		e.instalarComPortaPublicada()
+		prepara(e)
+		r := e.rodar()
+		require.Error(t, r.err, r.out)
+		assert.Contains(t, r.out, "rode de novo com --recriar")
+		assert.True(t, e.existe("systemd/rotaperfumes-db-firewall.service"), "o firewall fica enquanto a porta estiver publicada")
+		assert.NotContains(t, e.log(), "iptables")
+		r = e.rodar("--recriar", "--sem-backup-motivo", "ensaio sem dados no datadir")
+		require.NoError(t, r.err, r.out)
+		assert.Equal(t, "{}\n", e.state("portas"))
+		assert.False(t, e.existe("systemd/rotaperfumes-db-firewall.service"))
+		log := e.log()
+		assert.Less(t, strings.Index(log, "docker run -d "), strings.Index(log, "systemctl disable"), "o firewall sai depois do container novo")
+	})
+	t.Run("container de teste nao toca o firewall", func(t *testing.T) {
+		e2 := novoEnsaio(t)
+		escrever(t, filepath.Join(e2.dir, "systemd", "rotaperfumes-db-firewall.service"), "[Unit]\n", 0o644)
+		r := e2.rodar("--nova-ca", "--container", "teste-db", "--rede-nome", "teste-rede", "--rede-docker", "172.30.99.0/24")
+		require.NoError(t, r.err, r.out)
+		assert.NotContains(t, e2.log(), "iptables")
+		assert.NotContains(t, e2.log(), "systemctl")
+		assert.True(t, e2.existe("systemd/rotaperfumes-db-firewall.service"))
+		assert.Contains(t, e2.state("run_args"), "--network teste-rede --ip 172.30.99.2")
+		assert.Contains(t, sanDoCert(t, filepath.Join(e2.dir, "ssl", "server-cert.pem")), "DNS:teste-db")
+		assert.Contains(t, e2.state("sql"), "'rotaperfumes_app'@'172.30.99.10'")
+	})
 }
 
 // Convergência (SEC-45 item 2): contas do projeto com host fora do desejado
@@ -805,14 +788,10 @@ func ensaioDevIPFirewallEContas(t *testing.T, com32 bool) {
 func TestTST15_Ensaio_ConvergenciaDeContas(t *testing.T) {
 	casos := []struct {
 		nome      string
-		transicao bool
 		removidas []string
 		mantidas  []string
 	}{
-		{"transicao do --dev-ip remove casaos", true,
-			[]string{"'casaos'@'192.168.168.0/255.255.255.0'", "'casaos'@'192.168.168.50'", "'rotaperfumes_app'@'172.16.0.0/255.240.0.0'", "'rotaperfumes_admin'@'%'"},
-			[]string{"'rotaperfumes_app'@'172.30.42.10'", "'rotaperfumes_admin'@'172.30.42.20'"}},
-		{"sem --dev-ip remove casaos", false,
+		{"remove casaos",
 			[]string{"'casaos'@'192.168.168.0/255.255.255.0'", "'casaos'@'192.168.168.50'", "'rotaperfumes_app'@'172.16.0.0/255.240.0.0'", "'rotaperfumes_admin'@'%'"},
 			[]string{"'rotaperfumes_app'@'172.30.42.10'", "'rotaperfumes_admin'@'172.30.42.20'"}},
 	}
@@ -820,10 +799,6 @@ func TestTST15_Ensaio_ConvergenciaDeContas(t *testing.T) {
 		t.Run(c.nome, func(t *testing.T) {
 			e := novoEnsaio(t)
 			args := []string{"--nova-ca"}
-			if c.transicao {
-				e.instalarComPortaPublicada()
-				args = []string{"--dev-ip", "192.168.168.50"}
-			}
 			e.setState("contas", strings.Join([]string{
 				"casaos\t192.168.168.0/255.255.255.0", "casaos\t192.168.168.50", "casaos\tx'y",
 				"rotaperfumes_admin\t%", "rotaperfumes_admin\t172.30.42.20",
@@ -956,20 +931,12 @@ func TestTST15_Ensaio_FalhasFechadas(t *testing.T) {
 		msg   string
 		subiu bool
 	}{
-		{"--dev-ip sem DOCKER-USER", func(e *ensaio) { e.instalarComPortaPublicada(); e.setState("sem_docker_user", "") }, []string{"--dev-ip", "192.168.168.50"}, "chain DOCKER-USER nao encontrada", false},
-		{"--dev-ip com faixa", nil, []string{"--nova-ca", "--dev-ip", "192.168.168.0/24"}, "--dev-ip invalido", false},
-		{"--dev-ip loopback", nil, []string{"--nova-ca", "--dev-ip", "127.0.0.1"}, "--dev-ip nao pode ser 127.0.0.1", false},
-		{"--dev-ip com outro container", nil, []string{"--nova-ca", "--dev-ip", "192.168.168.50", "--container", "teste-db"}, "--dev-ip so com o container padrao", false},
+		{"--dev-ip numa instalacao com porta", func(e *ensaio) { e.instalarComPortaPublicada() }, []string{"--dev-ip", "192.168.168.50"}, "--dev-ip saiu (DEPLOY-11)", false},
 		{"--imagem-base sem digest", nil, []string{"--nova-ca", "--imagem-base", "mariadb:11.4"}, "--imagem-base invalida", false},
 		{"--imagem-base com digest maiusculo", nil, []string{"--nova-ca", "--imagem-base", "mariadb:11.4.13@sha256:" + strings.Repeat("A", 64)}, "--imagem-base invalida", false},
 		{"--ip loopback", nil, []string{"--nova-ca", "--ip", "127.0.0.1"}, "--ip precisa ser o IP da LAN", false},
 		{"--rede-docker /16", nil, []string{"--nova-ca", "--rede-docker", "172.30.0.0/16"}, "--rede-docker invalida", false},
 		{"rede existente com outra subnet", func(e *ensaio) { e.setState("rede", "172.30.99.0/24\n") }, []string{"--nova-ca"}, "ja existe com outra subnet ('172.30.99.0/24', esperado 172.30.42.0/24)", false},
-		{"porta ocupada por outro", func(e *ensaio) {
-			e.instalarComPortaPublicada()
-			e.setState("porta_ocupada", "")
-			e.setState("rodando", "false\n") // container parado: quem ocupa a porta é outro
-		}, []string{"--dev-ip", "192.168.168.50"}, "porta 3306 ocupada por outro servico", false},
 		{"conexao sem TLS aceita", func(e *ensaio) { e.setState("aceita_sem_tls", "") }, []string{"--nova-ca"}, "conexao SEM TLS foi aceita", true},
 	}
 	for _, c := range casos {
@@ -989,15 +956,16 @@ func TestTST15_Ensaio_FalhasFechadas(t *testing.T) {
 	}
 }
 
-// DEPLOY-10: container que publica a porta e pedido sem --dev-ip diverge; só o
-// --recriar, sem --dev-ip, muda o estado, e o container novo não publica nada.
+// DEPLOY-10/11: container que publica a porta diverge; só o --recriar muda o
+// estado, e o container novo não publica nada.
 func TestTST15_Ensaio_DivergenciaExigeRecriar(t *testing.T) {
 	e := novoEnsaio(t)
 	e.instalarComPortaPublicada()
 	r := e.rodar()
 	require.Error(t, r.err, r.out)
 	assert.Contains(t, r.out, "portas publicadas")
-	assert.Contains(t, r.out, "rode de novo com --recriar, sem --dev-ip")
+	assert.Contains(t, r.out, "rode de novo com --recriar (os dados")
+	assert.NotContains(t, r.out, "--dev-ip")
 	assert.NotContains(t, e.log(), "iptables-restore", "nada mudado antes do --recriar")
 	assert.NotContains(t, e.log(), "docker rm ")
 
@@ -1036,38 +1004,11 @@ func TestCHORE17_Ensaio_SemDevIPMantemCasaosSenha(t *testing.T) {
 	assert.NotContains(t, e.log(), sentinela)
 	assert.NotContains(t, r.out, "DB_USUARIO=casaos")
 
-	// --dev-ip não volta depois do --recriar: a porta fica fechada.
+	// --dev-ip não volta (DEPLOY-11): a porta fica fechada.
 	r = e.rodar("--dev-ip", "192.168.168.50")
 	require.Error(t, r.err, r.out)
-	assert.Contains(t, r.out, "--dev-ip recusado (DEPLOY-10)")
+	assert.Contains(t, r.out, "--dev-ip saiu (DEPLOY-11)")
 	assert.Equal(t, sentinela, e.arq(rel))
-}
-
-// Sem --dev-ip, mas com a unit de uma execução anterior: chain recarregada só
-// com DROP (fail closed); com --container de teste, nunca mexe no firewall.
-func TestTST15_Ensaio_SemDevIPComUnitAnterior(t *testing.T) {
-	e := novoEnsaio(t)
-	e.instalarComPortaPublicada()
-	require.NoError(t, e.rodar("--dev-ip", "192.168.168.50").err)
-	require.True(t, e.existe("systemd/rotaperfumes-db-firewall.service"))
-
-	r := e.rodar("--recriar")
-	require.NoError(t, r.err, r.out)
-	assert.Equal(t, "-A ROTAPERFUMES-DB -j DROP\n", e.state("chain_ROTAPERFUMES-DB"))
-	assert.Contains(t, r.out, "chain ROTAPERFUMES-DB recarregada so com DROP")
-	assert.NotRegexp(t, `(^|\s)-p\s`, e.state("run_args"))
-
-	t.Run("container de teste nao toca o firewall", func(t *testing.T) {
-		e2 := novoEnsaio(t)
-		escrever(t, filepath.Join(e2.dir, "systemd", "rotaperfumes-db-firewall.service"), "[Unit]\n", 0o644)
-		r := e2.rodar("--nova-ca", "--container", "teste-db", "--rede-nome", "teste-rede", "--rede-docker", "172.30.99.0/24")
-		require.NoError(t, r.err, r.out)
-		assert.NotContains(t, e2.log(), "iptables")
-		assert.NotContains(t, e2.log(), "systemctl")
-		assert.Contains(t, e2.state("run_args"), "--network teste-rede --ip 172.30.99.2")
-		assert.Contains(t, sanDoCert(t, filepath.Join(e2.dir, "ssl", "server-cert.pem")), "DNS:teste-db")
-		assert.Contains(t, e2.state("sql"), "'rotaperfumes_app'@'172.30.99.10'")
-	})
 }
 
 // DEPLOY-10: a saída de emergência do SEC-30 saiu: recusa própria, sem mudar nada,
@@ -1080,7 +1021,7 @@ func TestTST15_Ensaio_CasaosNativeMotivo(t *testing.T) {
 	escrever(t, filepath.Join(e.dir, rel), "historico\n", 0o600)
 	for _, args := range [][]string{
 		{"--casaos-native-motivo", "cliente do Windows sem ed25519"},
-		{"--nova-ca", "--dev-ip", "192.168.168.50", "--casaos-native-motivo", "cliente do Windows sem ed25519"},
+		{"--nova-ca", "--recriar", "--casaos-native-motivo", "cliente do Windows sem ed25519"},
 		{"--casaos-native-motivo"},
 	} {
 		r := e.rodar(args...)

@@ -23,8 +23,8 @@ const dbaInstalado = "/usr/local/sbin/rotaperfumes-dba"
 func ensaioDBA(t *testing.T) *ensaio {
 	t.Helper()
 	e := novoEnsaio(t)
-	e.instalarComPortaPublicada()
-	require.NoError(t, e.rodar("--dev-ip", "192.168.168.105").err)
+	e.instalarSemPorta()
+	require.NoError(t, e.rodar().err)
 	for _, nome := range []string{"dba_argv", "dba_env", "dba_stdin"} {
 		_ = os.Remove(filepath.Join(e.dir, "state", nome))
 	}

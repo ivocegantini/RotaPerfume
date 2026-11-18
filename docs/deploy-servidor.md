@@ -33,7 +33,7 @@ As **duas credenciais do Jenkins** continuam sendo cadastradas **à mão**: o `s
    # ou, com uma CA existente cuja chave está na mídia offline:
    sudo bash deploy/mariadb-docker.sh --ca-key /media/<pendrive>/ca-key.pem
    ```
-   O banco não publica porta: o DBA entra por SSH no servidor, com `sudo rotaperfumes-dba` (seção 3.4). `--dev-ip` só existe para a migração de quem ainda tem a 3306 publicada (seção 3.3). Numa instalação nova, o seed inicial é o `deploy/seed-producao.sh` (seção 11, passo 6), nunca o `make db-seed`.
+   O banco não publica porta: o DBA entra por SSH no servidor, com `sudo rotaperfumes-dba` (seção 3.4). O `--dev-ip` e o `--porta` saíram (DEPLOY-11, seção 3.3). Numa instalação nova, o seed inicial é o `deploy/seed-producao.sh` (seção 11, passo 6), nunca o `make db-seed`.
 2. **No Windows**, na raiz do projeto, copie o dump e o `.env` para o `/tmp` do servidor:
    ```powershell
    scp deploy\dumps\rotaperfumes-AAAAMMDD-HHMMSS.sql.gz .env SEU_USUARIO@ivo-inspiron-15-3530:/tmp/
@@ -130,7 +130,7 @@ Rode no servidor (via SSH ou no terminal local dele):
    docker --version
    docker compose version     # precisa ser v2.17 ou superior
    ```
-   Só na transição do `--dev-ip` (seção 3.3), o Docker precisa gerenciar o firewall com **iptables** (chain `DOCKER-USER`; confira com `sudo iptables -S DOCKER-USER`) e o host precisa de `iptables`, `iptables-restore` e `systemctl`. Sem isso, o script aborta com `--dev-ip` (fail closed); sem `--dev-ip`, nada disso é necessário.
+   O banco não publica porta, então o script não precisa de `iptables` nem da chain `DOCKER-USER` (DEPLOY-11). Só se encontrar a unit `rotaperfumes-db-firewall` antiga ele usa `iptables` e `systemctl`, para removê-la (seção 3.3).
 2. **Jenkins com acesso ao Docker do host:**
    - **Nativo:** coloque o usuário do Jenkins no grupo `docker` e **reinicie o Jenkins** (sem o restart, o processo continua sem o grupo novo):
      ```bash
@@ -166,14 +166,14 @@ sudo bash deploy/mariadb-docker.sh [--ca-key <mídia>/ca-key.pem | --nova-ca] [-
 
 Etapas (`[n/8]`):
 
-1. **Pré-requisitos:** root, `docker`/`openssl`/`ss`/`sha256sum`, formato da `--imagem-base`, IPs e caminhos; na transição do `--dev-ip`, `iptables` e a chain `DOCKER-USER`. Uma sessão do DBA aberta (container `rotaperfumes-dba-cliente`) recusa a execução, sem mudar nada. Se o container já existe com rede, IP, portas, `--read-only` ou usuário diferentes do desejado, **para** pedindo `--recriar` (nada foi mudado). Com `--dev-ip`, aborta se a porta estiver com outro serviço.
+1. **Pré-requisitos:** root, `docker`/`openssl`/`sha256sum`, formato da `--imagem-base`, IPs e caminhos. Uma sessão do DBA aberta (container `rotaperfumes-dba-cliente`) recusa a execução, sem mudar nada. Se o container já existe com rede, IP, portas, `--read-only`, usuário ou datadir diferentes do desejado, **para** pedindo `--recriar` (nada foi mudado). Com `--recriar`, um `--dados` diferente do datadir atual é recusado, salvo `--recriar --trocar-dados` (BACKUP-07): o novo caminho precisa já ter dados (`mysql/`), a guarda do backup sempre dispara e o `recriar.registro` ganha `dados_antes=` e `dados=`.
 2. **Imagem** `rotaperfumes-mariadb:11.4-<12 hex do digest>`: `FROM` a imagem base fixada por digest (SEC-31) + `zz-rotaperfumes.cnf` (TLS obrigatório, `tls_version = TLSv1.2,TLSv1.3`, `plugin_load_add = auth_ed25519`, `local_infile = 0`, `sql_mode` estrito, `utf8mb4_unicode_ci` com `character_set_collations`, `skip_name_resolve`). A chave privada **não** entra na imagem.
 3. **Certificados** em `/etc/mysql/ssl` (`--ssl-dir`; CA própria com a chave fora do servidor; ver [`docs/Instal_SSL.md`](Instal_SSL.md)). A chave de uma CA gerada no servidor (`--nova-ca`) e o `server-ext.cnf` ficam em `/root/rotaperfumes-ca` (`--ca-dir`), onde também fica o temporário da emissão (TST-16; antes era `/root/rotaperfumes-ssl.*`).
 4. **Senhas** em `/root/rotaperfumes-mariadb/` (`--segredos-dir`; 700; arquivos 600, só root): `root.senha`, `rotaperfumes_app.senha`, `rotaperfumes_admin.senha`, `rotaperfumes_backup.senha` e `dba-cliente/conta.senha`. Geradas uma vez (32 caracteres `[A-Za-z0-9]`); a reexecução **não** troca senha. Nada é impresso. **`casaos.senha` (DEPLOY-10):** nunca é criado, lido nem apagado por script, e a senha não é reaproveitada. Se existir, o script avisa `mantido; leve ao pendrive seguro`: mova o arquivo para a mídia cifrada, à mão, quando decidir.
 5. **Rede `rotaperfumes-db` e firewall** (seções 3.2 e 3.3).
 6. **Container** `rotaperfumes-mariadb`: só na rede `rotaperfumes-db` com IP `172.30.42.2`, `--user` do `mysql` da imagem, `--cap-drop ALL`, `no-new-privileges`, `--read-only` (com `tmpfs` em `/run/mysqld` e `/tmp`; `--sem-read-only` só se não subir), `restart unless-stopped`, datadir em `/var/lib/rotaperfumes/mariadb`, `MARIADB_ROOT_HOST=localhost`, `MARIADB_AUTO_UPGRADE=1`, logs `json-file` 5 × 10 MB.
 7. **Banco `rotaperfumes` e contas** (seção 3.4), convergidas a cada execução.
-8. **Teste de conexão TLS:** cliente descartável em `172.30.42.20` conecta com `--ssl-verify-server-cert`; uma conexão `--skip-ssl` aceita **aborta** o script. **DEPLOY-10:** instala `/usr/local/sbin/rotaperfumes-dba` (root, 700; só com o container padrão) e testa por ele: `SELECT CURRENT_USER()` precisa dar `rotaperfumes-admin@172.30.42.22`, e o `--skip-ssl` dessa conta precisa ser recusado. Confere também que o certificado **em uso** pelo `mariadbd` é o de `/etc/mysql/ssl/server-cert.pem` (mesma validade). Com `--dev-ip` (DEPLOY-08): `openssl verify -verify_ip 192.168.168.106` do certificado e leitura dos primeiros bytes de `192.168.168.106:3306` (greeting do MariaDB ou erro 1130 = porta publicada servida pelo `mariadbd`; nada, timeout ou outra resposta **aborta**). Não usa `openssl s_client` na porta publicada: do próprio servidor a conexão chega ao `mariadbd` pelo DNAT com uma origem sem conta (gateway da rede ou IP do host), e o `mariadbd` responde com o erro 1130 antes do greeting, sem handshake TLS. Sem a conta `casaos`, a máquina do `--dev-ip` também recebe o erro 1130: não há teste TLS a partir dela (DEPLOY-10). As contas `healthcheck@localhost`, `@127.0.0.1` e `@::1`, criadas pelo entrypoint da imagem oficial (só `USAGE`), são esperadas; o script só avisa se tiverem mais que `USAGE`.
+8. **Teste de conexão TLS:** cliente descartável em `172.30.42.20` conecta com `--ssl-verify-server-cert`; uma conexão `--skip-ssl` aceita **aborta** o script. **DEPLOY-10:** instala `/usr/local/sbin/rotaperfumes-dba` (root, 700; só com o container padrão) e testa por ele: `SELECT CURRENT_USER()` precisa dar `rotaperfumes-admin@172.30.42.22`, e o `--skip-ssl` dessa conta precisa ser recusado. Confere também que o certificado **em uso** pelo `mariadbd` é o de `/etc/mysql/ssl/server-cert.pem` (mesma validade). As contas `healthcheck@localhost`, `@127.0.0.1` e `@::1`, criadas pelo entrypoint da imagem oficial (só `USAGE`), são esperadas; o script só avisa se tiverem mais que `USAGE`.
 
 No fim, imprime o fingerprint da CA (formato do `deploy/db-ca.fingerprint`), onde está cada senha e os próximos passos. Avisa se a chave da CA ainda estiver no servidor.
 
@@ -188,16 +188,12 @@ No fim, imprime o fingerprint da CA (formato do `deploy/db-ca.fingerprint`), ond
 - A API fala com `rotaperfumes-mariadb:3306` (nome do container, que está no SAN); `DB_HOST`, `DB_PORT`, `DB_TLS_CA` e `DB_TLS_SERVER_NAME` são fixados no `environment` do compose e ganham do `api.env`.
 - **A rede e o container precisam existir antes do `docker compose up`**: sem a rede externa o compose falha (`network rotaperfumes-db declared as external, but could not be found`).
 
-### 3.3 Porta publicada antiga: transição do `--dev-ip` e firewall `DOCKER-USER`
+### 3.3 Sem porta publicada (DEPLOY-10/11)
 
-- **Sem `--dev-ip`:** **nenhuma** porta publicada. Um container que ainda publica a 3306 diverge, e o script pede `--recriar`.
-- **Fase 1 do DEPLOY-10 (atual):** `--dev-ip IP` (repetível, um IPv4 por máquina) só é aceito se o container **já publica a porta**. Serve para migrar as contas sem reiniciar. É recusado em instalação nova, em container sem porta e com `--recriar`. Não publica porta, não cria conta para a LAN e sempre avisa. O `-p` saiu do script.
-- **Fase 2 (card a abrir, depois do item 7 do DEPLOY-08):** recusar o `--dev-ip` como o `--rede-lan` e remover o restante.
-- **Chain:** na transição, a chain `ROTAPERFUMES-DB` tem `-s <IP>/32 -j RETURN` por máquina e `-j DROP` no fim, com um salto no topo de `DOCKER-USER` (`-p tcp -m conntrack --ctorigdst 192.168.168.106 --ctorigdstport 3306 --ctdir ORIGINAL -j ROTAPERFUMES-DB`). A recarga é atômica (`iptables-restore --noflush`).
-- **`--ctdir ORIGINAL` é obrigatório (DEPLOY-08):** o tuple original (`--ctorigdst`/`--ctorigdstport`) é o mesmo nos pacotes de ida e de volta. Sem o `--ctdir ORIGINAL`, a resposta do container (origem `172.30.42.2`) também salta para a chain, não casa nenhum `-s <IP>/32` e cai no `DROP`: o SYN-ACK morre e a máquina liberada recebe timeout na 3306. A reexecução do script insere o salto novo **antes** de remover o antigo (sem `--ctdir`), então não há janela aberta.
-- Persistência: `/usr/local/sbin/rotaperfumes-db-firewall` (root, 700) + unit `rotaperfumes-db-firewall.service` (`After=docker.service`, `PartOf=docker.service`, habilitada), que reaplica a regra depois de um reboot ou restart do Docker. Rodar sem `--dev-ip` depois de já ter usado a opção recarrega a chain só com o `DROP` (fail closed).
-- O ufw **não** filtra portas publicadas pelo Docker; a proteção é a chain acima. Confira: `sudo iptables -S ROTAPERFUMES-DB` e `sudo iptables -S DOCKER-USER | grep ROTAPERFUMES-DB`, que deve mostrar **uma** linha, com `--ctdir ORIGINAL` (`-A DOCKER-USER -p tcp -m conntrack --ctorigdst 192.168.168.106 --ctorigdstport 3306 --ctdir ORIGINAL -j ROTAPERFUMES-DB`). Um salto sem `--ctdir` é de antes do DEPLOY-08 e bloqueia as respostas: rode o script de novo.
-- **Mudar a lista de `--dev-ip`** só altera o firewall da transição: nenhum IP tem conta.
+- **Nenhuma** porta publicada. Um container que ainda publique a 3306 diverge, e o script pede `--recriar`.
+- **DEPLOY-11 (2026-11-18):** a 3306 foi fechada no servidor (`--recriar` sem `--dev-ip`). O `--dev-ip` e o `--porta` saíram e são recusados, como o `--rede-lan`.
+- **Firewall antigo:** se a unit `rotaperfumes-db-firewall.service` ou o `/usr/local/sbin/rotaperfumes-db-firewall` ainda existirem (só com o container padrão), o script os remove, junto com a chain `ROTAPERFUMES-DB` e o salto em `DOCKER-USER`. Isso acontece depois de o container estar no ar sem porta publicada; se ele publicar porta, o script para e o firewall fica.
+- Confira depois: `sudo iptables -S ROTAPERFUMES-DB` dá erro de chain inexistente, e `systemctl status rotaperfumes-db-firewall` dá unit não encontrada.
 
 ### 3.4 Contas e senhas
 
@@ -454,7 +450,7 @@ cd /var/lib/jenkins/workspace/rotaperfumes-deploy/deploy
 
 - **Nunca** rode `up` manualmente com `API_ENV_FILE=/dev/null`, porque a API seria recriada sem as variáveis. Para subir ou recriar, **rode o job**.
 - O banco **não** faz parte do compose: `down` não o afeta. Para recriá-lo, use `sudo rotaperfumes-backup-banco --agora` e `sudo bash deploy/mariadb-docker.sh --recriar`.
-- Os containers têm `restart: unless-stopped` e voltam sozinhos após um reboot do servidor. A exceção é se tiverem sido parados com `stop`. A unit `rotaperfumes-db-firewall` reaplica a regra do banco depois do Docker.
+- Os containers têm `restart: unless-stopped` e voltam sozinhos após um reboot do servidor. A exceção é se tiverem sido parados com `stop`.
 - Os logs rodam em `json-file` com até 5 × 10 MB por serviço.
 
 ### Backup do banco e das imagens de produto
@@ -480,9 +476,9 @@ Os dumps antigos em `/var/backups/rotaperfumes-mariadb/` ficam onde estão (a ro
 **Instalação numa produção já ativa, nesta ordem e em horário calmo:**
 
 1. Atualize o checkout do servidor (`/root/rotaperfumes` ainda não é checkout git: card DEPLOY-08, item 6 da limpeza).
-2. Crie as contas de backup e do DBA, **sem `--recriar`** (migração completa na seção 11, passo 11). Enquanto a porta estiver publicada, use o `--dev-ip` em uso; sem porta, omita a opção. O container não reinicia, mas há um `REVOKE` + `GRANT` rápido nas contas, a `casaos` sai e o firewall é recarregado:
+2. Crie as contas de backup e do DBA, **sem `--recriar`** (migração completa na seção 11, passo 11). O container não reinicia, mas há um `REVOKE` + `GRANT` rápido nas contas e a `casaos` sai:
    ```bash
-   sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.105
+   sudo bash deploy/mariadb-docker.sh
    ```
 3. Instale a rotina. O volume de imagens precisa existir (ele nasce no 1º deploy). O 1º backup roda pela unit, e o comando falha se ele falhar:
    ```bash
@@ -509,13 +505,13 @@ Os dumps antigos em `/var/backups/rotaperfumes-mariadb/` ficam onde estão (a ro
 
 O root executa só a cópia `/usr/local/sbin/rotaperfumes-backup-banco` (700, root), nunca o checkout: um push na `main` não vira código rodando como root. Por isso, depois de atualizar o script ou o digest, rode `--instalar` de novo. A exceção é `--conferir-imagens`, que só lê o arquivo.
 
-**Retenção:** 14 pares diários e 3 manuais, por contagem de pares bons e por série, nunca por data. Para mudar, use `--instalar --retencao-diarios N --retencao-manuais N` (mínimo 2); o valor fica em `/etc/rotaperfumes/backup-banco.conf`. A retenção só roda depois de um par novo publicado, então disco cheio nunca apaga backup. Ela **falha sem apagar nada**, com o par novo intacto, se houver par com data futura, se fosse apagar o próprio par novo ou se o novo ou um dos dois pares mais novos estiver corrompido (`gzip -t` nos dois arquivos e marcador no dump). A mensagem nomeia o arquivo: confira-o e remova-o à mão, se for o caso. Até lá, o backup continua sendo gravado, a retenção não roda e a execução termina com erro. Os pares mais antigos não são relidos. Ela não toca em nomes parecidos, symlinks, subdiretórios, `pre-restauracao-*` nem `parcial-*`.
+**Retenção:** 14 pares diários e 3 manuais, por contagem de pares bons e por série, nunca por data. Para mudar, use `--instalar --retencao-diarios N --retencao-manuais N` (mínimo 2); o valor fica em `/etc/rotaperfumes/backup-banco.conf`. A retenção só roda depois de um par novo publicado, então disco cheio nunca apaga backup. Ela **falha sem apagar nada**, com o par novo intacto, se houver par com data futura, se fosse apagar o próprio par novo ou se o novo, um par que fica na série ou um dos dois pares mais novos estiver corrompido (`gzip -t` nos dois arquivos e marcador no dump). A mensagem nomeia o arquivo: confira-o e remova-o à mão, se for o caso. Até lá, o backup continua sendo gravado, a retenção não roda e a execução termina com erro. Antes de apagar, relê todos os pares que ficam na série e os dois mais novos (BACKUP-05); os que saem não são relidos, e sem nada a apagar nada é relido. Par corrompido: mova o dump e as imagens para fora de `/var/backups/rotaperfumes`. Ela não toca em nomes parecidos, symlinks, subdiretórios, `pre-restauracao-*` nem `parcial-*`.
 
 **Espaço:** antes de começar, exige livre ≥ 2× o dump anterior + o maior entre 2× as imagens anteriores e o tamanho atual do volume + 1 GiB. O backup divide o disco com o banco: encher o disco derruba o banco.
 
-**Quando as imagens falham:** o dump já validado é guardado como `parcial-rotaperfumes-*.sql.gz`, e a execução termina com erro. Esse arquivo **não conta como backup bom**: não dispara a retenção, não satisfaz o `--status` nem a guarda do `--recriar`. Ele fica para uso manual, e só os 3 mais novos são mantidos. Volume ausente é falha. Volume vazio é aceito com `AVISO`. A regra dos 50% vale só para o dump, porque remover produto é legítimo; tamanho e contagem de arquivos ficam no log (`journalctl -u rotaperfumes-backup-banco.service`), que nunca traz linhas do dump nem nomes do tar.
+**Quando as imagens falham:** o dump já validado é guardado como `parcial-rotaperfumes-*.sql.gz`, e a execução termina com erro. Esse arquivo **não conta como backup bom**: não dispara a retenção nem satisfaz o `--status`; a guarda do `--recriar` e do `seed --forcar` o aceita, com `AVISO` (BACKUP-04), mas o `gerar-imagens-producao.sh` e o `restaurar-maquina.sh` não. Ele fica para uso manual, e só os 3 mais novos são mantidos. Volume ausente é falha. Volume vazio é aceito com `AVISO`. A regra dos 50% vale só para o dump, porque remover produto é legítimo; tamanho e contagem de arquivos ficam no log (`journalctl -u rotaperfumes-backup-banco.service`), que nunca traz linhas do dump nem nomes do tar.
 
-**Guarda do `--recriar` e do `seed-producao.sh --forcar`:** com dados existentes, exigem um dump de até 60 minutos (`--backup-janela-min N` muda a janela; acima de 60, só com `--sem-backup-motivo TEXTO`, que justifica a janela maior sem dispensar a conferência do dump), regular, root, 600, sem data futura, com `gzip -t` e marcador na última linha. Nome `pre-restauracao-*` ou `parcial-*` não vale. Exigem só o dump porque não tocam no volume de imagens. Para dispensar (ex.: container parado, que não gera dump novo), use `--sem-backup-motivo TEXTO`, com 10 a 300 caracteres, gravado em `/root/rotaperfumes-mariadb/recriar.registro` ou `seed-forcar.registro` (600), junto com `janela=N`. Com outro destino, passe também `--backup-dir DIR`.
+**Guarda do `--recriar` e do `seed-producao.sh --forcar`:** com dados existentes, exigem um dump de até 60 minutos (`--backup-janela-min N` muda a janela; acima de 60, só com `--sem-backup-motivo TEXTO`, que justifica a janela maior sem dispensar a conferência do dump), regular, root, 600, sem data futura (folga de 300 s para ajuste de relógio, BACKUP-03), com `gzip -t` e marcador na última linha. O mais novo é escolhido pelo carimbo; só `pre-restauracao-*` não vale; `parcial-*` vale, com aviso (no mesmo carimbo vence o completo). Se o mais novo falhar, recusa sem recuar para um mais antigo. Exigem só o dump porque não tocam no volume de imagens. Para dispensar (ex.: container parado, que não gera dump novo), use `--sem-backup-motivo TEXTO`, com 10 a 300 caracteres, gravado em `/root/rotaperfumes-mariadb/recriar.registro` ou `seed-forcar.registro` (600), junto com `janela=N`. Com outro destino, passe também `--backup-dir DIR`.
 
 **Destino em outro disco (ex.: SSD):**
 
@@ -603,8 +599,9 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 | Máquina de dev na 3306: `Host ... is not allowed to connect` (erro 1130) ou timeout | Esperado desde o DEPLOY-10: nenhuma conta aceita a LAN | Por SSH no servidor: `sudo rotaperfumes-dba` |
 | `rotaperfumes-dba`: `ja ha uma sessao aberta` ou `mariadb-docker.sh`: `ha uma sessao do DBA aberta` | Container `rotaperfumes-dba-cliente` em uso ou abandonado | Feche a sessão; se abandonada, `sudo rotaperfumes-dba --encerrar-sessao` |
 | Cliente: `Authentication plugin 'client_ed25519' cannot be loaded` | Cliente sem ed25519 (ex.: `mysql` do Oracle, Workbench) | Use o cliente `mariadb` 11.x. Na produção, o `sudo rotaperfumes-dba` já traz o cliente certo |
-| `mariadb-docker.sh`: "rode de novo com --recriar, sem --dev-ip" | Container existente difere do desejado (rede, porta, read-only, usuário) | Rode `sudo rotaperfumes-backup-banco --agora` e depois `--recriar` sem `--dev-ip`, o que fecha a 3306 (o banco fica fora do ar alguns segundos) |
-| `mariadb-docker.sh`: "--dev-ip recusado" | Instalação nova ou container que não publica porta (DEPLOY-10) | Rode sem `--dev-ip` |
+| `mariadb-docker.sh`: "rode de novo com --recriar" | Container existente difere do desejado (rede, porta, read-only, usuário, datadir) | Rode `sudo rotaperfumes-backup-banco --agora` e depois `--recriar` (o banco fica fora do ar alguns segundos) |
+| `mariadb-docker.sh`: "--dev-ip saiu" ou "--porta saiu" | Opções removidas no DEPLOY-11: o banco não publica porta | Rode sem a opção; DBA: `sudo rotaperfumes-dba` |
+| `mariadb-docker.sh`: "difere do datadir atual do container" | `--recriar` com `--dados` diferente do datadir em uso (BACKUP-07) | Use o caminho atual; para mover o datadir: backup, copie os dados e use `--recriar --trocar-dados` |
 | `mariadb-docker.sh --recriar` ou `seed-producao.sh --forcar`: "nenhum backup", "tem mais de 60 min" ou outra recusa do backup mais recente | Guarda do BACKUP-01: exige dump recente, antes de qualquer mudança | `sudo rotaperfumes-backup-banco --agora`. Com o container parado, `--sem-backup-motivo TEXTO` (seção 9) |
 | `rotaperfumes-backup-banco`: "nao esta montado" | Destino com `--exigir-montagem` e o disco desmontado; nada foi gravado | Abra e monte o disco e rode `--agora` |
 | `rotaperfumes-backup-banco`: "volume rotaperfumes_produto_imagens nao existe" | O volume nasce no 1º deploy; o dump ficou como `parcial-*`, sem contar como backup bom | Rode o job do Jenkins e depois `--agora` |
@@ -619,7 +616,7 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 
 ## 11. Instalação inicial da produção (DEPLOY-07)
 
-> **Estado em 2026-11-06 (informado pelo usuário): a produção está NO AR.** `rotaperfumes-api-1`, `rotaperfumes-frontend-1`, `rotaperfumes-caddy-1` (porta 8443) e `rotaperfumes-mariadb` estão no ar, e o admin já fez login e trocou a senha. **Os passos abaixo descrevem a instalação do zero: não os repita neste servidor.** O que falta é a limpeza pós-instalação do card DEPLOY-08 (`tarefas/afazer.md`), na ordem de lá. Um push na `main` agora é um **deploy em sistema vivo**. A `192.168.168.106:3306` segue publicada, com a chain `ROTAPERFUMES-DB` liberando só `192.168.168.105`, contra o cenário abaixo; isso é tratado no item 7 da limpeza.
+> **Estado em 2026-11-06 (informado pelo usuário): a produção está NO AR.** `rotaperfumes-api-1`, `rotaperfumes-frontend-1`, `rotaperfumes-caddy-1` (porta 8443) e `rotaperfumes-mariadb` estão no ar, e o admin já fez login e trocou a senha. **Os passos abaixo descrevem a instalação do zero: não os repita neste servidor.** O que falta é a limpeza pós-instalação do card DEPLOY-08 (`tarefas/afazer.md`), na ordem de lá. Um push na `main` agora é um **deploy em sistema vivo**. A `192.168.168.106:3306` foi fechada em 2026-11-18 (item 7 da limpeza; DEPLOY-11).
 >
 > **Execução do usuário**, uma vez, no servidor `192.168.168.106` (`ivo-inspiron-15-3530`) e na máquina do admin. A equipe não tem acesso ao servidor nem ao Docker dele: nenhum agente executou esta seção contra o servidor real.
 >
@@ -667,7 +664,7 @@ cd /root/rotaperfumes
 bash deploy/mariadb-docker.sh --nova-ca
 ```
 
-> **Caminho ainda não testado no servidor.** O script só tem cobertura de teste com Docker simulado (`backend/shared/tests/deploy/mariadb_docker_test.go`) e pelo teste real opt-in do passo 12, em container isolado. Faça as conferências abaixo na primeira execução e registre o resultado no card DEPLOY-08. **Neste servidor,** o script já rodou com `--dev-ip`: a primeira execução sem essa opção será o `--recriar` do item 7 da limpeza (card DEPLOY-08), nunca o `--nova-ca` acima, e vale o caso "Se o script já rodou neste servidor com `--dev-ip`", abaixo.
+> **Caminho ainda não testado no servidor.** O script só tem cobertura de teste com Docker simulado (`backend/shared/tests/deploy/mariadb_docker_test.go`) e pelo teste real opt-in do passo 12, em container isolado. Faça as conferências abaixo na primeira execução e registre o resultado no card DEPLOY-08. **Neste servidor,** o script já rodou e a 3306 já foi fechada pelo `--recriar` (2026-11-18): nunca rode o `--nova-ca` acima nele.
 
 - `--nova-ca` gera a CA de produção (`CN=RotaPerfumes_MariaDB_CA`, chave em `/root/rotaperfumes-ca/ca-key.pem`, que sai do servidor no passo 3) e o certificado do servidor (SAN `IP:192.168.168.106, DNS:rotaperfumes-mariadb, DNS:localhost, IP:127.0.0.1, DNS:<hostname>`). O script cria a rede `rotaperfumes-db`, o container, o banco `rotaperfumes` **vazio**, as contas e as senhas em `/root/rotaperfumes-mariadb/` (seções 3.1 a 3.4).
 - **Produção só local** (decisão de 2026-11-04): nenhuma porta é publicada, a chain `ROTAPERFUMES-DB` e a unit `rotaperfumes-db-firewall.service` não são criadas, e não há conta `casaos` nem `casaos.senha`. Um `casaos.senha` já existente é mantido, com o aviso `mantido; leve ao pendrive seguro`; nenhum script o lê ou apaga (DEPLOY-10). A API, o Jenkins e o DBA não precisam da porta (usam a rede interna).
@@ -680,7 +677,7 @@ bash deploy/mariadb-docker.sh --nova-ca
   iptables -S ROTAPERFUMES-DB           # erro de chain inexistente (rc 1)
   iptables -S DOCKER-USER | grep ROTAPERFUMES-DB   # nenhuma saída
   ```
-- **Se o script já rodou neste servidor com `--dev-ip`,** siga o passo 11, sem `--nova-ca`. Sem `--dev-ip` nem `--recriar`, o script para antes de mudar qualquer coisa (porta divergente). Com a unit antiga, a chain continua existindo, recarregada só com `-j DROP` (fail closed), e as duas últimas conferências acima não valem. O datadir `/var/lib/rotaperfumes/mariadb` é preservado, então o banco **não** nasce vazio: pare e avalie antes de seguir. No `--recriar` do item 7 da limpeza (card DEPLOY-08), preservar o banco é o objetivo: não há o que parar por isso.
+- **Se o script já rodou neste servidor,** não use `--nova-ca`. O datadir `/var/lib/rotaperfumes/mariadb` é preservado, então o banco **não** nasce vazio: pare e avalie antes de seguir. A unit e a chain do firewall antigo, se existirem, são removidas pelo script (seção 3.3).
 - **Anote o `CA_FP`**: é o valor impresso no fim, em "CA do banco de PRODUCAO ... fingerprint SHA-256 (formato do deploy/db-ca.fingerprint)". Ele vai para o passo 4. Numa instalação do zero, com CA nova, o resumo também avisa que o `deploy/db-ca.fingerprint` "NAO contem" esse valor (o arquivo traz o fingerprint da CA que estava em uso, trocado no passo 4), que a CA é nova e que a chave da CA está no servidor (passo 3). Os três avisos são esperados. O texto "a linha antiga pode ficar ate o deploy" desse aviso vale para a rotação de CA; numa instalação do zero, a troca é feita no passo 4.
 - **Não** copie esta CA para `deploy/ca-cert.pem`: esse arquivo é a CA de **dev** (CasaOS).
 
@@ -837,8 +834,9 @@ Só em instalação anterior ao DEPLOY-10. Vem entre os itens 6 e 7 da limpeza d
 
 1. Em horário calmo, com o checkout atualizado (item 6). Cria `rotaperfumes_backup` e `rotaperfumes-admin`, remove `casaos@*`, instala o comando, sem reiniciar o container:
    ```bash
-   sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.105
+   sudo bash deploy/mariadb-docker.sh
    ```
+   (Na época, com a 3306 publicada, este comando levava `--dev-ip 192.168.168.105`; a opção saiu no DEPLOY-11.)
 2. Confira. A saída precisa trazer `rotaperfumes-admin@172.30.42.22`:
    ```bash
    echo 'SELECT CURRENT_USER()' | sudo rotaperfumes-dba
@@ -859,7 +857,7 @@ Só em instalação anterior ao DEPLOY-10. Vem entre os itens 6 e 7 da limpeza d
 
 - A máquina de dev não acessa mais a produção: um `.env.producao` e um `deploy/ca-producao.pem` nela deixam de ter uso. O `.env` padrão continua apontando para o CasaOS de dev (`192.168.168.106:3307`), que não muda.
 - `casaos.senha` e `casaos-native.motivo` ficam onde estão, sem uso. Nenhum script os lê ou apaga, e a senha não é reaproveitada. Leve o `casaos.senha` ao pendrive seguro.
-- Fase 2 do `--dev-ip`: card a abrir depois do item 7.
+- Fase 2 do `--dev-ip`: feita no DEPLOY-11 (2026-11-18); a opção é recusada e o firewall antigo sai na próxima execução do script.
 
 ### Passo 12. Teste real do script (`TestTST15_MariadbDocker_Real`)
 
@@ -940,7 +938,7 @@ Com `--sem-tunel` (ensaio), o script pula o `cloudflared` e o token e dispensa a
 
 **Cloudflare, no painel:** o `--listar-manuais` e a etapa 11 trazem a lista: hostname público, serviço `https://localhost:8443` com a verificação TLS desligada (noTLSVerify), token, conector antigo parado, hostnames adicionais e os do Turnstile. Dois conectores com o mesmo token ficam ativos ao mesmo tempo, e cada requisição vai para o mais próximo: o script não enxerga a outra máquina, e a proteção é a declaração digitada. **Com a máquina antiga perdida ou sob suspeita,** "Rotate token" no painel não basta: limpe também as conexões (`DELETE` em `/connections` da API), porque os conectores atuais seguem ativos até reiniciar.
 
-**Chave do apt:** `deploy/cloudflare-apt.asc` e `deploy/cloudflare-apt.fingerprint`. Fingerprint diferente encerra o script. **O fingerprint veio só do HTTPS da própria Cloudflare (a página não o publica): confirme-o por um segundo canal antes de confiar nele.** Ao trocar a chave, mude os dois arquivos juntos.
+**Chave do apt:** `deploy/cloudflare-apt.asc` e `deploy/cloudflare-apt.fingerprint`. Fingerprint diferente encerra o script. O fingerprint veio do HTTPS da Cloudflare e foi confirmado em 2026-11-07 por um segundo canal (SEC-73): keyserver.ubuntu.com e keys.openpgp.org servem a mesma chave e a subchave `06C8…F50F`. Ao trocar a chave, confirme o fingerprint novo por um segundo canal antes do commit e mude os dois arquivos juntos.
 
 **IP ou hostname diferentes:** o certificado do banco é reemitido, o que exige `--ca-key`, e o `--listar-manuais` lista os arquivos que precisam de commit (`Jenkinsfile`, `deploy/docker-compose.yml`, `deploy/mariadb-docker.sh`, `deploy/setup-servidor.sh`, guardas do `Makefile` e do `integracao.go`) e os que não mudam (CasaOS de dev). Com `--nova-ca`, grave o fingerprint em `deploy/db-ca.fingerprint`, faça o commit e o push **depois** de atualizar o Secret file, senão o estágio "CA do banco" recusa. O `caddy_data` nasce novo: reinstale a raiz da CA nos clientes da LAN.
 

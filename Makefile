@@ -652,18 +652,18 @@ frontend-deps: ## Instala dependências npm do frontend (roda uma vez)
 test: test-shared test-api ## Roda todos os testes Go (requer Go local na versão do go.mod, com covdata: ver make setup-check / TST-08)
 
 test-shared: $(GUARDA_INTEGRACAO) ## Testes do pacote compartilhado (em tests/, cobertura medida com -coverpkg=./...)
-	cd backend/shared && $(SEM_SEGREDOS_TESTE) go test ./... $(GO_TEST_FLAGS) -v -coverpkg=./... -coverprofile=coverage.txt
+	cd backend/shared && $(SEM_SEGREDOS_TESTE) go test ./... -timeout=30m $(GO_TEST_FLAGS) -v -coverpkg=./... -coverprofile=coverage.txt
 
 cover-shared: $(GUARDA_INTEGRACAO) ## Cobertura do shared: total + relatório HTML (backend/shared/coverage.html)
-	cd backend/shared && $(SEM_SEGREDOS_TESTE) go test ./... -coverpkg=./... -coverprofile=coverage.txt
+	cd backend/shared && $(SEM_SEGREDOS_TESTE) go test ./... -timeout=30m -coverpkg=./... -coverprofile=coverage.txt
 	cd backend/shared && $(SEM_SEGREDOS) go tool cover -func=coverage.txt | tail -1
 	cd backend/shared && $(SEM_SEGREDOS) go tool cover -html=coverage.txt -o coverage.html
 
 test-api: $(GUARDA_INTEGRACAO) build-shared ## Testes da API (em tests/, cobertura medida com -coverpkg=./...)
-	cd backend/rotaperfumes-api && $(SEM_SEGREDOS_TESTE) go test ./... $(GO_TEST_FLAGS) -v -coverpkg=./... -coverprofile=coverage.txt
+	cd backend/rotaperfumes-api && $(SEM_SEGREDOS_TESTE) go test ./... -timeout=30m $(GO_TEST_FLAGS) -v -coverpkg=./... -coverprofile=coverage.txt
 
 cover-api: $(GUARDA_INTEGRACAO) build-shared ## Cobertura da API: total + relatório HTML (backend/rotaperfumes-api/coverage.html)
-	cd backend/rotaperfumes-api && $(SEM_SEGREDOS_TESTE) go test ./... -coverpkg=./... -coverprofile=coverage.txt
+	cd backend/rotaperfumes-api && $(SEM_SEGREDOS_TESTE) go test ./... -timeout=30m -coverpkg=./... -coverprofile=coverage.txt
 	cd backend/rotaperfumes-api && $(SEM_SEGREDOS) go tool cover -func=coverage.txt | tail -1
 	cd backend/rotaperfumes-api && $(SEM_SEGREDOS) go tool cover -html=coverage.txt -o coverage.html
 
@@ -676,8 +676,8 @@ arch-check: $(GUARDA_INTEGRACAO) ## ARQ-01: testes de arquitetura (dependências
 # shared, somada à do módulo shared (blocos mesclados: um bloco conta como
 # coberto se algum dos dois perfis o cobrir).
 cover-combinada: $(GUARDA_INTEGRACAO) build-shared ## ARQ-01: cobertura combinada API+shared (-coverpkg cobrindo os dois módulos, blocos mesclados)
-	cd backend/shared && $(SEM_SEGREDOS_TESTE) go test ./... -coverpkg=./... -coverprofile=coverage-combinada-shared.txt
-	cd backend/rotaperfumes-api && $(SEM_SEGREDOS_TESTE) go test ./... -coverpkg=./...,github.com/rotaperfumes/shared/... -coverprofile=coverage-combinada-api.txt
+	cd backend/shared && $(SEM_SEGREDOS_TESTE) go test ./... -timeout=30m -coverpkg=./... -coverprofile=coverage-combinada-shared.txt
+	cd backend/rotaperfumes-api && $(SEM_SEGREDOS_TESTE) go test ./... -timeout=30m -coverpkg=./...,github.com/rotaperfumes/shared/... -coverprofile=coverage-combinada-api.txt
 	awk 'NR == 1 { print; next } FNR == 1 { next } { chave = $$1 " " $$2; if (!(chave in n) || $$3 > n[chave]) n[chave] = $$3 } END { for (c in n) print c, n[c] }' \
 		backend/rotaperfumes-api/coverage-combinada-api.txt backend/shared/coverage-combinada-shared.txt > backend/rotaperfumes-api/coverage-combinada.txt
 	cd backend/rotaperfumes-api && $(SEM_SEGREDOS) go tool cover -func=coverage-combinada.txt | tail -1

@@ -47,6 +47,8 @@ readonly VOLUME="rotaperfumes_produto_imagens"
 readonly UID_IMAGENS="65532"
 readonly DIR_IMAGENS="/data/produtos-imagens"
 readonly BACKUP_JANELA_MIN=60
+# BACKUP-03: folga para ajuste de relogio ao julgar "data futura" (igual ao backup-banco.sh).
+readonly TOLERANCIA_RELOGIO_S=300
 
 MODO=""
 SOBRESCREVER=false
@@ -145,6 +147,8 @@ conferir_dir_privado() { # opcao dir [existe]
   fi
 }
 
+# BACKUP-04: ao contrario do --recriar e do seed, aqui parcial-* NAO vale: este
+# script grava no volume de imagens, e o parcial nao tem o tar das imagens.
 conferir_backup_recente() { # dir janela_min -> define BACKUP_USADO
   local dir=$1 janela=$2 LC_ALL=C arq="" f nome agora mtime carimbo dica
   dica="gere um com: sudo rotaperfumes-backup-banco --agora (ou use --sem-backup-motivo TEXTO, que fica registrado)"
@@ -164,7 +168,7 @@ conferir_backup_recente() { # dir janela_min -> define BACKUP_USADO
   agora=$(date +%s)
   mtime=$(stat -c %Y -- "$arq")
   for f in "$carimbo" "$mtime"; do
-    (( f <= agora )) || die "o backup mais recente ($nome) tem data futura; $dica"
+    (( f <= agora + TOLERANCIA_RELOGIO_S )) || die "o backup mais recente ($nome) tem data futura (mais de ${TOLERANCIA_RELOGIO_S} s a frente do relogio); $dica"
     (( agora - f <= janela * 60 )) || die "o backup mais recente ($nome) tem mais de $janela min; $dica"
   done
   gzip -t -- "$arq" 2>/dev/null || die "o backup mais recente ($nome) esta corrompido; $dica"
@@ -222,10 +226,13 @@ conferir_volume() {
   [[ "$dono" == "$UID_IMAGENS" ]] || die "a raiz do volume $VOLUME e do uid $dono (esperado $UID_IMAGENS, o da API)"
 }
 
+# Como o dono (65532): root sem CAP_DAC_OVERRIDE nao le o volume; pipefail
+# faz o erro do find derrubar a contagem em vez de imprimir 0.
 contar_arquivos_volume() {
   docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges:true --read-only \
+    --user "$UID_IMAGENS:$UID_IMAGENS" \
     --mount "type=volume,source=$VOLUME,target=/v,readonly" --entrypoint sh "$GO_IMAGE" \
-    -c 'find /v -type f | wc -l' </dev/null
+    -c 'set -o pipefail; find /v -type f | wc -l' </dev/null
 }
 
 # ---------------------------------------------------------------------------

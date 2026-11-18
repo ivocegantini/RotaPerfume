@@ -1388,12 +1388,6 @@ func TestBACKUP01_TB_GuardaRecusaSemNenhumaMudanca(t *testing.T) {
 		{"so imagens", func(t *testing.T, _ *ensaio, dir string) {
 			escrever(t, filepath.Join(dir, "rotaperfumes-imagens-"+carimboAgora(0)+".tar.gz"), comprimir(t, dumpBackupBom()), 0o600)
 		}, "nenhum backup"},
-		{"parcial novo com bom antigo", func(t *testing.T, _ *ensaio, dir string) {
-			p := novo(t, dir, "rotaperfumes-"+carimboAgora(-2*time.Hour)+".sql.gz")
-			v := time.Now().Add(-2 * time.Hour)
-			require.NoError(t, os.Chtimes(p, v, v))
-			novo(t, dir, "parcial-rotaperfumes-"+carimboAgora(0)+".sql.gz")
-		}, "tem mais de 60 min"},
 		{"pre-restauracao novo com bom antigo", func(t *testing.T, _ *ensaio, dir string) {
 			p := novo(t, dir, "rotaperfumes-"+carimboAgora(-2*time.Hour)+".sql.gz")
 			v := time.Now().Add(-2 * time.Hour)
@@ -1462,9 +1456,6 @@ func TestBACKUP01_TB_GuardaEscolheOBackupCerto(t *testing.T) {
 		nome   string
 		extras func(t *testing.T, dir string)
 	}{
-		{"parcial mais novo", func(t *testing.T, dir string) {
-			dumpRecente(t, dir, "parcial-rotaperfumes-"+carimboAgora(time.Second)+".sql.gz")
-		}},
 		{"pre-restauracao mais novo", func(t *testing.T, dir string) {
 			dumpRecente(t, dir, "pre-restauracao-"+carimboAgora(time.Second)+".sql.gz")
 		}},
@@ -1640,9 +1631,6 @@ func TestBACKUP01_TB_SeedGuardaRecusas(t *testing.T) {
 		{"sem marcador", func(t *testing.T, _ *ensaioSeed, dir string) {
 			escrever(t, filepath.Join(dir, agora()), comprimir(t, "CREATE TABLE x;\n"), 0o600)
 		}, "marcador"},
-		{"parcial", func(t *testing.T, _ *ensaioSeed, dir string) {
-			dumpRecente(t, dir, "parcial-rotaperfumes-"+carimboAgora(0)+".sql.gz")
-		}, "nenhum backup"},
 		{"pre-restauracao", func(t *testing.T, _ *ensaioSeed, dir string) {
 			dumpRecente(t, dir, "pre-restauracao-"+carimboAgora(0)+".sql.gz")
 		}, "nenhum backup"},
