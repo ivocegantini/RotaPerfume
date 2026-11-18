@@ -222,10 +222,13 @@ conferir_volume() {
   [[ "$dono" == "$UID_IMAGENS" ]] || die "a raiz do volume $VOLUME e do uid $dono (esperado $UID_IMAGENS, o da API)"
 }
 
+# Como o dono (65532): root sem CAP_DAC_OVERRIDE nao le o volume; pipefail
+# faz o erro do find derrubar a contagem em vez de imprimir 0.
 contar_arquivos_volume() {
   docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges:true --read-only \
+    --user "$UID_IMAGENS:$UID_IMAGENS" \
     --mount "type=volume,source=$VOLUME,target=/v,readonly" --entrypoint sh "$GO_IMAGE" \
-    -c 'find /v -type f | wc -l' </dev/null
+    -c 'set -o pipefail; find /v -type f | wc -l' </dev/null
 }
 
 # ---------------------------------------------------------------------------

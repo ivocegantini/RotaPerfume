@@ -12,6 +12,10 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: IMG-02 (imagens de produto na produção)
+- Causa: as imagens nunca foram geradas em produção (292 produtos, 0 com imagem); a 3306 fechada impedia o `make db-gerar-imagens-produtos`. Correção: `deploy/gerar-imagens-producao.sh` (build isolado; roda na rede do banco, uid 65532, read-only, conta admin .20 via TLS).
+- Servidor: `--confirmar` gerou 292/292, 0 falhas; backup `--agora` com 292 imagens. Correção posterior: a conferência contava 0 (find como root sem CAP_DAC_OVERRIDE); agora roda como o dono do volume e com pipefail.
+
 ## Avulso de 2026-11-18: MERGE-01 concluído no servidor
 - PR mesclado (`f78597d`); servidor: timer antigo removido, contas `rotaperfumes_backup`/`rotaperfumes-admin` criadas (`casaos_ro` removida), `backup-banco.sh --instalar` (1º backup ok), `verificar-backup.sh` APROVADO (14 tabelas), `--agora` + `--recriar` (imagem nova, 3306 fechada). `--status` ok.
 - Observado: volume de imagens de produto vazio (0 arquivos); uid 999 do host é o `dnsmasq` (aviso antigo do script).

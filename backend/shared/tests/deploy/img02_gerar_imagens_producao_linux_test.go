@@ -111,6 +111,14 @@ func TestIMG02_ExecucaoIsolada(t *testing.T) {
 		assert.NotContains(t, build, s)
 	}
 
+	// Contagem como o dono do volume e com pipefail (root sem CAP_DAC_OVERRIDE
+	// não lê o volume e o wc imprimia 0 sem erro).
+	k := strings.Index(codigo, "contar_arquivos_volume() {")
+	require.GreaterOrEqual(t, k, 0)
+	conta := codigo[k : k+strings.Index(codigo[k:], "\n}\n")]
+	assert.Contains(t, conta, `--user "$UID_IMAGENS:$UID_IMAGENS"`)
+	assert.Contains(t, conta, "set -o pipefail; find /v -type f | wc -l")
+
 	// Com --confirmar: backup recente antes de gravar.
 	assert.Regexp(t, `(?s)if \[\[ "\$MODO" == confirmar \]\]; then.*?conferir_backup_recente "\$BACKUP_DIR" "\$BACKUP_JANELA_MIN"`, codigo)
 }
