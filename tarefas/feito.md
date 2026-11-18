@@ -12,6 +12,11 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: ECOM-11 página do produto
+- `produtos.descricao` → `nome` e nova `descricao` TEXT (migração 34, `make db-fix-produtos-nome-descricao`; DDL 10 no estado final); domínio valida até 5000 caracteres; API/front/Postman com `nome`, `produto_nome` e `?order_by=nome`.
+- `GET /api/loja/produtos/{id}` público (só ativo, inativo = 404 igual, limite por IP, cache `vitrine`); página `/produtos/[id]` aberta pelo cartão da vitrine; textarea "Descricao" no admin.
+- Importer gera descrição ≥500 caracteres (categoria, nota, embalagem, marca, lançamento) e não sobrescreve a editada. `make test` e `make test-frontend` (1901) rc=0; migração 34 e `db-import-produtos` aplicados no CasaOS :3307 (292 atualizados).
+
 ## Avulso de 2026-11-18: DEPLOY-13 (imagem do container alinhada)
 - `rotaperfumes-backup-banco --agora` ok (15:54Z, dump validado, 292 imagens) e `mariadb-docker.sh --recriar` do `/root/rotaperfumes-main`: container na `rotaperfumes-mariadb:11.4-5e73baf8179b` (11.4.13), sem o aviso de imagem diferente; TLS 1.3, sem-TLS recusado, DBA ok, fingerprint da CA confere. Segue o aviso antigo do uid 999 (`dnsmasq`).
 

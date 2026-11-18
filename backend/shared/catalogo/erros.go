@@ -13,7 +13,8 @@ import "github.com/rotaperfumes/shared/kernel"
 var (
 	ErrProdutoNaoEncontrado   = kernel.NovoErro(kernel.KindNaoEncontrado, "produto não encontrado")
 	ErrSKUObrigatorio         = kernel.NovoErro(kernel.KindInvalido, "sku é obrigatório")
-	ErrDescricaoObrigatoria   = kernel.NovoErro(kernel.KindInvalido, "descrição é obrigatória")
+	ErrNomeObrigatorio        = kernel.NovoErro(kernel.KindInvalido, "nome é obrigatório")
+	ErrDescricaoMuitoLonga    = kernel.NovoErro(kernel.KindInvalido, "descrição deve ter no máximo 5000 caracteres") // ECOM-11
 	ErrCategoriaObrigatoria   = kernel.NovoErro(kernel.KindInvalido, "categoria é obrigatória")
 	ErrMarcaObrigatoria       = kernel.NovoErro(kernel.KindInvalido, "marca é obrigatória")
 	ErrUnidadeObrigatoria     = kernel.NovoErro(kernel.KindInvalido, "unidade é obrigatória")

@@ -15,11 +15,11 @@ import (
 )
 
 // lojaProdutoResposta é o item da vitrine (ECOM-01): só dados públicos (sem
-// custo, sem ativo nem timestamps).
+// custo, sem ativo nem timestamps). A descrição completa fica só no detalhe.
 type lojaProdutoResposta struct {
 	ID           int64           `json:"id"`
 	SKU          string          `json:"sku"`
-	Descricao    string          `json:"descricao"`
+	Nome         string          `json:"nome"`
 	Categoria    string          `json:"categoria"`
 	Marca        string          `json:"marca"`
 	NotaOlfativa string          `json:"nota_olfativa"`
@@ -30,9 +30,16 @@ type lojaProdutoResposta struct {
 
 func produtoParaLoja(p catalogo.Produto) lojaProdutoResposta {
 	return lojaProdutoResposta{
-		ID: p.ID, SKU: p.SKU.String(), Descricao: p.Descricao, Categoria: p.Categoria, Marca: p.Marca,
+		ID: p.ID, SKU: p.SKU.String(), Nome: p.Nome, Categoria: p.Categoria, Marca: p.Marca,
 		NotaOlfativa: p.NotaOlfativa, Preco: p.PrecoTabela, Unidade: p.Unidade, ImagemURL: urlImagem(p.Imagem),
 	}
+}
+
+// lojaProdutoDetalhe é a página do produto (ECOM-11): o item da vitrine mais
+// a descrição completa ("" sem descrição).
+type lojaProdutoDetalhe struct {
+	lojaProdutoResposta
+	Descricao string `json:"descricao"`
 }
 
 // limitadorLoja é o rate limit da vitrine (adapters/ratelimit satisfaz).
@@ -103,6 +110,31 @@ func (h *ProdutoHandler) ListProdutosLoja(w http.ResponseWriter, r *http.Request
 	variante := cache.Variante(strconv.Itoa(pagina.Numero()), strconv.Itoa(pagina.Limite()),
 		filtro.Categoria, filtro.Marca, filtro.NotaOlfativa, fmt.Sprintf("%v", filtro.Ordenacao))
 	httpx.ServirComCache(w, r, h.cache, cache.AreaVitrine, variante, gerar)
+}
+
+// GetProdutoLoja GET /api/loja/produtos/{id} (Public, ECOM-11): a página do
+// produto. Inativo e inexistente dão o mesmo 404 (não revela o id).
+func (h *ProdutoHandler) GetProdutoLoja(w http.ResponseWriter, r *http.Request) {
+	const tag = "[loja] GetProdutoLoja"
+	if !h.dentroDoLimite(w, r, tag) {
+		return
+	}
+	id, err := httpx.IDDoPath(r, "id")
+	if err != nil {
+		httpx.ResponderErro(w, tag, err)
+		return
+	}
+	httpx.ServirComCache(w, r, h.cache, cache.AreaVitrine, cache.Variante("produto", strconv.FormatInt(id, 10)), func(w http.ResponseWriter) {
+		p, err := h.casos.ObterProduto(r.Context(), id)
+		if err == nil && !p.Ativo {
+			err = catalogo.ErrProdutoNaoEncontrado
+		}
+		if err != nil {
+			httpx.ResponderErro(w, tag, err)
+			return
+		}
+		httpx.JSON(w, http.StatusOK, lojaProdutoDetalhe{lojaProdutoResposta: produtoParaLoja(*p), Descricao: p.Descricao}, "")
+	})
 }
 
 // opcoesLojaResposta são as opções dos filtros da vitrine (ECOM-04); listas

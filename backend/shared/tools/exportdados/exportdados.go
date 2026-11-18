@@ -151,9 +151,9 @@ var Exports = []TableExport{
 	},
 	{
 		RelPath: filepath.Join("erp", "produtos.csv"),
-		Header:  []string{"sku", "descricao", "categoria", "marca", "nota_olfativa", "preco_tabela", "custo_unitario", "unidade", "ativo", "data_lancamento"},
+		Header:  []string{"sku", "nome", "categoria", "marca", "nota_olfativa", "preco_tabela", "custo_unitario", "unidade", "ativo", "data_lancamento"},
 		Query: `
-			SELECT sku, descricao, categoria, marca, COALESCE(nota_olfativa, ''),
+			SELECT sku, nome, categoria, marca, COALESCE(nota_olfativa, ''),
 			       preco_tabela, custo_unitario, unidade, IF(ativo = 1, 'S', 'N'),
 			       COALESCE(DATE_FORMAT(data_lancamento, '%Y-%m-%d'), '')
 			FROM produtos

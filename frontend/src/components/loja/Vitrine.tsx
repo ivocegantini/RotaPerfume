@@ -2,56 +2,29 @@
 
 // ECOM-01/10: vitrine da loja, a pagina inicial do site (publica). Lista os
 // produtos ativos de GET /api/loja/produtos (sem custo), com busca, filtros,
-// ordenacao e paginacao no servidor. O topo mostra Entrar/Criar conta ao
-// visitante e Ola/Sair (e Painel para a equipe) a quem esta logado.
+// ordenacao e paginacao no servidor. O topo (TopoLoja) mostra a conta; o
+// cartao abre a pagina do produto (/produtos/{id}, ECOM-11).
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Paginador } from "@/components/ui/Paginador";
+import { TopoLoja } from "@/components/loja/TopoLoja";
 import { apiListProdutosLoja, apiOpcoesFiltroLoja } from "@/lib/api";
-import { logout, rotaInicial } from "@/lib/auth";
 import { urlImagemProduto } from "@/lib/imagemProduto";
 import { useUltimaResposta } from "@/lib/useListaSegura";
-import type { OpcoesFiltroLoja, ProdutoLoja, User } from "@/lib/types";
+import type { OpcoesFiltroLoja, ProdutoLoja } from "@/lib/types";
 import { vlog } from "@/lib/vlog";
 
 const FILE = "Vitrine.tsx";
 
-// Sessao do cache local (so para o topo; a API decide o acesso). Store
-// externa: no servidor e na hydration e "sem sessao", entao o HTML bate.
-const CHAVE_USUARIO = "auth_user";
-const assinarSessao = (cb: () => void) => {
-  window.addEventListener("storage", cb);
-  return () => window.removeEventListener("storage", cb);
-};
-const lerSessao = () => {
-  try {
-    return localStorage.getItem(CHAVE_USUARIO);
-  } catch {
-    return null;
-  }
-};
-const sessaoNoServidor = () => null;
-
-function useSessaoLocal(): Pick<User, "nome" | "role"> | null {
-  const bruto = useSyncExternalStore(assinarSessao, lerSessao, sessaoNoServidor);
-  if (!bruto) return null;
-  try {
-    const u = JSON.parse(bruto) as User;
-    return u && typeof u.nome === "string" ? { nome: u.nome, role: u.role } : null;
-  } catch {
-    return null;
-  }
-}
-
 const POR_PAGINA = 24;
 
-type Ordem = "descricao:asc" | "preco_tabela:asc" | "preco_tabela:desc" | "marca:asc";
+type Ordem = "nome:asc" | "preco_tabela:asc" | "preco_tabela:desc" | "marca:asc";
 const ORDENS: { value: Ordem; label: string }[] = [
-  { value: "descricao:asc", label: "Nome (A-Z)" },
+  { value: "nome:asc", label: "Nome (A-Z)" },
   { value: "preco_tabela:asc", label: "Menor preco" },
   { value: "preco_tabela:desc", label: "Maior preco" },
   { value: "marca:asc", label: "Marca (A-Z)" },
@@ -66,7 +39,7 @@ interface Pedido {
   marca: string;
   nota: string;
 }
-const PEDIDO_INICIAL: Pedido = { pg: 1, q: "", o: "descricao:asc", categoria: "", marca: "", nota: "" };
+const PEDIDO_INICIAL: Pedido = { pg: 1, q: "", o: "nome:asc", categoria: "", marca: "", nota: "" };
 const SEM_OPCOES: OpcoesFiltroLoja = { categorias: [], marcas: [], notas_olfativas: [] };
 
 const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -74,23 +47,28 @@ const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 function CartaoProduto({ p }: { p: ProdutoLoja }) {
   const img = urlImagemProduto(p.imagem_url);
   return (
-    <li className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
-      <div className="flex aspect-square items-center justify-center bg-slate-100">
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt={p.descricao} loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <span className="text-4xl font-bold text-slate-300" aria-hidden="true">
-            {p.descricao.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <p className="text-xs uppercase tracking-wide text-slate-400">{p.marca}</p>
-        <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{p.descricao}</h3>
-        {p.nota_olfativa && <p className="text-xs text-slate-500">{p.nota_olfativa}</p>}
-        <p className="mt-auto pt-2 text-lg font-bold text-primary-700">{moeda.format(Number(p.preco) || 0)}</p>
-      </div>
+    <li>
+      <Link
+        href={`/produtos/${p.id}`}
+        className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
+        <div className="flex aspect-square items-center justify-center bg-slate-100">
+          {img ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={img} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-4xl font-bold text-slate-300" aria-hidden="true">
+              {p.nome.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col gap-1 p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-400">{p.marca}</p>
+          <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{p.nome}</h3>
+          {p.nota_olfativa && <p className="text-xs text-slate-500">{p.nota_olfativa}</p>}
+          <p className="mt-auto pt-2 text-lg font-bold text-primary-700">{moeda.format(Number(p.preco) || 0)}</p>
+        </div>
+      </Link>
     </li>
   );
 }
@@ -103,7 +81,6 @@ export function Vitrine() {
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const sessao = useSessaoLocal();
 
   const executar = useUltimaResposta();
   // Pedido da carga atual; trocar dispara a busca.
@@ -126,7 +103,7 @@ export function Vitrine() {
 
   useEffect(() => {
     vlog(FILE, "Vitrine.useEffect", "buscando vitrine, pagina/ordem:", pedido.pg, pedido.o);
-    const [campo, dir] = pedido.o.split(":") as ["descricao" | "marca" | "preco_tabela", "asc" | "desc"];
+    const [campo, dir] = pedido.o.split(":") as ["nome" | "marca" | "preco_tabela", "asc" | "desc"];
     void executar(
       apiListProdutosLoja(pedido.pg, POR_PAGINA, pedido.q, campo, dir, {
         categoria: pedido.categoria,
@@ -173,40 +150,7 @@ export function Vitrine() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Rota<span className="text-primary-600">Perfumes</span>
-          </h1>
-          <nav className="flex items-center gap-2 sm:gap-3" aria-label="Conta">
-            {sessao ? (
-              <>
-                <span className="hidden text-sm text-slate-600 sm:inline">Ola, {sessao.nome}</span>
-                {sessao.role !== "usuario" && (
-                  <Link href={rotaInicial(sessao.role)} className="text-sm font-medium text-primary-600 hover:underline">
-                    Painel
-                  </Link>
-                )}
-                <Button size="sm" variant="secondary" onClick={() => void logout()}>
-                  Sair
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="text-sm font-medium text-slate-700 hover:underline">
-                  Entrar
-                </Link>
-                <Link
-                  href="/cadastro"
-                  className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
-                >
-                  Criar conta
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
+      <TopoLoja marcaComoTitulo />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

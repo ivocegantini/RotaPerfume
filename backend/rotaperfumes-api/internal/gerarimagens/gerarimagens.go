@@ -169,7 +169,7 @@ func processar(ctx context.Context, cat Catalogo, op Opcoes, p catalogo.Produto,
 		t.Pulados++
 		return
 	}
-	png, err := RenderizarPNG(p.Descricao, p.SKU.String())
+	png, err := RenderizarPNG(p.Nome, p.SKU.String())
 	if err != nil {
 		t.Falhas++
 		fmt.Fprintf(out, "FALHA  id=%d sku=%s: renderizar: %v\n", p.ID, p.SKU.String(), err)

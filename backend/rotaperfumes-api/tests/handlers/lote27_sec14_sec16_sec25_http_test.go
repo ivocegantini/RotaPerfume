@@ -209,10 +209,10 @@ func TestSEC25_HTTP_Busca100Caracteres_OK(t *testing.T) {
 			tok := generateToken(t, testCfg(), 2, "normal")
 			like := "%" + c.q + "%"
 
-			mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE \(descricao LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`).
+			mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE \(nome LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`).
 				WithArgs(like, like).
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-			mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE \(descricao LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\) ORDER BY id ASC LIMIT \? OFFSET \?`).
+			mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE \(nome LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\) ORDER BY id ASC LIMIT \? OFFSET \?`).
 				WithArgs(like, like, 20, 0).
 				WillReturnRows(emptyProdutoRowsForHandler())
 
@@ -229,7 +229,7 @@ func TestSEC25_HTTP_CuringaLiteral(t *testing.T) {
 	defer db.Close()
 	tok := generateToken(t, testCfg(), 2, "normal")
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE \(descricao LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE \(nome LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`).
 		WithArgs("%!%%", "%!%%").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE .+ LIMIT \? OFFSET \?`).

@@ -10,7 +10,7 @@ type CampoProduto string
 const (
 	OrdemProdutoID             CampoProduto = "id"
 	OrdemProdutoSKU            CampoProduto = "sku"
-	OrdemProdutoDescricao      CampoProduto = "descricao"
+	OrdemProdutoNome           CampoProduto = "nome"
 	OrdemProdutoCategoria      CampoProduto = "categoria"
 	OrdemProdutoMarca          CampoProduto = "marca"
 	OrdemProdutoPrecoTabela    CampoProduto = "preco_tabela"
@@ -24,7 +24,7 @@ const (
 // CamposOrdenacaoProduto devolve a whitelist de campos de produto.
 func CamposOrdenacaoProduto() []CampoProduto {
 	return []CampoProduto{
-		OrdemProdutoID, OrdemProdutoSKU, OrdemProdutoDescricao, OrdemProdutoCategoria,
+		OrdemProdutoID, OrdemProdutoSKU, OrdemProdutoNome, OrdemProdutoCategoria,
 		OrdemProdutoMarca, OrdemProdutoPrecoTabela, OrdemProdutoCustoUnitario,
 		OrdemProdutoDataLancamento, OrdemProdutoAtivo, OrdemProdutoCriadoEm, OrdemProdutoAtualizadoEm,
 	}
@@ -33,12 +33,12 @@ func CamposOrdenacaoProduto() []CampoProduto {
 // CamposOrdenacaoLoja é a whitelist da vitrine (ECOM-01): sem custo, ativo
 // nem datas internas, para não vazar informação pela ordem.
 func CamposOrdenacaoLoja() []CampoProduto {
-	return []CampoProduto{OrdemProdutoDescricao, OrdemProdutoCategoria, OrdemProdutoMarca, OrdemProdutoPrecoTabela}
+	return []CampoProduto{OrdemProdutoNome, OrdemProdutoCategoria, OrdemProdutoMarca, OrdemProdutoPrecoTabela}
 }
 
-// OrdenacaoLojaPadrao é "descricao ASC".
+// OrdenacaoLojaPadrao é "nome ASC".
 func OrdenacaoLojaPadrao() kernel.Ordenacao[CampoProduto] {
-	return kernel.NovaOrdenacao(OrdemProdutoDescricao, kernel.Asc)
+	return kernel.NovaOrdenacao(OrdemProdutoNome, kernel.Asc)
 }
 
 // OrdenacaoProdutoPadrao é "id ASC" (comportamento de sempre).

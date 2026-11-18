@@ -57,17 +57,17 @@ func novoPedidoDetalheJSON(p vendas.Pedido) pedidoDetalheJSON {
 }
 
 type itemPedidoJSON struct {
-	ItemIDOrigem     int64           `json:"item_id_origem"`
-	PedidoID         int64           `json:"pedido_id"`
-	ProdutoID        int64           `json:"produto_id"`
-	Quantidade       int             `json:"quantidade"`
-	PrecoPraticado   kernel.Dinheiro `json:"preco_praticado"`
-	DescontoPct      float64         `json:"desconto_pct"`
-	ValorBruto       kernel.Dinheiro `json:"valor_bruto"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
-	ProdutoSKU       string          `json:"produto_sku"`
-	ProdutoDescricao string          `json:"produto_descricao"`
+	ItemIDOrigem   int64           `json:"item_id_origem"`
+	PedidoID       int64           `json:"pedido_id"`
+	ProdutoID      int64           `json:"produto_id"`
+	Quantidade     int             `json:"quantidade"`
+	PrecoPraticado kernel.Dinheiro `json:"preco_praticado"`
+	DescontoPct    float64         `json:"desconto_pct"`
+	ValorBruto     kernel.Dinheiro `json:"valor_bruto"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+	ProdutoSKU     string          `json:"produto_sku"`
+	ProdutoNome    string          `json:"produto_nome"`
 }
 
 func novoItemPedidoJSON(it vendas.ItemPedido) itemPedidoJSON { return itemPedidoJSON(it) }

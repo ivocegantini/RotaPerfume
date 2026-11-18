@@ -12,11 +12,11 @@ import (
 )
 
 // produtoColunasRegex reflete a constante produtoColunas do repositório.
-const produtoColunasRegex = `id, sku, descricao, categoria, marca, COALESCE\(nota_olfativa, ''\), preco_tabela, custo_unitario, unidade, data_lancamento, ativo, COALESCE\(imagem, ''\), created_at, updated_at`
+const produtoColunasRegex = `id, sku, nome, COALESCE\(descricao, ''\), categoria, marca, COALESCE\(nota_olfativa, ''\), preco_tabela, custo_unitario, unidade, data_lancamento, ativo, COALESCE\(imagem, ''\), created_at, updated_at`
 
 func produtoColunasHeaderForHandler() []string {
 	return []string{
-		"id", "sku", "descricao", "categoria", "marca", "nota_olfativa",
+		"id", "sku", "nome", "descricao", "categoria", "marca", "nota_olfativa",
 		"preco_tabela", "custo_unitario", "unidade", "data_lancamento", "ativo", "imagem", "created_at", "updated_at",
 	}
 }
@@ -30,7 +30,7 @@ func produtoRowsForHandler() *sqlmock.Rows {
 func produtoRowsAtivoForHandler(ativo bool) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(produtoColunasHeaderForHandler()).
-		AddRow(int64(1), "SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico",
+		AddRow(int64(1), "SKU-001", "Perfume Teste", "", "Perfumaria", "Marca X", "Cítrico",
 			"99.90", "45.00", "UN", nil, ativo, "", now, now)
 }
 
@@ -110,10 +110,10 @@ func TestListProdutos_ComFiltros(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE categoria = \? AND marca = \? AND ativo = \? AND \(descricao LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE categoria = \? AND marca = \? AND ativo = \? AND \(nome LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`).
 		WithArgs("Perfumaria", "Marca X", true, "%Perfume%", "%Perfume%").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE categoria = \? AND marca = \? AND ativo = \? AND \(descricao LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\) ORDER BY id ASC LIMIT \? OFFSET \?`).
+	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE categoria = \? AND marca = \? AND ativo = \? AND \(nome LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\) ORDER BY id ASC LIMIT \? OFFSET \?`).
 		WithArgs("Perfumaria", "Marca X", true, "%Perfume%", "%Perfume%", 20, 0).
 		WillReturnRows(produtoRowsForHandler())
 
@@ -217,7 +217,7 @@ func TestGetProduto_Success(t *testing.T) {
 	body := decodeResponse(t, readBody(t, resp))
 	assert.True(t, como[bool](t, body["success"]))
 	data := como[map[string]any](t, body["data"])
-	assert.Equal(t, "Perfume Teste", data["descricao"])
+	assert.Equal(t, "Perfume Teste", data["nome"])
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -430,7 +430,7 @@ func TestToggleAtivoProduto_NegadoParaNaoAdmin(t *testing.T) {
 func validProdutoPayload() map[string]any {
 	return map[string]any{
 		"sku":             "SKU-001",
-		"descricao":       "Perfume Teste",
+		"nome":            "Perfume Teste",
 		"categoria":       "Perfumaria",
 		"marca":           "Marca X",
 		"nota_olfativa":   "Cítrico",
@@ -449,8 +449,8 @@ func TestCreateProduto_Success(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectExec(`INSERT INTO produtos \(sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo\)`).
-		WithArgs("SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), true).
+	mock.ExpectExec(`INSERT INTO produtos \(sku, nome, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo\)`).
+		WithArgs("SKU-001", "Perfume Teste", nil, "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), true).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	req, _ := http.NewRequest("POST", server.URL+"/api/produtos", makeJSON(validProdutoPayload()))
@@ -464,7 +464,7 @@ func TestCreateProduto_Success(t *testing.T) {
 	body := decodeResponse(t, readBody(t, resp))
 	assert.True(t, como[bool](t, body["success"]))
 	data := como[map[string]any](t, body["data"])
-	assert.Equal(t, "Perfume Teste", data["descricao"])
+	assert.Equal(t, "Perfume Teste", data["nome"])
 	assert.Equal(t, float64(1), data["id"])
 
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -526,13 +526,13 @@ func TestCreateProduto_ValidacaoNegocio(t *testing.T) {
 			wantMsg: "sku é obrigatório",
 		},
 		{
-			nome: "descricao vazia",
+			nome: "nome vazio",
 			payload: func() map[string]any {
 				p := validProdutoPayload()
-				p["descricao"] = ""
+				p["nome"] = ""
 				return p
 			},
-			wantMsg: "descrição é obrigatória",
+			wantMsg: "nome é obrigatório",
 		},
 		{
 			nome: "categoria vazia",
@@ -625,8 +625,8 @@ func TestUpdateProduto_Success(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectExec(`UPDATE produtos\s+SET descricao = \?, categoria = \?, marca = \?, nota_olfativa = \?, preco_tabela = \?, custo_unitario = \?, unidade = \?, data_lancamento = \?\s+WHERE id = \?`).
-		WithArgs("Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), int64(1)).
+	mock.ExpectExec(`UPDATE produtos\s+SET nome = \?, descricao = \?, categoria = \?, marca = \?, nota_olfativa = \?, preco_tabela = \?, custo_unitario = \?, unidade = \?, data_lancamento = \?\s+WHERE id = \?`).
+		WithArgs("Perfume Teste", nil, "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT ` + produtoColunasRegex + ` FROM produtos WHERE id = \? LIMIT 1`).
 		WithArgs(int64(1)).
@@ -643,7 +643,7 @@ func TestUpdateProduto_Success(t *testing.T) {
 	body := decodeResponse(t, readBody(t, resp))
 	assert.True(t, como[bool](t, body["success"]))
 	data := como[map[string]any](t, body["data"])
-	assert.Equal(t, "Perfume Teste", data["descricao"])
+	assert.Equal(t, "Perfume Teste", data["nome"])
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -739,8 +739,8 @@ func TestUpdateProduto_NaoEncontrado(t *testing.T) {
 	cfg := testCfg()
 	adminToken := generateToken(t, cfg, 1, "admin")
 
-	mock.ExpectExec(`UPDATE produtos\s+SET descricao = \?, categoria = \?, marca = \?, nota_olfativa = \?, preco_tabela = \?, custo_unitario = \?, unidade = \?, data_lancamento = \?\s+WHERE id = \?`).
-		WithArgs("Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), int64(999)).
+	mock.ExpectExec(`UPDATE produtos\s+SET nome = \?, descricao = \?, categoria = \?, marca = \?, nota_olfativa = \?, preco_tabela = \?, custo_unitario = \?, unidade = \?, data_lancamento = \?\s+WHERE id = \?`).
+		WithArgs("Perfume Teste", nil, "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), int64(999)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/produtos/999", makeJSON(validProdutoPayload()))

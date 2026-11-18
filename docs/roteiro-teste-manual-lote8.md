@@ -122,14 +122,14 @@ Use duas janelas: **A** (normal) com o admin e **B** (anônima) com o `qa.lote8@
 
    | # | Requisição (Postman) | Ajuste no body | Campo a anotar |
    | --- | --- | --- | --- |
-   | 2.1 | Produtos > **Criar Produto** | `sku` = `QA-LOTE8-01`, `descricao` = `QA-LOTE8 Produto` | `id` |
+   | 2.1 | Produtos > **Criar Produto** | `sku` = `QA-LOTE8-01`, `nome` = `QA-LOTE8 Produto` | `id` |
    | 2.2 | Estoque > **Criar Estoque** | `sku` = `QA-LOTE8-01` | `id` |
    | 2.3 | **Criar Visita** | `resultado` = `QA-LOTE8` | `visita_id` |
    | 2.4 | **Criar Oportunidade** | `origem` = `QA-LOTE8` | `oportunidade_id` |
    | 2.5 | **Criar Pagamento** | `forma_pagamento` = `PIX`, `valor` = `1`, `valor_liquido` = `1` | `pagamento_id` |
 
    - [ ] 2.1 a 2.5 Cada `201` traz `created_at` e `updated_at` com a data e a hora **de agora** (fuso `-03:00`), e **não** `0001-01-01T00:00:00Z`.
-   - [ ] 2.6 No estoque (2.2), `produto_descricao` vem preenchido com `QA-LOTE8 Produto` (vem do JOIN com `produtos`).
+   - [ ] 2.6 No estoque (2.2), `produto_nome` vem preenchido com `QA-LOTE8 Produto` (vem do JOIN com `produtos`).
    - [ ] 2.7 **Vendedor (sem requisição na collection):** em `/admin/vendedores`, crie o vendedor `QA-LOTE8 Vendedor`. Na Network, o `POST /api/vendedores` responde **201** com `created_at`/`updated_at` preenchidos. Anote o `id`.
 
 ---

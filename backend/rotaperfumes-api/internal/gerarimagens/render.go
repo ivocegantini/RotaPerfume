@@ -56,8 +56,8 @@ func novaFace(tamanho float64) (font.Face, error) {
 // RenderizarPNG desenha o PNG do produto: fundo em degradê com a cor
 // derivada do SKU, o nome (descrição) em branco na diagonal, quebrado em até
 // 3 linhas e truncado com "…" se não couber, e o SKU no rodapé.
-func RenderizarPNG(descricao, sku string) ([]byte, error) {
-	texto := strings.Join(strings.Fields(descricao), " ")
+func RenderizarPNG(nome, sku string) ([]byte, error) {
+	texto := strings.Join(strings.Fields(nome), " ")
 	if texto == "" {
 		texto = sku
 	}

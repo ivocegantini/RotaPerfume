@@ -1,4 +1,4 @@
-sku,descricao,categoria,marca,nota_olfativa,preco_tabela,custo_unitario,unidade,ativo,data_lancamento
+sku,nome,categoria,marca,nota_olfativa,preco_tabela,custo_unitario,unidade,ativo,data_lancamento
 SKU00001,Nadir Cardamomo Eau de Parfum KIT 5,Eau de Parfum,Nadir,Cardamomo,199.14,108.56,KIT 5,S,
 SKU00002,Sahra Oud Eau de Parfum KIT 3,Eau de Parfum,Sahra,Oud,337.35,178.83,KIT 3,S,
 SKU00003,Mizan Cedro Eau de Parfum KIT 5,Eau de Parfum,Mizan,Cedro,318.50,179.09,KIT 5,S,2025-04-07

@@ -43,12 +43,12 @@ var reNomeV4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][
 
 const antiga = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.png"
 
-var colunasProduto = []string{"id", "sku", "descricao", "categoria", "marca", "nota_olfativa", "preco_tabela",
+var colunasProduto = []string{"id", "sku", "nome", "descricao", "categoria", "marca", "nota_olfativa", "preco_tabela",
 	"custo_unitario", "unidade", "data_lancamento", "ativo", "imagem", "created_at", "updated_at"}
 
 func linha(rows *sqlmock.Rows, id int64, sku, desc, imagem string) *sqlmock.Rows {
 	agora := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	return rows.AddRow(id, sku, desc, "EDP", "Marca", "", "10.0", "5.0", "UN", nil, true, imagem, agora, agora)
+	return rows.AddRow(id, sku, desc, "", "EDP", "Marca", "", "10.0", "5.0", "UN", nil, true, imagem, agora, agora)
 }
 
 type execucao struct {
@@ -341,7 +341,7 @@ func produtos(n int, comImagem func(i int) bool) []catalogo.Produto {
 	out := make([]catalogo.Produto, n)
 	for i := range out {
 		out[i] = catalogo.Produto{ID: int64(i + 1)}
-		out[i].Descricao = fmt.Sprintf("Produto %d", i+1)
+		out[i].Nome = fmt.Sprintf("Produto %d", i+1)
 		if comImagem(i) {
 			out[i].Imagem = antiga
 		}

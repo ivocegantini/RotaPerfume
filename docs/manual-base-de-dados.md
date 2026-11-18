@@ -662,7 +662,8 @@ Catálogo do ERP, importado de `dados/erp/produtos.csv` (`make db-import-produto
 | --- | --- | --- | --- | --- |
 | `id` | BIGINT AUTO_INCREMENT | não | - | PK interna, desacoplada da origem. |
 | `sku` | VARCHAR(40) | não | - | SKU da origem (ex.: SKU00001). **Único** (`uk_produtos_sku`); chave do upsert da importação e destino da FK de `estoque`. |
-| `descricao` | VARCHAR(255) | não | - | Nome/descrição. |
+| `nome` | VARCHAR(255) | não | - | Nome do produto (era `descricao` até o ECOM-11, migração 34). |
+| `descricao` | TEXT | sim | NULL | Descrição completa da página do produto (ECOM-11); o `make db-import-produtos` gera ≥500 caracteres. |
 | `categoria` | VARCHAR(80) | não | - | Categoria (ex.: Eau de Parfum). |
 | `marca` | VARCHAR(80) | não | - | Marca. |
 | `nota_olfativa` | VARCHAR(80) | sim | NULL | Nota olfativa predominante. |

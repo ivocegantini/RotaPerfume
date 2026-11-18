@@ -127,6 +127,7 @@ func rotas(h Handlers) []httpx.Rota {
 		// Loja (ECOM-01/10): vitrine PÚBLICA da página inicial (só ativos, sem
 		// custo, com limite por IP no handler).
 		{Metodo: get, Padrao: "/api/loja/produtos", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.ListProdutosLoja", Handler: h.Produto.ListProdutosLoja},
+		{Metodo: get, Padrao: "/api/loja/produtos/{id}", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.GetProdutoLoja", Handler: h.Produto.GetProdutoLoja},
 		{Metodo: get, Padrao: "/api/loja/filtros", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.OpcoesFiltroLoja", Handler: h.Produto.OpcoesFiltroLoja},
 
 		// Imagem do produto (IMG-01): upload/remoção admin; leitura pública

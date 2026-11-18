@@ -41,7 +41,7 @@ func abrirDBLote25(t *testing.T) *sql.DB {
 func produtoLote25(t *testing.T, db *sql.DB, ativo bool) (int64, string) {
 	t.Helper()
 	sku := fmt.Sprintf("ZZ-TEST-L25-%d", time.Now().UnixNano())
-	res, err := db.Exec(`INSERT INTO produtos (sku, descricao, categoria, marca, preco_tabela, custo_unitario, unidade, ativo)
+	res, err := db.Exec(`INSERT INTO produtos (sku, nome, categoria, marca, preco_tabela, custo_unitario, unidade, ativo)
 		VALUES (?, 'ZZ-TEST Lote 25', 'Teste', 'Teste', 1, 1, 'UN', ?)`, sku, ativo)
 	require.NoError(t, err)
 	id, err := res.LastInsertId()

@@ -5,6 +5,7 @@ package catalogo_test
 // validações é a do legado (produto_service.go/estoque_service.go).
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 
 func dadosProdutoValidos() catalogo.DadosProduto {
 	return catalogo.DadosProduto{
-		SKU: " SKU-1 ", Descricao: " Perfume ", Categoria: "EDP", Marca: "M", NotaOlfativa: " Cítrico ",
+		SKU: " SKU-1 ", Nome: " Perfume ", Categoria: "EDP", Marca: "M", NotaOlfativa: " Cítrico ",
 		PrecoTabela: "10", CustoUnitario: "4", Unidade: "UN", DataLancamento: "2024-03-10",
 	}
 }
@@ -51,8 +52,9 @@ func TestNovoProduto_Validacoes(t *testing.T) {
 		campo string // mensagem pública esperada
 	}{
 		{"sku vazio", func(d *catalogo.DadosProduto) { d.SKU = " " }, catalogo.ErrSKUObrigatorio, "sku é obrigatório"},
-		{"sku antes da descrição", func(d *catalogo.DadosProduto) { d.SKU, d.Descricao = "", "" }, catalogo.ErrSKUObrigatorio, "sku é obrigatório"},
-		{"descrição vazia", func(d *catalogo.DadosProduto) { d.Descricao = "" }, catalogo.ErrDescricaoObrigatoria, "descrição é obrigatória"},
+		{"sku antes do nome", func(d *catalogo.DadosProduto) { d.SKU, d.Nome = "", "" }, catalogo.ErrSKUObrigatorio, "sku é obrigatório"},
+		{"nome vazio", func(d *catalogo.DadosProduto) { d.Nome = "" }, catalogo.ErrNomeObrigatorio, "nome é obrigatório"},
+		{"descrição acima de 5000 caracteres (ECOM-11)", func(d *catalogo.DadosProduto) { d.Descricao = strings.Repeat("é", 5001) }, catalogo.ErrDescricaoMuitoLonga, "descrição deve ter no máximo 5000 caracteres"},
 		{"categoria vazia", func(d *catalogo.DadosProduto) { d.Categoria = "  " }, catalogo.ErrCategoriaObrigatoria, "categoria é obrigatória"},
 		{"marca vazia", func(d *catalogo.DadosProduto) { d.Marca = "" }, catalogo.ErrMarcaObrigatoria, "marca é obrigatória"},
 		{"unidade vazia", func(d *catalogo.DadosProduto) { d.Unidade = "" }, catalogo.ErrUnidadeObrigatoria, "unidade é obrigatória"},
@@ -83,7 +85,7 @@ func TestNovoProduto_Sucesso(t *testing.T) {
 	p, err := catalogo.NovoProduto(dadosProdutoValidos())
 	require.NoError(t, err)
 	assert.Equal(t, catalogo.SKU("SKU-1"), p.SKU)
-	assert.Equal(t, "Perfume", p.Descricao, "campos aparados")
+	assert.Equal(t, "Perfume", p.Nome, "campos aparados")
 	assert.Equal(t, "Cítrico", p.NotaOlfativa)
 	assert.True(t, p.Ativo, "todo produto nasce ativo")
 	require.NotNil(t, p.DataLancamento)
@@ -102,7 +104,7 @@ func TestNovosCamposProduto_IgnoraSKU(t *testing.T) {
 	d.SKU = ""
 	c, err := catalogo.NovosCamposProduto(d)
 	require.NoError(t, err, "na edição o SKU não é validado nem alterado")
-	assert.Equal(t, "Perfume", c.Descricao)
+	assert.Equal(t, "Perfume", c.Nome)
 }
 
 func TestProduto_DefinirAtivo(t *testing.T) {
@@ -238,4 +240,18 @@ func TestOrdenacao_EnumsCatalogo(t *testing.T) {
 	assert.Equal(t, catalogo.OrdemEstoqueDataSnapshot,
 		kernel.ParseOrdenacao("preco_tabela", "", catalogo.CamposOrdenacaoEstoque(), pe).Campo(),
 		"campo de produto não vale para estoque")
+}
+
+// ECOM-11: a descrição completa é opcional, aparada e aceita até 5000
+// caracteres (contados em runas, não em bytes).
+func TestNovoProduto_DescricaoCompleta(t *testing.T) {
+	d := catalogo.DadosProduto{SKU: "S", Nome: "N", Categoria: "C", Marca: "M", Unidade: "UN", PrecoTabela: "1", CustoUnitario: "1"}
+	d.Descricao = "  " + strings.Repeat("é", catalogo.MaxDescricaoProduto) + "  "
+	p, err := catalogo.NovoProduto(d)
+	require.NoError(t, err)
+	assert.Equal(t, strings.Repeat("é", catalogo.MaxDescricaoProduto), p.Descricao)
+	d.Descricao = ""
+	p, err = catalogo.NovoProduto(d)
+	require.NoError(t, err)
+	assert.Empty(t, p.Descricao)
 }

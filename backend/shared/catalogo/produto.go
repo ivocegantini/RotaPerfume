@@ -3,6 +3,7 @@ package catalogo
 import (
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/rotaperfumes/shared/kernel"
 )
@@ -22,9 +23,15 @@ type Produto struct {
 	UpdatedAt time.Time
 }
 
+// MaxDescricaoProduto é o limite (em caracteres) da descrição completa
+// (ECOM-11; a coluna é TEXT, 65535 bytes).
+const MaxDescricaoProduto = 5000
+
 // CamposProduto são os campos editáveis (o PUT altera todos de uma vez; SKU
 // e ativo ficam de fora).
 type CamposProduto struct {
+	Nome string
+	// Descricao é o texto completo da página do produto (ECOM-11); "" grava NULL.
 	Descricao     string
 	Categoria     string
 	Marca         string
@@ -39,6 +46,7 @@ type CamposProduto struct {
 // DadosProduto é a entrada crua de criação/edição (o comando).
 type DadosProduto struct {
 	SKU            string // ignorado na edição
+	Nome           string
 	Descricao      string
 	Categoria      string
 	Marca          string
@@ -64,10 +72,12 @@ func NovoProduto(d DadosProduto) (*Produto, error) {
 	return &Produto{SKU: sku, CamposProduto: campos, Ativo: true}, nil
 }
 
-// NovosCamposProduto apara e valida os campos editáveis, na ordem descrição,
-// categoria, marca, unidade, preço, custo e data de lançamento (opcional).
+// NovosCamposProduto apara e valida os campos editáveis, na ordem nome,
+// descrição (opcional, até MaxDescricaoProduto), categoria, marca, unidade,
+// preço, custo e data de lançamento (opcional).
 func NovosCamposProduto(d DadosProduto) (CamposProduto, error) {
 	c := CamposProduto{
+		Nome:         strings.TrimSpace(d.Nome),
 		Descricao:    strings.TrimSpace(d.Descricao),
 		Categoria:    strings.TrimSpace(d.Categoria),
 		Marca:        strings.TrimSpace(d.Marca),
@@ -96,8 +106,10 @@ func NovosCamposProduto(d DadosProduto) (CamposProduto, error) {
 
 func (c CamposProduto) validarObrigatorios() error {
 	switch {
-	case c.Descricao == "":
-		return ErrDescricaoObrigatoria
+	case c.Nome == "":
+		return ErrNomeObrigatorio
+	case utf8.RuneCountInString(c.Descricao) > MaxDescricaoProduto:
+		return ErrDescricaoMuitoLonga
 	case c.Categoria == "":
 		return ErrCategoriaObrigatoria
 	case c.Marca == "":
@@ -127,7 +139,7 @@ type FiltroProduto struct {
 	// NotaOlfativa filtra pelo valor exato (ECOM-04, vitrine).
 	NotaOlfativa string
 	Ativo        *bool
-	Busca        string // em descrição OU sku (LIKE; %/_ literais, SEC-25)
+	Busca        string // em nome OU sku (LIKE; %/_ literais, SEC-25)
 	Ordenacao    kernel.Ordenacao[CampoProduto]
 }
 

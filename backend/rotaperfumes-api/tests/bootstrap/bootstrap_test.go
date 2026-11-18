@@ -145,7 +145,7 @@ func TestNovoRouter_ContagemEMetodosDasRotas(t *testing.T) {
 	cfg := testCfg()
 	hs := bootstrap.NovosHandlers(pool, cfg, notificacaosmtp.NovoNoop())
 	rotas := bootstrap.NovoRouter(cfg, checkerNulo{}, hs).Rotas()
-	assert.Len(t, rotas, 71) // + google e google/cadastro (ECOM-02); + confirmar/reenviar e-mail (ECOM-03); 60 + funil (DASH-01) + 3 de imagem (IMG-01) + cadastro e loja (ECOM-01) + filtros (ECOM-04)
+	assert.Len(t, rotas, 72) // + página do produto (ECOM-11); + google e google/cadastro (ECOM-02); + confirmar/reenviar e-mail (ECOM-03); 60 + funil (DASH-01) + 3 de imagem (IMG-01) + cadastro e loja (ECOM-01) + filtros (ECOM-04)
 	re := regexp.MustCompile(`^(GET|POST|PUT|PATCH|DELETE)$`)
 	funil := 0
 	for _, rt := range rotas {

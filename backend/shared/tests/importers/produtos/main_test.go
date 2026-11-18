@@ -148,7 +148,7 @@ func TestParseRow(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			nome: "descricao vazia",
+			nome: "nome vazio",
 			record: []string{
 				"SKU-001", "", "Perfumaria", "Marca X", "Cítrico",
 				"99.90", "45.00", "UN", "S", "2024-01-15",

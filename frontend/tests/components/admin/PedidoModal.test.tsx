@@ -59,7 +59,7 @@ function cliente(id: number): ClienteResumo {
 const produto = {
   id: 50,
   sku: "P50",
-  descricao: "Perfume 50",
+  nome: "Perfume 50",
   preco_tabela: 99.9,
   ativo: true,
 } as Produto;
@@ -285,7 +285,7 @@ describe("PedidoModal - formulario", () => {
 
   it("carrega todas as paginas de produtos", async () => {
     api.apiListProdutos.mockImplementation(async (page: number) => ({
-      data: [{ ...produto, id: 50 + page, descricao: `Perfume p${page}` }],
+      data: [{ ...produto, id: 50 + page, nome: `Perfume p${page}` }],
       page,
       limit: 100,
       total: 3,

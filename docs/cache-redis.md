@@ -13,7 +13,7 @@ Cache na API das leituras **públicas** da loja (o navegador nunca fala com o Re
 ## Áreas das telas da loja (`/` e `/loja`)
 | Área | Rota | TTL | Invalida em |
 | --- | --- | --- | --- |
-| `vitrine` | `GET /api/loja/produtos` (sem `?q`) | 5 min | criar/editar/ativar produto, enviar/remover imagem |
+| `vitrine` | `GET /api/loja/produtos` (sem `?q`) e `GET /api/loja/produtos/{id}` (ECOM-11) | 5 min | criar/editar/ativar produto, enviar/remover imagem |
 | `filtros` | `GET /api/loja/filtros` | 15 min | criar/editar/ativar produto |
 | `imagem_produto` | `GET /api/public/produtos/imagens/{arquivo}` | 1 h | enviar/remover imagem |
 

@@ -17,7 +17,7 @@
 //  2. Lê o CSV informado via flag -csv (default: dados/erp/produtos.csv, resolvido
 //     a partir da raiz do repositório) ou via env PRODUTOS_CSV_PATH.
 //  3. O CSV TEM cabeçalho (diferente do CSV de clientes) — a primeira linha é
-//     descartada. Colunas: sku,descricao,categoria,marca,nota_olfativa,
+//     descartada. Colunas: sku,nome,categoria,marca,nota_olfativa,
 //     preco_tabela,custo_unitario,unidade,ativo,data_lancamento.
 //  4. Faz parsing linha a linha com TRIM em todos os campos:
 //     - preco_tabela/custo_unitario: float.
@@ -25,9 +25,11 @@
 //     valor inválido/ausente vira TRUE (default ATIVO para itens
 //     importados) — só fica inativo se o CSV trouxer 'N' explicitamente.
 //     - data_lancamento: opcional, formato "2006-01-02"; vazio = NULL.
-//  5. Faz upsert via INSERT ... ON DUPLICATE KEY UPDATE usando `sku` como
+//  5. ECOM-11: gera a descrição completa (GerarDescricao, ≥500 caracteres);
+//     no upsert ela só preenche produto sem descrição (não sobrescreve a do admin).
+//  6. Faz upsert via INSERT ... ON DUPLICATE KEY UPDATE usando `sku` como
 //     chave de idempotência (UNIQUE KEY na tabela).
-//  6. Loga contadores finais: total de linhas lidas, importadas (insert),
+//  7. Loga contadores finais: total de linhas lidas, importadas (insert),
 //     atualizadas (update), ignoradas e com erro — e devolve erro (o comando
 //     encerra com log.Fatalf) se houver erro de conexão ou de leitura do arquivo.
 package produtos
@@ -56,7 +58,8 @@ const dataLancamentoLayout = "2006-01-02"
 // Row é uma linha já normalizada do CSV, pronta para o upsert.
 type Row struct {
 	SKU            string
-	Descricao      string
+	Nome           string
+	Descricao      string // ECOM-11: gerada (GerarDescricao)
 	Categoria      string
 	Marca          string
 	NotaOlfativa   string
@@ -139,7 +142,7 @@ func ParseRow(record []string) (Row, error) {
 	}
 
 	sku := record[0]
-	descricao := record[1]
+	nome := record[1]
 	categoria := record[2]
 	marca := record[3]
 	notaOlfativa := record[4]
@@ -147,8 +150,8 @@ func ParseRow(record []string) (Row, error) {
 	if sku == "" {
 		return Row{}, fmt.Errorf("sku vazio")
 	}
-	if descricao == "" || categoria == "" || marca == "" {
-		return Row{}, fmt.Errorf("descricao, categoria ou marca vazios")
+	if nome == "" || categoria == "" || marca == "" {
+		return Row{}, fmt.Errorf("nome, categoria ou marca vazios")
 	}
 
 	precoTabela, err := kernel.LerDinheiro(record[5]) // exato, sem float64 (ARQ-09)
@@ -173,9 +176,9 @@ func ParseRow(record []string) (Row, error) {
 		return Row{}, fmt.Errorf("data_lancamento inválida (%q): %w", record[9], err)
 	}
 
-	return Row{
+	row := Row{
 		SKU:            sku,
-		Descricao:      descricao,
+		Nome:           nome,
 		Categoria:      categoria,
 		Marca:          marca,
 		NotaOlfativa:   notaOlfativa,
@@ -184,7 +187,9 @@ func ParseRow(record []string) (Row, error) {
 		Unidade:        unidade,
 		Ativo:          ativo,
 		DataLancamento: dataLancamento,
-	}, nil
+	}
+	row.Descricao = GerarDescricao(row)
+	return row, nil
 }
 
 // ParseAtivo converte 'S'/'N' (case-insensitive) para bool. REGRA DE
@@ -215,11 +220,12 @@ func ParseDataLancamento(raw string) (*time.Time, error) {
 // upsertProdutos usa sku como chave de idempotência (UNIQUE KEY na tabela).
 const upsertProdutos = `
 		INSERT INTO produtos
-			(sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo)
+			(sku, nome, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo)
 		VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
-			descricao = VALUES(descricao),
+			nome = VALUES(nome),
+			descricao = IF(descricao IS NULL OR descricao = '', VALUES(descricao), descricao),
 			categoria = VALUES(categoria),
 			marca = VALUES(marca),
 			nota_olfativa = VALUES(nota_olfativa),
@@ -255,7 +261,7 @@ func argsProduto(row Row) ([]any, bool) {
 		dataLancamento = row.DataLancamento.Format(dataLancamentoLayout)
 	}
 	return []any{
-		row.SKU, row.Descricao, row.Categoria, row.Marca, notaOlfativa,
+		row.SKU, row.Nome, row.Descricao, row.Categoria, row.Marca, notaOlfativa,
 		row.PrecoTabela.String(), row.CustoUnitario.String(), row.Unidade, dataLancamento, row.Ativo,
 	}, true
 }

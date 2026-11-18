@@ -379,9 +379,9 @@ function EstoquePageContent() {
             <span className="block font-mono text-xs font-medium text-slate-900 hover:underline">
               {e.sku}
             </span>
-            {e.produto_descricao && (
+            {e.produto_nome && (
               <span className="block text-xs text-slate-500">
-                {e.produto_descricao}
+                {e.produto_nome}
               </span>
             )}
           </button>
@@ -390,9 +390,9 @@ function EstoquePageContent() {
             <span className="block font-mono text-xs font-medium text-slate-900">
               {e.sku}
             </span>
-            {e.produto_descricao && (
+            {e.produto_nome && (
               <span className="block text-xs text-slate-500">
-                {e.produto_descricao}
+                {e.produto_nome}
               </span>
             )}
           </span>

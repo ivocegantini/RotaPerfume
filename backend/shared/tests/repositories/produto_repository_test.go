@@ -32,16 +32,16 @@ func ordenacaoProduto(orderBy, orderDir string) kernel.Ordenacao[catalogo.CampoP
 }
 
 var produtoColumns = []string{
-	"id", "sku", "descricao", "categoria", "marca", "nota_olfativa",
+	"id", "sku", "nome", "descricao", "categoria", "marca", "nota_olfativa",
 	"preco_tabela", "custo_unitario", "unidade", "data_lancamento", "ativo", "imagem", "created_at", "updated_at",
 }
 
-func produtoRow(id int64, sku, descricao, categoria, marca, notaOlfativa string, precoTabela, custoUnitario float64, unidade string, dataLancamento *time.Time, ativo bool, created, updated time.Time) []driver.Value {
+func produtoRow(id int64, sku, nome, categoria, marca, notaOlfativa string, precoTabela, custoUnitario float64, unidade string, dataLancamento *time.Time, ativo bool, created, updated time.Time) []driver.Value {
 	var dl driver.Value = nil
 	if dataLancamento != nil {
 		dl = *dataLancamento
 	}
-	return []driver.Value{id, sku, descricao, categoria, marca, notaOlfativa, decT(precoTabela), decT(custoUnitario), unidade, dl, ativo, "", created, updated}
+	return []driver.Value{id, sku, nome, "", categoria, marca, notaOlfativa, decT(precoTabela), decT(custoUnitario), unidade, dl, ativo, "", created, updated}
 }
 
 func TestProdutoList_SemFiltro(t *testing.T) {
@@ -99,7 +99,7 @@ func TestProdutoList_ComFiltros(t *testing.T) {
 		{
 			nome:        "filtro por busca textual",
 			filtro:      catalogo.FiltroProduto{Busca: "Perfume"},
-			whereRegexp: "WHERE \\(descricao LIKE \\? ESCAPE '!' OR sku LIKE \\? ESCAPE '!'\\)",
+			whereRegexp: "WHERE \\(nome LIKE \\? ESCAPE '!' OR sku LIKE \\? ESCAPE '!'\\)",
 			args:        []driver.Value{"%Perfume%", "%Perfume%"},
 		},
 	}
@@ -137,9 +137,9 @@ func TestProdutoList_OrderBy(t *testing.T) {
 	}{
 		{
 			nome:        "order_by válido asc",
-			orderBy:     "descricao",
+			orderBy:     "nome",
 			orderDir:    "asc",
-			orderRegexp: "ORDER BY descricao ASC",
+			orderRegexp: "ORDER BY nome ASC",
 		},
 		{
 			nome:        "order_by válido desc",
@@ -439,7 +439,7 @@ func TestProdutoCreate_Success(t *testing.T) {
 	p := &catalogo.Produto{
 		SKU: "SKU1",
 		CamposProduto: catalogo.CamposProduto{
-			Descricao:     "Perfume A",
+			Nome:     "Perfume A",
 			Categoria:     "Perfumaria",
 			Marca:         "Marca A",
 			NotaOlfativa:  "Floral",
@@ -451,7 +451,7 @@ func TestProdutoCreate_Success(t *testing.T) {
 	}
 
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs(p.SKU.String(), p.Descricao, p.Categoria, p.Marca, "Floral", p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, p.Ativo).
+		WithArgs(p.SKU.String(), p.Nome, nil, p.Categoria, p.Marca, "Floral", p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, p.Ativo).
 		WillReturnResult(sqlmock.NewResult(7, 1))
 
 	repo := catalogomysql.NovoProdutos(db)
@@ -467,10 +467,10 @@ func TestProdutoCreate_NotaOlfativaVazia(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 
-	p := &catalogo.Produto{SKU: "SKU2", CamposProduto: catalogo.CamposProduto{Descricao: "Perfume B"}}
+	p := &catalogo.Produto{SKU: "SKU2", CamposProduto: catalogo.CamposProduto{Nome: "Perfume B"}}
 
 	mock.ExpectExec("INSERT INTO produtos").
-		WithArgs(p.SKU.String(), p.Descricao, p.Categoria, p.Marca, nil, p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, p.Ativo).
+		WithArgs(p.SKU.String(), p.Nome, nil, p.Categoria, p.Marca, nil, p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, p.Ativo).
 		WillReturnResult(sqlmock.NewResult(8, 1))
 
 	repo := catalogomysql.NovoProdutos(db)
@@ -503,7 +503,7 @@ func TestProdutoUpdate_Success(t *testing.T) {
 	defer db.Close()
 
 	p := &catalogo.Produto{CamposProduto: catalogo.CamposProduto{
-		Descricao:     "Perfume A Atualizado",
+		Nome:     "Perfume A Atualizado",
 		Categoria:     "Perfumaria",
 		Marca:         "Marca A",
 		NotaOlfativa:  "Cítrico",
@@ -513,7 +513,7 @@ func TestProdutoUpdate_Success(t *testing.T) {
 	}}
 
 	mock.ExpectExec("UPDATE produtos").
-		WithArgs(p.Descricao, p.Categoria, p.Marca, "Cítrico", p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, int64(1)).
+		WithArgs(p.Nome, nil, p.Categoria, p.Marca, "Cítrico", p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nil, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	repo := catalogomysql.NovoProdutos(db)

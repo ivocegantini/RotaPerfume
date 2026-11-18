@@ -119,7 +119,7 @@ func TestIntegracaoBUG01_GravaLeReSalvaSemDeslocamento(t *testing.T) {
 				t.Run("produto.data_lancamento", func(t *testing.T) {
 					casos := novosCasosCatalogo(db)
 					in := catalogo.DadosProduto{
-						SKU: "ZZ-TEST-BUG01-" + sufixo, Descricao: "Produto teste BUG-01", Categoria: "Teste",
+						SKU: "ZZ-TEST-BUG01-" + sufixo, Nome: "Produto teste BUG-01", Categoria: "Teste",
 						Marca: "Teste", Unidade: "UN", PrecoTabela: "1", CustoUnitario: "1", DataLancamento: data,
 					}
 					p, err := casos.CriarProduto(ctx, in)
@@ -181,7 +181,7 @@ func TestIntegracao_UpdateSemAlteracao(t *testing.T) {
 	t.Run("produto", func(t *testing.T) {
 		casos := novosCasosCatalogo(db)
 		in := catalogo.DadosProduto{
-			SKU: "ZZ-TEST-BUG01-" + sufixo, Descricao: "Produto teste", Categoria: "Teste",
+			SKU: "ZZ-TEST-BUG01-" + sufixo, Nome: "Produto teste", Categoria: "Teste",
 			Marca: "Teste", Unidade: "UN", PrecoTabela: "1", CustoUnitario: "1", DataLancamento: "2024-01-01",
 		}
 		p, err := casos.CriarProduto(ctx, in)

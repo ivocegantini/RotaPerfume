@@ -19,6 +19,7 @@ import (
 type produtoResposta struct {
 	ID             int64           `json:"id"`
 	SKU            string          `json:"sku"`
+	Nome           string          `json:"nome"`
 	Descricao      string          `json:"descricao"`
 	Categoria      string          `json:"categoria"`
 	Marca          string          `json:"marca"`
@@ -36,7 +37,7 @@ type produtoResposta struct {
 
 func produtoParaResposta(p catalogo.Produto) produtoResposta {
 	return produtoResposta{
-		ID: p.ID, SKU: p.SKU.String(), Descricao: p.Descricao, Categoria: p.Categoria, Marca: p.Marca,
+		ID: p.ID, SKU: p.SKU.String(), Nome: p.Nome, Descricao: p.Descricao, Categoria: p.Categoria, Marca: p.Marca,
 		NotaOlfativa: p.NotaOlfativa, PrecoTabela: p.PrecoTabela, CustoUnitario: p.CustoUnitario,
 		Unidade: p.Unidade, DataLancamento: p.DataLancamento, Ativo: p.Ativo,
 		ImagemURL: urlImagem(p.Imagem), CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt,
@@ -62,7 +63,8 @@ type criarProdutoRequest struct {
 // atualizarProdutoRequest é o body do PUT de produto. Não tem sku: como no
 // legado, um "sku" no PUT é ignorado (e não vira 400 por tipo errado).
 type atualizarProdutoRequest struct {
-	Descricao      string         `json:"descricao"`
+	Nome           string         `json:"nome"`
+	Descricao      string         `json:"descricao"` // ECOM-11: opcional
 	Categoria      string         `json:"categoria"`
 	Marca          string         `json:"marca"`
 	NotaOlfativa   string         `json:"nota_olfativa"`
@@ -80,7 +82,7 @@ func (r criarProdutoRequest) paraDados() catalogo.DadosProduto {
 
 func (r atualizarProdutoRequest) paraDados() catalogo.DadosProduto {
 	return catalogo.DadosProduto{
-		Descricao: r.Descricao, Categoria: r.Categoria, Marca: r.Marca, NotaOlfativa: r.NotaOlfativa,
+		Nome: r.Nome, Descricao: r.Descricao, Categoria: r.Categoria, Marca: r.Marca, NotaOlfativa: r.NotaOlfativa,
 		PrecoTabela: r.PrecoTabela, CustoUnitario: r.CustoUnitario, Unidade: r.Unidade,
 		DataLancamento: r.DataLancamento,
 	}
@@ -106,19 +108,19 @@ func filtroProdutoDaQuery(r *http.Request) (catalogo.FiltroProduto, error) {
 // estoqueResposta tem as mesmas chaves, ordem e tipos do models.Estoque
 // legado.
 type estoqueResposta struct {
-	ID               int64     `json:"id"`
-	DataSnapshot     time.Time `json:"data_snapshot"`
-	SKU              string    `json:"sku"`
-	ProdutoDescricao string    `json:"produto_descricao"`
-	Saldo            int       `json:"saldo"`
-	Ruptura          bool      `json:"ruptura"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID           int64     `json:"id"`
+	DataSnapshot time.Time `json:"data_snapshot"`
+	SKU          string    `json:"sku"`
+	ProdutoNome  string    `json:"produto_nome"`
+	Saldo        int       `json:"saldo"`
+	Ruptura      bool      `json:"ruptura"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 func estoqueParaResposta(e catalogo.RegistroEstoque) estoqueResposta {
 	return estoqueResposta{
-		ID: e.ID, DataSnapshot: e.DataSnapshot, SKU: e.SKU.String(), ProdutoDescricao: e.ProdutoDescricao,
+		ID: e.ID, DataSnapshot: e.DataSnapshot, SKU: e.SKU.String(), ProdutoNome: e.ProdutoNome,
 		Saldo: e.Saldo, Ruptura: e.Ruptura, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt,
 	}
 }

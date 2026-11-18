@@ -36,7 +36,7 @@ const FILE = "admin/produtos/page.tsx";
 type SortKey =
   | "id"
   | "sku"
-  | "descricao"
+  | "nome"
   | "categoria"
   | "marca"
   | "preco_tabela"
@@ -282,7 +282,7 @@ function ProdutosPageContent() {
     const acao = novoStatus ? "reativar" : "inativar";
     vlog(FILE, "ProdutosPageContent.handleToggleStatus", "pedindo confirmacao ao usuario");
     const ok = window.confirm(
-      `Tem certeza que deseja ${acao} o produto "${produto.descricao}"?`
+      `Tem certeza que deseja ${acao} o produto "${produto.nome}"?`
     );
     vlog(FILE, "ProdutosPageContent.handleToggleStatus", "verificando confirmacao (ok=%s)", ok);
     if (!ok) {
@@ -351,7 +351,7 @@ function ProdutosPageContent() {
       vlog(FILE, "ProdutosPageContent.handleModalSubmit", "chamando apiCreateProduto");
       const created = await apiCreateProduto(data);
       vlog(FILE, "ProdutosPageContent.handleModalSubmit", "montando mensagem de sucesso (produto_id=%d)", created.id);
-      const msg = `Produto "${created.descricao}" criado com sucesso.`;
+      const msg = `Produto "${created.nome}" criado com sucesso.`;
       vlog(FILE, "ProdutosPageContent.handleModalSubmit", "recarregando produtos apos criacao");
       const erroRecarga = await loadProdutos();
       vlog(FILE, "ProdutosPageContent.handleModalSubmit", "verificando falha na recarga (falhou=%s)", erroRecarga !== null);
@@ -365,7 +365,7 @@ function ProdutosPageContent() {
         prev.map((p) => (p.id === updated.id ? updated : p))
       );
       vlog(FILE, "ProdutosPageContent.handleModalSubmit", "exibindo mensagem de sucesso");
-      mostrarSucesso(`Produto "${updated.descricao}" atualizado com sucesso.`);
+      mostrarSucesso(`Produto "${updated.nome}" atualizado com sucesso.`);
     }
     vlog(FILE, "ProdutosPageContent.handleModalSubmit", "fechando modal");
     setModalOpen(false);
@@ -402,7 +402,7 @@ function ProdutosPageContent() {
           // eslint-disable-next-line @next/next/no-img-element -- IMG-01: miniatura servida pela API (rota publica), sem next/image
           <img
             src={src}
-            alt={`${p.id} - ${p.descricao}`}
+            alt={`${p.id} - ${p.nome}`}
             loading="lazy"
             decoding="async"
             className="mx-auto h-10 w-10 rounded-md border border-slate-200 bg-slate-50 object-cover"
@@ -419,8 +419,8 @@ function ProdutosPageContent() {
       },
     },
     {
-      key: "descricao",
-      header: "Descricao",
+      key: "nome",
+      header: "Nome",
       sortable: true,
       render: (p) => (
         <button
@@ -429,7 +429,7 @@ function ProdutosPageContent() {
           className="font-medium text-slate-900 hover:text-primary-600 hover:underline text-left"
           title="Editar produto"
         >
-          {p.descricao}
+          {p.nome}
         </button>
       ),
     },
@@ -565,7 +565,7 @@ function ProdutosPageContent() {
               <div className="flex-1 sm:max-w-xs">
                 <Input
                   label="Buscar"
-                  placeholder="Descricao ou SKU..."
+                  placeholder="Nome ou SKU..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   maxLength={MAX_BUSCA}
