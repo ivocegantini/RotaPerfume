@@ -168,6 +168,21 @@ export interface ProdutoLojaDetalhe extends ProdutoLoja {
   descricao: string;
 }
 
+// ECOM-12: item de GET /api/loja/minhas-compras (produtos comprados, somados por produto).
+export interface ProdutoComprado {
+  produto_id: number;
+  sku: string;
+  nome: string;
+  imagem_url: string | null;
+  ativo: boolean; // inativo: sem link para a pagina do produto
+  quantidade: number;
+  pedidos: number;
+  total_gasto: number;
+  ultima_compra: string; // AAAA-MM-DD
+}
+
+export type OrdemCompra = "ultima_compra" | "nome" | "quantidade" | "pedidos" | "total_gasto";
+
 // ECOM-04: GET /api/loja/filtros (valores dos produtos ativos).
 export interface OpcoesFiltroLoja {
   categorias: string[];

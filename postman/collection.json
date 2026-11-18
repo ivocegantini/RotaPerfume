@@ -6116,6 +6116,61 @@
             "description": "GET /api/loja/produtos/{id} — **pública** (sem token), mesmo limite por IP da vitrine (429 acima dele) e cache Redis da área `vitrine`.\n\nDevolve o item da vitrine (sem custo, ativo nem datas) mais `descricao`, o texto completo da página do produto (\"\" quando não há).\n\n**Erros:** 400 id inválido; 404 `produto não encontrado` para id inexistente **ou inativo** (mesma resposta, não revela o id)."
           },
           "response": []
+        },
+        {
+          "name": "Minhas Compras (AnyRole, ECOM-12)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+                  "var d = pm.response.json().data;",
+                  "pm.test('Lista sem custo', function() {",
+                  "    pm.expect(d).to.be.an('array');",
+                  "    d.forEach(function(p) { pm.expect(p).to.not.have.property('custo_unitario'); pm.expect(p).to.have.property('produto_id'); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/loja/minhas-compras?page=1&limit=20&order_by=ultima_compra&order_dir=desc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "loja",
+                "minhas-compras"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "order_by",
+                  "value": "ultima_compra",
+                  "description": "ultima_compra (padrão), nome, quantidade, pedidos, total_gasto"
+                },
+                {
+                  "key": "order_dir",
+                  "value": "desc"
+                }
+              ]
+            },
+            "description": "GET /api/loja/minhas-compras — **AnyRole** (sessão obrigatória). Produtos dos pedidos **não cancelados** do cliente da loja ligado ao usuário do token (`clientes.usuario_id`), somados por produto: `produto_id`, `sku`, `nome`, `imagem_url`, `ativo`, `quantidade`, `pedidos`, `total_gasto`, `ultima_compra` (AAAA-MM-DD).\n\nO usuário vem só do token (id na query é ignorado). Login sem cliente da loja (equipe) → `data: []`.\n\n**Erros:** 401 sem sessão."
+          },
+          "response": []
         }
       ]
     },

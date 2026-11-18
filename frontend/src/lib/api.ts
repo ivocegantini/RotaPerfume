@@ -7,6 +7,8 @@ import {
   OpcoesFiltroLoja,
   ProdutoLoja,
   ProdutoLojaDetalhe,
+  ProdutoComprado,
+  OrdemCompra,
   LoginRequest,
   LoginResponse,
   User,
@@ -238,6 +240,19 @@ export async function apiListProdutosLoja(
 export async function apiGetProdutoLoja(id: number): Promise<ProdutoLojaDetalhe> {
   vlog(F, "apiGetProdutoLoja", "buscando produto da loja, id:", id);
   return fetchWithAuth<ProdutoLojaDetalhe>(`/api/loja/produtos/${id}`, { method: "GET" });
+}
+
+// ECOM-12: GET /api/loja/minhas-compras — produtos comprados pelo usuario logado
+// (o usuario vem do token; nada de id na query).
+export async function apiMinhasCompras(
+  page = 1,
+  limit = 20,
+  orderBy: OrdemCompra = "ultima_compra",
+  orderDir: "asc" | "desc" = "desc"
+): Promise<Paginado<ProdutoComprado[]>> {
+  vlog(F, "apiMinhasCompras", "buscando compras do usuario, pagina/ordem:", page, orderBy, orderDir);
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit), order_by: orderBy, order_dir: orderDir });
+  return listarPaginado<ProdutoComprado[]>(`/api/loja/minhas-compras?${qs.toString()}`, page, limit);
 }
 
 // ECOM-04: GET /api/loja/filtros — opcoes de categoria, marca e nota olfativa.

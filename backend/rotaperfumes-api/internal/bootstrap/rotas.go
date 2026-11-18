@@ -23,7 +23,7 @@ func HandlerHTTP(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) h
 	)
 }
 
-// NovoRouter registra as 71 rotas da API com método e política obrigatórios.
+// NovoRouter registra as 73 rotas da API com método e política obrigatórios.
 // Rotas() do router devolvido é a fonte da matriz ARQ-00.
 func NovoRouter(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) *httpx.Router {
 	r := httpx.NovoRouter(httpx.NovoAutenticador(identidadecrypto.NovoJWT(cfg), checker).ComCookieSeguro(cfg.CookieSecure))
@@ -129,6 +129,8 @@ func rotas(h Handlers) []httpx.Rota {
 		{Metodo: get, Padrao: "/api/loja/produtos", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.ListProdutosLoja", Handler: h.Produto.ListProdutosLoja},
 		{Metodo: get, Padrao: "/api/loja/produtos/{id}", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.GetProdutoLoja", Handler: h.Produto.GetProdutoLoja},
 		{Metodo: get, Padrao: "/api/loja/filtros", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.OpcoesFiltroLoja", Handler: h.Produto.OpcoesFiltroLoja},
+		// Minhas compras (ECOM-12): produtos comprados pelo usuário do token.
+		{Metodo: get, Padrao: "/api/loja/minhas-compras", Policy: todos, Arquivo: "compras_handler.go", Funcao: "PedidoHandler.MinhasCompras", Handler: h.Pedido.MinhasCompras},
 
 		// Imagem do produto (IMG-01): upload/remoção admin; leitura pública
 		// (aprovada pelo SecBrain), por handler próprio sem FileServer.
