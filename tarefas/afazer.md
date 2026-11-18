@@ -7,7 +7,7 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| IMG-02 | ALTA | o site não mostra nenhuma imagem de produto (volume vazio em produção) | 🟡 BackBrain |
+| IMG-02 | ALTA | em execução (ver `fazendo.md`): script pronto, falta rodar no servidor | 🟡 BackBrain |
 | LOTE-43 | MÉDIA | BACKUP-03/04/05/07, SEC-73, TST-28 (`tarefas/lote-43-spec.md`) | 🟣 SecBrain |
 | DEPLOY-11 | BAIXA | fase 2 do `--dev-ip`: recusar a opção e remover a transição | 🟡 BackBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
@@ -22,7 +22,7 @@
 **Sintoma (2026-11-18):** nenhuma imagem aparece no site; o backup acusou o volume `rotaperfumes_produto_imagens` vazio (0 arquivos), e já estava vazio antes do `--recriar` do banco.
 **Causa (confirmada):** 292 produtos, 0 com `produtos.imagem`: as imagens nunca foram geradas em produção (só no dev, IMG-01). Nada se perdeu. Volume único `rotaperfumes_produto_imagens`.
 **Restrição:** a 3306 está fechada (DEPLOY-10) e a imagem da API só traz o `server`: o `make db-gerar-imagens-produtos` não alcança a produção.
-**Opções (decisão do usuário):** (a) `deploy/gerar-imagens-producao.sh`: compila o `gerarimagens` num container (como o `seed-producao.sh`), roda na rede `rotaperfumes-db` com o volume (uid 65532) e a conta admin .20 via TLS, com confirmação e backup antes; (b) fotos reais pelo upload do admin.
+**Decisão do usuário (2026-11-18): opção A.** (a) `deploy/gerar-imagens-producao.sh`: compila o `gerarimagens` num container (como o `seed-producao.sh`), roda na rede `rotaperfumes-db` com o volume (uid 65532) e a conta admin .20 via TLS, com confirmação e backup antes; (b) fotos reais pelo upload do admin.
 
 ## LOTE-43: spec da `lote-42` ainda não implementada — MÉDIA
 **Ação:** implementar conforme `tarefas/lote-43-spec.md`: BACKUP-03 (tolerância de relógio 300 s), BACKUP-04 (`parcial-*` na guarda), BACKUP-05 (retenção relê os pares), BACKUP-07 (`--trocar-dados`), SEC-73 (fingerprint da chave apt da Cloudflare por 2º canal), TST-28 (`-timeout=30m`). Depois do MERGE-01.
