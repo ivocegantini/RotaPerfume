@@ -2,5 +2,5 @@
 
 > Só o card em execução e o passo atual; sem histórico (o que termina vai para `feito.md`).
 
-## MERGE-01: portar os cards da `lote-42` (branch `lote-43-merge-01`)
-**Passo atual:** código portado e testes reais verdes; falta a execução assistida no servidor e o PR (ver card em `afazer.md`).
+## IMG-02: imagens de produto na produção (opção A)
+**Passo atual:** `deploy/gerar-imagens-producao.sh` pronto e testado (estático, opções, rehearsal do container contra o CasaOS em dry-run); falta o usuário rodar no servidor (`--dry-run`, backup, `--confirmar`).

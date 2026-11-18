@@ -530,6 +530,18 @@ sudo bash deploy/backup-banco.sh --instalar --backup-dir /mnt/ssd/rotaperfumes -
 
 **Falha invisível:** sem aviso externo (decisão D2 do BACKUP-01 em aberto), uma falha só aparece no `--status`, consultado à mão. E o backup local não protege contra perda do disco (D1 em aberto).
 
+### Imagens de produto em produção (IMG-02)
+
+O `make db-gerar-imagens-produtos` não alcança a produção (3306 fechada). No servidor, `deploy/gerar-imagens-producao.sh` compila o `gerarimagens` num container e o roda na rede `rotaperfumes-db` (conta `rotaperfumes_admin`, .20, TLS), como o uid 65532 dono do volume `rotaperfumes_produto_imagens`, com `--read-only` e `--cap-drop ALL`. Grava pelo mesmo caso de uso do upload e pula quem já tem imagem.
+
+```bash
+sudo bash deploy/gerar-imagens-producao.sh --dry-run      # só lista; volume montado só leitura
+sudo rotaperfumes-backup-banco --agora                    # o --confirmar exige backup de até 60 min
+sudo bash deploy/gerar-imagens-producao.sh --confirmar    # --sobrescrever troca também as existentes
+```
+
+A vitrine mostra as imagens em até 5 min (TTL do cache). Cada `--confirmar` fica em `/root/rotaperfumes-mariadb/gerar-imagens.registro`. Fotos reais seguem pelo upload do admin.
+
 ### Atualizar
 
 1. Faça commit e push no `main`.

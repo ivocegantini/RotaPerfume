@@ -7,15 +7,22 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| MERGE-01 | MÉDIA | código portado; faltam testes reais e o servidor (execução assistida) | 🔵 SubBrain |
+| IMG-02 | ALTA | em execução (ver `fazendo.md`): script pronto, falta rodar no servidor | 🟡 BackBrain |
 | LOTE-43 | MÉDIA | BACKUP-03/04/05/07, SEC-73, TST-28 (`tarefas/lote-43-spec.md`) | 🟣 SecBrain |
+| DEPLOY-11 | BAIXA | fase 2 do `--dev-ip`: recusar a opção e remover a transição | 🟡 BackBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
 
-## MERGE-01: finalizar o porte da `lote-42` — MÉDIA
-**Feito:** etapas 1 e 2 na branch `lote-43-merge-01` (ver `feito.md`).
-**Falta:** (1) execução assistida no servidor: desligar o `rotaperfumes-backup.timer` antigo, `backup-banco.sh --instalar`, `rotaperfumes-backup-banco --agora`, `verificar-backup.sh`, `mariadb-docker.sh --recriar` (fecha a porta da LAN e remove `casaos`/`casaos_ro`); (2) PR para a `main`.
+## DEPLOY-11: fase 2 do `--dev-ip` — BAIXA
+**Contexto:** a porta 3306 foi fechada no servidor em 2026-11-18 (`--recriar` sem `--dev-ip`); a transição acabou.
+**Ação:** recusar o `--dev-ip` no `mariadb-docker.sh` (como o `--rede-lan`) e remover o código e a unit de firewall da transição; atualizar `docs/deploy-servidor.md` §3.3 e os testes.
+
+## IMG-02: site em produção sem imagens de produto — ALTA
+**Sintoma (2026-11-18):** nenhuma imagem aparece no site; o backup acusou o volume `rotaperfumes_produto_imagens` vazio (0 arquivos), e já estava vazio antes do `--recriar` do banco.
+**Causa (confirmada):** 292 produtos, 0 com `produtos.imagem`: as imagens nunca foram geradas em produção (só no dev, IMG-01). Nada se perdeu. Volume único `rotaperfumes_produto_imagens`.
+**Restrição:** a 3306 está fechada (DEPLOY-10) e a imagem da API só traz o `server`: o `make db-gerar-imagens-produtos` não alcança a produção.
+**Decisão do usuário (2026-11-18): opção A.** (a) `deploy/gerar-imagens-producao.sh`: compila o `gerarimagens` num container (como o `seed-producao.sh`), roda na rede `rotaperfumes-db` com o volume (uid 65532) e a conta admin .20 via TLS, com confirmação e backup antes; (b) fotos reais pelo upload do admin.
 
 ## LOTE-43: spec da `lote-42` ainda não implementada — MÉDIA
 **Ação:** implementar conforme `tarefas/lote-43-spec.md`: BACKUP-03 (tolerância de relógio 300 s), BACKUP-04 (`parcial-*` na guarda), BACKUP-05 (retenção relê os pares), BACKUP-07 (`--trocar-dados`), SEC-73 (fingerprint da chave apt da Cloudflare por 2º canal), TST-28 (`-timeout=30m`). Depois do MERGE-01.

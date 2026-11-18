@@ -12,6 +12,10 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: MERGE-01 concluído no servidor
+- PR mesclado (`f78597d`); servidor: timer antigo removido, contas `rotaperfumes_backup`/`rotaperfumes-admin` criadas (`casaos_ro` removida), `backup-banco.sh --instalar` (1º backup ok), `verificar-backup.sh` APROVADO (14 tabelas), `--agora` + `--recriar` (imagem nova, 3306 fechada). `--status` ok.
+- Observado: volume de imagens de produto vazio (0 arquivos); uid 999 do host é o `dnsmasq` (aviso antigo do script).
+
 ## Avulso de 2026-11-17: MERGE-01 etapa 2 (backup, DBA e restauração da `lote-42`)
 - BACKUP-01/02: `backup-banco.sh` (timer + `rotaperfumes-backup-banco`) substitui o `backup-mariadb.sh`; `verificar-backup.sh` e `restaurar-maquina.sh` portados; guia com a remoção do timer antigo.
 - DEPLOY-10: conta DBA `rotaperfumes-admin` (.22); sem porta publicada na LAN: `casaos` e `casaos_ro` removidas no `--recriar` (decisão do usuário; a .105 perde as consultas). SEC-60 sem efeito; SEC-71 já coberto.

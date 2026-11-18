@@ -773,13 +773,13 @@ deps-audit-frontend: ## SEC-13: npm audit (falha em severidade high+) e npm outd
 # e sudo bash deploy/mariadb-docker.sh --recriar (ver deploy/mariadb-docker.sh).
 # SEC-77: há buildx (ex.: 0.30 do Ubuntu) que ignora o --format e imprime o
 # inspect inteiro; o digest sai da linha "Digest:" (ou da linha só com o digest).
-IMAGENS_FIXADAS_EM = Jenkinsfile deploy/mariadb-docker.sh deploy/seed-producao.sh deploy/backup-banco.sh deploy/verificar-backup.sh deploy/restaurar-maquina.sh
+IMAGENS_FIXADAS_EM = Jenkinsfile deploy/mariadb-docker.sh deploy/seed-producao.sh deploy/gerar-imagens-producao.sh deploy/backup-banco.sh deploy/verificar-backup.sh deploy/restaurar-maquina.sh
 # SEC-47: bases dos Dockerfile. O FROM é resolvido com os ARG padrão do próprio
 # arquivo (ex.: ${GO_VERSION} e ${GO_DIGEST} do backend/Dockerfile); FROM sem digest vira AVISO.
 IMAGENS_DOCKERFILES = backend/Dockerfile frontend/Dockerfile deploy/Dockerfile.caddy
 IMAGEM_ACCEPT = application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json
 
-deps-audit-imagens: ## SEC-31/SEC-47: compara os digests fixados (Jenkinsfile: GO_IMAGE, GO_TEST_IMAGE, NODE_IMAGE e mariadb; mariadb-docker.sh; seed-producao.sh; backup-banco.sh; verificar-backup.sh; restaurar-maquina.sh; Dockerfiles) com os das tags atuais no registry (informativo, nunca falha)
+deps-audit-imagens: ## SEC-31/SEC-47: compara os digests fixados (Jenkinsfile: GO_IMAGE, GO_TEST_IMAGE, NODE_IMAGE e mariadb; mariadb-docker.sh; seed-producao.sh; gerar-imagens-producao.sh; backup-banco.sh; verificar-backup.sh; restaurar-maquina.sh; Dockerfiles) com os das tags atuais no registry (informativo, nunca falha)
 	@digest_remoto() { \
 	  case "$$1" in *.*/*) \
 	    command -v curl >/dev/null 2>&1 || return 1; \
