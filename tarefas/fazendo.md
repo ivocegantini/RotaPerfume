@@ -3,4 +3,4 @@
 > Só o card em execução e o passo atual; sem histórico (o que termina vai para `feito.md`).
 
 ## MERGE-01: portar os cards da `lote-42` (branch `lote-43-merge-01`)
-**Passo atual:** código portado e testado localmente (etapa 2); faltam os testes reais na MS-7E28 e a execução assistida no servidor (ver card em `afazer.md`).
+**Passo atual:** código portado e testes reais verdes; falta a execução assistida no servidor e o PR (ver card em `afazer.md`).

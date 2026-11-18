@@ -15,7 +15,7 @@
 
 ## MERGE-01: finalizar o porte da `lote-42` — MÉDIA
 **Feito:** etapas 1 e 2 na branch `lote-43-merge-01` (ver `feito.md`).
-**Falta:** (1) usuário roda na MS-7E28 os testes reais BACKUP01, TST15, TST17, DEPLOY-09/10; (2) execução assistida no servidor: desligar o `rotaperfumes-backup.timer` antigo, `backup-banco.sh --instalar`, `rotaperfumes-backup-banco --agora`, `verificar-backup.sh`, `mariadb-docker.sh --recriar` (fecha a porta da LAN e remove `casaos`/`casaos_ro`); (3) PR para a `main`.
+**Falta:** (1) execução assistida no servidor: desligar o `rotaperfumes-backup.timer` antigo, `backup-banco.sh --instalar`, `rotaperfumes-backup-banco --agora`, `verificar-backup.sh`, `mariadb-docker.sh --recriar` (fecha a porta da LAN e remove `casaos`/`casaos_ro`); (2) PR para a `main`.
 
 ## LOTE-43: spec da `lote-42` ainda não implementada — MÉDIA
 **Ação:** implementar conforme `tarefas/lote-43-spec.md`: BACKUP-03 (tolerância de relógio 300 s), BACKUP-04 (`parcial-*` na guarda), BACKUP-05 (retenção relê os pares), BACKUP-07 (`--trocar-dados`), SEC-73 (fingerprint da chave apt da Cloudflare por 2º canal), TST-28 (`-timeout=30m`). Depois do MERGE-01.

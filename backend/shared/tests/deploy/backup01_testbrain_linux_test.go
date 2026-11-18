@@ -2026,7 +2026,7 @@ func TestBACKUP01_ContaBackup_Real(t *testing.T) {
 		ls := linhas(dump)
 		require.NotEmpty(t, ls)
 		assert.True(t, strings.HasPrefix(ls[len(ls)-1], "-- Dump completed"), "marcador na última linha")
-		assert.Equal(t, 13, len(regexp.MustCompile(`(?m)^CREATE TABLE `).FindAllString(dump, -1)))
+		assert.Equal(t, tabelasDaOrdemDDL(t), len(regexp.MustCompile(`(?m)^CREATE TABLE `).FindAllString(dump, -1)))
 		for _, tab := range []string{"usuarios", "clientes", "vendedores"} {
 			assert.Regexp(t, "(?m)^CREATE TABLE `"+tab+"` \\(", dump)
 		}
@@ -2096,7 +2096,7 @@ func TestBACKUP01_ContaBackup_Real(t *testing.T) {
 			return out
 		}
 		assert.Equal(t, somas("rotaperfumes"), somas("restaurado_l42t"))
-		assert.Len(t, somas("restaurado_l42t"), 13)
+		assert.Len(t, somas("restaurado_l42t"), tabelasDaOrdemDDL(t))
 	})
 
 	t.Run("restaurar sobre tabela existente falha sem mexer nos dados", func(t *testing.T) {

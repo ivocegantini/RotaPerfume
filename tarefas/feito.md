@@ -16,6 +16,7 @@
 - BACKUP-01/02: `backup-banco.sh` (timer + `rotaperfumes-backup-banco`) substitui o `backup-mariadb.sh`; `verificar-backup.sh` e `restaurar-maquina.sh` portados; guia com a remoção do timer antigo.
 - DEPLOY-10: conta DBA `rotaperfumes-admin` (.22); sem porta publicada na LAN: `casaos` e `casaos_ro` removidas no `--recriar` (decisão do usuário; a .105 perde as consultas). SEC-60 sem efeito; SEC-71 já coberto.
 - `seed-producao.sh` sem senha digitada (SEC-52) e `--cap-drop ALL`. `make test` rc=0 (13200 PASS, 0 FAIL), `test-integration` (CasaOS :3307), `lint` e `shellcheck` ok.
+- Testes reais na MS-7E28 verdes: BACKUP01 (VerificarBackup, ContaBackup), DEPLOY09, DEPLOY10, Lote42_Legado_QuoteReal, TST15, TST17. ContaBackup passou a contar as tabelas pelo `sql/ordem-ddl.txt` (14).
 
 ## Avulso de 2026-11-17: testes reais de deploy (BACKUP-01, TST-15, TST-17) verdes
 - Rodados pelo usuário na `residentivo-MS-7E28` (fora da produção), com `sudo` e Docker: `TestBACKUP01_RestauracaoReal_Docker`, `TestTST15_MariadbDocker_Real` e `TestTST17_SeedProducao_Real` (3 subtestes) PASS.

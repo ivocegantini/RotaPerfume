@@ -197,11 +197,13 @@ func TestLote42_Legado_QuoteReal(t *testing.T) {
 	md := lerRaiz(t, "deploy", "mariadb-docker.sh")
 	imagem := regexp.MustCompile(`(?m)^IMAGEM_BASE="([^"]+)"$`).FindStringSubmatch(md)
 	require.NotNil(t, imagem)
-	gera := regexp.MustCompile(`(?m)^LEGADO_SQL=\$\(root_sql --raw -e "(.+)"\)$`).FindStringSubmatch(md)
+	gera := regexp.MustCompile(`(?m)^\s*LEGADO_SQL=\$\(root_sql --raw -e "(.+)"\)$`).FindStringSubmatch(md)
 	require.NotNil(t, gera, "consulta que gera o DROP")
-	conta := regexp.MustCompile(`(?m)^LEGADO_RESTA=\$\(root_sql -e "(.+)"\)$`).FindStringSubmatch(md)
+	conta := regexp.MustCompile(`(?m)^\s*LEGADO_RESTA=\$\(root_sql -e "(.+)"\)$`).FindStringSubmatch(md)
 	require.NotNil(t, conta)
-	q := func(s string) string { return strings.ReplaceAll(s, "$DB_LEGADO", "casaos") }
+	q := func(s string) string {
+		return strings.NewReplacer("$DB_LEGADO", "casaos", "$LEGADA", "casaos").Replace(s)
+	}
 
 	const nome = "rp-quote-l42"
 	_ = exec.Command("docker", "rm", "-f", nome).Run()
