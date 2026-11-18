@@ -47,3 +47,7 @@ var (
 
 // ErrMuitasRequisicoesLoja (ECOM-10): vitrine pública acima do limite por IP.
 var ErrMuitasRequisicoesLoja = kernel.NovoErro(kernel.KindBloqueado, "muitas requisições — tente novamente em instantes")
+
+// ErrEstoqueInsuficienteFaturamento (BUG-32): faturar levaria o saldo do
+// produto abaixo de zero; nada é gravado (rollback do faturamento, 409).
+var ErrEstoqueInsuficienteFaturamento = kernel.NovoErro(kernel.KindConflito, "estoque insuficiente para faturar o pedido")

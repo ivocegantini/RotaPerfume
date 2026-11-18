@@ -48,6 +48,8 @@ import {
   Estoque,
   EstoqueInput,
   ListEstoqueFilters,
+  CheckoutRequest,
+  CompraFinalizada,
 } from "./types";
 import { fetchEnvelopeWithAuth, fetchWithAuth } from "./apiClient";
 import { vlog } from "./vlog";
@@ -253,6 +255,13 @@ export async function apiMinhasCompras(
   vlog(F, "apiMinhasCompras", "buscando compras do usuario, pagina/ordem:", page, orderBy, orderDir);
   const qs = new URLSearchParams({ page: String(page), limit: String(limit), order_by: orderBy, order_dir: orderDir });
   return listarPaginado<ProdutoComprado[]>(`/api/loja/minhas-compras?${qs.toString()}`, page, limit);
+}
+
+// ECOM-14: POST /api/loja/checkout — fecha o carrinho do usuario logado
+// (201 novo; 200 se a mesma chave ja virou pedido).
+export async function apiFinalizarCompra(input: CheckoutRequest): Promise<CompraFinalizada> {
+  vlog(F, "apiFinalizarCompra", "enviando checkout, itens:", input.itens.length);
+  return fetchWithAuth<CompraFinalizada>("/api/loja/checkout", { method: "POST", body: JSON.stringify(input) });
 }
 
 // ECOM-04: GET /api/loja/filtros — opcoes de categoria, marca e nota olfativa.

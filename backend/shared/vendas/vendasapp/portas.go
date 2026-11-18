@@ -116,6 +116,29 @@ type TxPedido struct {
 	Pedidos    PedidosNaTx
 	Pagamentos PagamentosNaTx
 	Estoque    BaixaEstoque
+	// Loja: leituras e a chave do checkout (ECOM-14); nil → checkout recusado.
+	Loja LojaNaTx
+}
+
+// LojaNaTx são as leituras do checkout da loja na tx do pedido (ECOM-14).
+type LojaNaTx interface {
+	// ClienteDoUsuario trava (FOR UPDATE) o cliente ligado ao login: serializa
+	// os checkouts do mesmo cliente. Sem cliente → vendas.ErrCheckoutSemCliente.
+	ClienteDoUsuario(ctx context.Context, usuarioID int64) (int64, error)
+	// VendedorLoja: o vendedor "Loja Online" (sql/33); ausente →
+	// vendas.ErrVendedorLojaAusente.
+	VendedorLoja(ctx context.Context) (int64, error)
+	// OfertasAtivas: preço e disponível dos produtos ATIVOS entre ids (os
+	// demais ficam fora do mapa). Trava cada produto (FOR UPDATE, ids em
+	// ordem crescente) para dois checkouts não venderem a mesma unidade.
+	OfertasAtivas(ctx context.Context, ids []int64) (map[int64]vendas.OfertaLoja, error)
+	// PedidoPorChave: o pedido e o cliente da chave (achou=false sem linha).
+	PedidoPorChave(ctx context.Context, chave string) (pedidoID, clienteID int64, achou bool, err error)
+	// GravarChave grava a chave no pedido; chave repetida →
+	// vendas.ErrCheckoutChaveEmUso.
+	GravarChave(ctx context.Context, pedidoID int64, chave string) error
+	// PagamentoDoPedido: o primeiro pagamento do pedido (nil sem linha).
+	PagamentoDoPedido(ctx context.Context, pedidoID int64) (*vendas.Pagamento, error)
 }
 
 // Transactor é o Unit of Work (db.Transactor satisfaz).

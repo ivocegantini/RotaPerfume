@@ -601,126 +601,97 @@ func newMockTx(t *testing.T) (*sql.DB, sqlmock.Sqlmock, *sql.Tx) {
 	return db, mock, tx
 }
 
-func TestEstoqueAjustarSaldoPorFaturamento_CriaRegistroQuandoNaoExiste(t *testing.T) {
-	db, mock, tx := newMockTx(t)
-	defer db.Close()
+// BUG-32 (decisão do usuário): a baixa parte do último saldo até o dia; o
+// saldo nunca fica negativo; sem saldo suficiente, nada é gravado (409).
+const lockUltimoSnapshot = `SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? ORDER BY data_snapshot DESC, id DESC LIMIT 1 FOR UPDATE`
 
-	data := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+var colunasUltimoSnapshot = []string{"id", "data_snapshot", "saldo"}
 
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WithArgs("2024-06-01", "SKU1").
-		WillReturnError(sql.ErrNoRows)
-	// delta=5 (baixa): contribuicao = -5, ruptura = (-5 <= 0) = true.
-	mock.ExpectExec(`INSERT INTO estoque .+ ON DUPLICATE KEY UPDATE`).
-		WithArgs("2024-06-01", "SKU1", -5, true).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
+// lockProduto: a linha do produto é o mutex da baixa (antes do snapshot).
+const lockProduto = `SELECT id FROM produtos WHERE sku = \? FOR UPDATE`
 
-	ctx := context.Background()
-	err := catalogomysql.NovoEstoques(tx).AjustarSaldoPorFaturamento(ctx, "SKU1", data, 5)
-	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+func TestBUG32_Faturamento_ProdutoInexistenteE500(t *testing.T) {
+	err := ajustar(t, nil, 5)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, catalogo.ErrEstoqueInsuficienteFaturamento)
 }
 
-func TestEstoqueAjustarSaldoPorFaturamento_DecrementaSaldoExistente(t *testing.T) {
+// ajustar roda a baixa numa tx do mock e devolve o erro.
+func ajustar(t *testing.T, preparar func(sqlmock.Sqlmock), delta int) error {
+	t.Helper()
 	db, mock, tx := newMockTx(t)
 	defer db.Close()
-
-	data := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WithArgs("2024-06-01", "SKU1").
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(42)))
-	mock.ExpectExec(`INSERT INTO estoque .+ ON DUPLICATE KEY UPDATE`).
-		WithArgs("2024-06-01", "SKU1", -3, true).
-		WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectCommit()
-
-	ctx := context.Background()
-	err := catalogomysql.NovoEstoques(tx).AjustarSaldoPorFaturamento(ctx, "SKU1", data, 3)
-	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
-
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestEstoqueAjustarSaldoPorFaturamento_RupturaRecalculada(t *testing.T) {
-	// Cobre a derivação de ruptura a partir do delta/contribuição aplicada:
-	// delta positivo grande o suficiente para deixar o saldo <= 0.
-	testes := []struct {
-		nome            string
-		delta           int
-		wantContrib     int
-		wantRupturaFlag bool
-	}{
-		{"delta pequeno não gera ruptura (contribuição positiva)", -2, 2, false},
-		{"delta gera ruptura (contribuição negativa/zero)", 10, -10, true},
-		{"delta exatamente zero de contribuição gera ruptura (<=0)", 0, 0, true},
+	if preparar != nil { // nil: o produto não existe
+		mock.ExpectQuery(lockProduto).WithArgs("SKU1").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+		preparar(mock)
+	} else {
+		mock.ExpectQuery(lockProduto).WithArgs("SKU1").WillReturnError(sql.ErrNoRows)
+		mock.ExpectRollback()
 	}
+	err := catalogomysql.NovoEstoques(tx).AjustarSaldoPorFaturamento(context.Background(), "SKU1", time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC), delta)
+	_ = tx.Rollback()
+	assert.NoError(t, mock.ExpectationsWereMet())
+	return err
+}
 
-	for _, tt := range testes {
-		t.Run(tt.nome, func(t *testing.T) {
-			db, mock, tx := newMockTx(t)
-			defer db.Close()
+func TestBUG32_Faturamento_DiaNovoParteDoUltimoSaldo(t *testing.T) {
+	err := ajustar(t, func(m sqlmock.Sqlmock) {
+		m.ExpectQuery(lockUltimoSnapshot).WithArgs("SKU1", "2024-06-01").
+			WillReturnRows(sqlmock.NewRows(colunasUltimoSnapshot).AddRow(int64(42), time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC), 8))
+		m.ExpectExec(`INSERT INTO estoque \(data_snapshot, sku, saldo, ruptura\) VALUES \(\?, \?, \?, \?\)$`).
+			WithArgs("2024-06-01", "SKU1", 3, false).WillReturnResult(sqlmock.NewResult(1, 1))
+		m.ExpectRollback()
+	}, 5)
+	require.NoError(t, err)
+}
 
-			data := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+func TestBUG32_Faturamento_MesmoDiaAtualizaALinha(t *testing.T) {
+	err := ajustar(t, func(m sqlmock.Sqlmock) {
+		m.ExpectQuery(lockUltimoSnapshot).WithArgs("SKU1", "2024-06-01").
+			WillReturnRows(sqlmock.NewRows(colunasUltimoSnapshot).AddRow(int64(42), time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC), 5))
+		// zerar é permitido (saldo >= 0) e marca ruptura.
+		m.ExpectExec(`UPDATE estoque SET saldo = \?, ruptura = \? WHERE id = \?`).
+			WithArgs(0, true, int64(42)).WillReturnResult(sqlmock.NewResult(0, 1))
+		m.ExpectRollback()
+	}, 5)
+	require.NoError(t, err)
+}
 
-			mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-				WithArgs("2024-06-01", "SKU1").
-				WillReturnError(sql.ErrNoRows)
-			mock.ExpectExec(`INSERT INTO estoque .+ ON DUPLICATE KEY UPDATE`).
-				WithArgs("2024-06-01", "SKU1", tt.wantContrib, tt.wantRupturaFlag).
-				WillReturnResult(sqlmock.NewResult(1, 1))
-			mock.ExpectCommit()
-
-			ctx := context.Background()
-			err := catalogomysql.NovoEstoques(tx).AjustarSaldoPorFaturamento(ctx, "SKU1", data, tt.delta)
-			require.NoError(t, err)
-			require.NoError(t, tx.Commit())
-
-			assert.NoError(t, mock.ExpectationsWereMet())
+func TestBUG32_Faturamento_NuncaNegativo(t *testing.T) {
+	casos := map[string]func(sqlmock.Sqlmock){
+		"saldo menor que a baixa": func(m sqlmock.Sqlmock) {
+			m.ExpectQuery(lockUltimoSnapshot).WithArgs("SKU1", "2024-06-01").
+				WillReturnRows(sqlmock.NewRows(colunasUltimoSnapshot).AddRow(int64(42), time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC), 4))
+			m.ExpectRollback()
+		},
+		"sem snapshot (saldo 0)": func(m sqlmock.Sqlmock) {
+			m.ExpectQuery(lockUltimoSnapshot).WithArgs("SKU1", "2024-06-01").WillReturnError(sql.ErrNoRows)
+			m.ExpectRollback()
+		},
+	}
+	for nome, preparar := range casos {
+		t.Run(nome, func(t *testing.T) {
+			err := ajustar(t, preparar, 5) // sem INSERT/UPDATE: o mock falharia
+			assert.ErrorIs(t, err, catalogo.ErrEstoqueInsuficienteFaturamento)
 		})
 	}
 }
 
 func TestEstoqueAjustarSaldoPorFaturamento_ErroNoLock(t *testing.T) {
-	db, mock, tx := newMockTx(t)
-	defer db.Close()
-
-	data := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WithArgs("2024-06-01", "SKU1").
-		WillReturnError(sql.ErrConnDone)
-	mock.ExpectRollback()
-
-	ctx := context.Background()
-	err := catalogomysql.NovoEstoques(tx).AjustarSaldoPorFaturamento(ctx, "SKU1", data, 5)
-	assert.Error(t, err)
-	require.NoError(t, tx.Rollback())
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+	err := ajustar(t, func(m sqlmock.Sqlmock) {
+		m.ExpectQuery(lockUltimoSnapshot).WithArgs("SKU1", "2024-06-01").WillReturnError(sql.ErrConnDone)
+		m.ExpectRollback()
+	}, 5)
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	assert.NotErrorIs(t, err, catalogo.ErrEstoqueInsuficienteFaturamento)
 }
 
-func TestEstoqueAjustarSaldoPorFaturamento_ErroNoUpsert(t *testing.T) {
-	db, mock, tx := newMockTx(t)
-	defer db.Close()
-
-	data := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WithArgs("2024-06-01", "SKU1").
-		WillReturnError(sql.ErrNoRows)
-	mock.ExpectExec(`INSERT INTO estoque .+ ON DUPLICATE KEY UPDATE`).
-		WillReturnError(sql.ErrConnDone)
-	mock.ExpectRollback()
-
-	ctx := context.Background()
-	err := catalogomysql.NovoEstoques(tx).AjustarSaldoPorFaturamento(ctx, "SKU1", data, 5)
-	assert.Error(t, err)
-	require.NoError(t, tx.Rollback())
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+func TestEstoqueAjustarSaldoPorFaturamento_ErroNaGravacao(t *testing.T) {
+	err := ajustar(t, func(m sqlmock.Sqlmock) {
+		m.ExpectQuery(lockUltimoSnapshot).WithArgs("SKU1", "2024-06-01").
+			WillReturnRows(sqlmock.NewRows(colunasUltimoSnapshot).AddRow(int64(42), time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC), 10))
+		m.ExpectExec(`INSERT INTO estoque`).WillReturnError(sql.ErrConnDone)
+		m.ExpectRollback()
+	}, 5)
+	assert.ErrorIs(t, err, sql.ErrConnDone)
 }

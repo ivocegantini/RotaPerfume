@@ -403,9 +403,10 @@ func expectCreateComItensSuccess(mock sqlmock.Sqlmock) {
 	}{{10, "SKU-010", 2}, {11, "SKU-011", 1}} {
 		mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).WithArgs(it.produtoID).
 			WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow(it.sku))
-		mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}))
-		mock.ExpectExec(`INSERT INTO estoque`).WithArgs(sqlmock.AnyArg(), it.sku, -it.delta, true).
+		mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+		mock.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100)) // BUG-32: último saldo 100
+		mock.ExpectExec(`INSERT INTO estoque`).WithArgs(sqlmock.AnyArg(), it.sku, 100-it.delta, false).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 	}
 	mock.ExpectCommit()
@@ -517,15 +518,17 @@ func TestPedidoService_UpdatePedido_Sucesso(t *testing.T) {
 	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).
 		WithArgs(int64(10)).
 		WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU10"))
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mock.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100)) // BUG-32: último saldo 100
 	mock.ExpectExec(`INSERT INTO estoque`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).
 		WithArgs(int64(11)).
 		WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU11"))
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mock.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100)) // BUG-32: último saldo 100
 	mock.ExpectExec(`INSERT INTO estoque`).
 		WillReturnResult(sqlmock.NewResult(2, 1))
 	mock.ExpectCommit()

@@ -168,6 +168,25 @@ export interface ProdutoLojaDetalhe extends ProdutoLoja {
   descricao: string;
 }
 
+// ECOM-14: POST /api/loja/checkout — so produto e quantidade (preco vem do servidor).
+export type FormaCheckout = "pix" | "cartao" | "boleto";
+export interface CheckoutRequest {
+  chave: string; // UUID (idempotencia)
+  forma_pagamento: FormaCheckout;
+  itens: { produto_id: number; quantidade: number }[];
+}
+export interface CompraFinalizada {
+  pedido_id: number;
+  data_pedido: string;
+  status: string;
+  valor_total: number;
+  forma_pagamento: string;
+  status_pagamento: string;
+  data_vencimento: string;
+  repetida: boolean;
+  itens: { produto_id: number; nome: string; quantidade: number; preco: number; valor: number }[];
+}
+
 // ECOM-12: item de GET /api/loja/minhas-compras (produtos comprados, somados por produto).
 export interface ProdutoComprado {
   produto_id: number;

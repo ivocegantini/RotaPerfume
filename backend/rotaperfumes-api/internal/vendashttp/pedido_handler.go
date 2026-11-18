@@ -9,7 +9,12 @@ import (
 
 // PedidoHandler trata /api/pedidos/* (Authenticated, escopo por carteira).
 // O nome do tipo e dos métodos é o do legado: é o rótulo do vlog de rota.
-type PedidoHandler struct{ casos *vendasapp.Casos }
+type PedidoHandler struct {
+	casos *vendasapp.Casos
+	// SEC-79: limites do checkout (nil = sem limite, como nos testes antigos).
+	limiteUsuario, limiteIP limitador
+	confiarProxy            bool
+}
 
 // NovoPedidoHandler exige os casos de uso (nil: panic na montagem).
 func NovoPedidoHandler(c *vendasapp.Casos) *PedidoHandler {

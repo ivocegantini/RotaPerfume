@@ -115,6 +115,7 @@ var matrizRotas = []rotaMatriz{
 	{"GET /api/loja/produtos/{id}", politicaPublic, p("/api/loja/produtos/1"), false},       // ECOM-11: página do produto
 	{"GET /api/loja/filtros", politicaPublic, p("/api/loja/filtros"), false},                // ECOM-04/10
 	{"GET /api/loja/minhas-compras", politicaAnyRole, p("/api/loja/minhas-compras"), false}, // ECOM-12: compras do usuário
+	{"POST /api/loja/checkout", politicaAnyRole, p("/api/loja/checkout"), false},            // ECOM-14: fecha o carrinho
 	// Usuários / admin
 	{"GET /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
 	{"POST /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
@@ -328,12 +329,12 @@ func TestARQ00_Matriz_CobreTodasAsRotasDeRoutesGo(t *testing.T) {
 	assert.Empty(t, faltando, "rotas registradas no router SEM política na matriz ARQ-00 — adicione-as a matrizRotas")
 	assert.Empty(t, sobrando, "rotas na matriz ARQ-00 que NÃO estão mais no router — remova-as ou corrija o padrão")
 	assert.Empty(t, divergentes, "política registrada no router diverge da matriz ARQ-00")
-	assert.Len(t, registradas, 73, "a API registra 73 padrões (13 Public, 34 Authenticated, 23 AdminOnly, 3 AnyRole)")
+	assert.Len(t, registradas, 74, "a API registra 74 padrões (13 Public, 34 Authenticated, 23 AdminOnly, 4 AnyRole)")
 	porPolitica := map[politicaRota]int{}
 	for _, rt := range registradas {
 		porPolitica[politicaDe(rt.Policy)]++
 	}
-	assert.Equal(t, map[politicaRota]int{politicaPublic: 13, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 3}, porPolitica,
+	assert.Equal(t, map[politicaRota]int{politicaPublic: 13, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 4}, porPolitica,
 		"contagem por política registrada no router")
 }
 

@@ -3,7 +3,8 @@
 // ECOM-01/10: vitrine da loja, a pagina inicial do site (publica). Lista os
 // produtos ativos de GET /api/loja/produtos (sem custo), com busca, filtros,
 // ordenacao e paginacao no servidor. O topo (TopoLoja) mostra a conta; o
-// cartao abre a pagina do produto (/produtos/{id}, ECOM-11).
+// cartao abre a pagina do produto (/produtos/{id}, ECOM-11). ECOM-13: botao
+// Comprar em cada cartao e o carrinho na barra lateral (LayoutLoja).
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
@@ -11,7 +12,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Paginador } from "@/components/ui/Paginador";
-import { TopoLoja } from "@/components/loja/TopoLoja";
+import { BotaoComprar, LayoutLoja } from "@/components/loja/CarrinhoLateral";
 import { apiListProdutosLoja, apiOpcoesFiltroLoja } from "@/lib/api";
 import { urlImagemProduto } from "@/lib/imagemProduto";
 import { useUltimaResposta } from "@/lib/useListaSegura";
@@ -47,10 +48,10 @@ const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 function CartaoProduto({ p }: { p: ProdutoLoja }) {
   const img = urlImagemProduto(p.imagem_url);
   return (
-    <li>
+    <li className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
       <Link
         href={`/produtos/${p.id}`}
-        className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="flex flex-1 flex-col focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500"
       >
         <div className="flex aspect-square items-center justify-center bg-slate-100">
           {img ? (
@@ -69,6 +70,9 @@ function CartaoProduto({ p }: { p: ProdutoLoja }) {
           <p className="mt-auto pt-2 text-lg font-bold text-primary-700">{moeda.format(Number(p.preco) || 0)}</p>
         </div>
       </Link>
+      <div className="px-3 pb-3">
+        <BotaoComprar produto={p} size="sm" fullWidth />
+      </div>
     </li>
   );
 }
@@ -149,10 +153,7 @@ export function Vitrine() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <TopoLoja marcaComoTitulo />
-
-      <main className="mx-auto max-w-6xl px-4 py-6">
+    <LayoutLoja marcaComoTitulo>
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <form onSubmit={onBuscar} className="flex w-full gap-2 sm:max-w-md" role="search">
             <div className="flex-1">
@@ -225,7 +226,7 @@ export function Vitrine() {
         ) : (
           <>
             <p className="mb-3 text-sm text-slate-500">{total} produto(s)</p>
-            <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
               {produtos.map((p) => (
                 <CartaoProduto key={p.id} p={p} />
               ))}
@@ -236,7 +237,6 @@ export function Vitrine() {
         <div className="mt-6">
           <Paginador pagina={pagina} paginas={paginas} onIrPara={(n) => pedir({ pg: n })} />
         </div>
-      </main>
-    </div>
+    </LayoutLoja>
   );
 }
