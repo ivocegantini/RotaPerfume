@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rotaperfumes/shared/catalogo"
 	"github.com/rotaperfumes/shared/vendas"
 	"github.com/rotaperfumes/shared/vlog"
 )
@@ -48,9 +49,10 @@ func bug16Releitura(m sqlmock.Sqlmock, id int64, status string) {
 
 func bug16Baixa(m sqlmock.Sqlmock, produtoID int64, sku string, delta int) {
 	m.ExpectQuery(`SELECT sku FROM produtos WHERE id = \?`).WithArgs(produtoID).WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow(sku))
-	m.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).WithArgs(sqlmock.AnyArg(), sku).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	m.ExpectExec(`INSERT INTO estoque`).WithArgs(sqlmock.AnyArg(), sku, -delta, true).WillReturnResult(sqlmock.NewResult(0, 1))
+	m.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	m.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100)) // BUG-32: último saldo 100
+	m.ExpectExec(`INSERT INTO estoque`).WithArgs(sqlmock.AnyArg(), sku, 100-delta, false).WillReturnResult(sqlmock.NewResult(0, 1))
 }
 
 func bug16Dados(status string) vendas.DadosPedido {
@@ -215,12 +217,15 @@ func TestBUG20_Casos_CriarFaturado_FalhaNaBaixa_Rollback(t *testing.T) {
 		},
 		"lock do estoque": func(m sqlmock.Sqlmock) {
 			m.ExpectQuery(`SELECT sku FROM produtos WHERE id = \?`).WithArgs(int64(10)).WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU-10"))
-			m.ExpectQuery(`SELECT id FROM estoque`).WillReturnError(errBanco)
+			m.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+			m.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque`).WillReturnError(errBanco)
 		},
 		"upsert do segundo item": func(m sqlmock.Sqlmock) {
 			bug16Baixa(m, 10, "SKU-10", 2)
 			m.ExpectQuery(`SELECT sku FROM produtos WHERE id = \?`).WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU-11"))
-			m.ExpectQuery(`SELECT id FROM estoque`).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+			m.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+			m.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque`).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100))
 			m.ExpectExec(`INSERT INTO estoque`).WillReturnError(errBanco)
 		},
 	}
@@ -240,6 +245,27 @@ func TestBUG20_Casos_CriarFaturado_FalhaNaBaixa_Rollback(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet(), "sem commit e sem releitura")
 		})
 	}
+}
+
+// BUG-32: faturar sem saldo suficiente (o 2º item pede 1, saldo 0) é 409
+// e desfaz tudo, inclusive a baixa do 1º item e o INSERT do pedido.
+func TestBUG32_Casos_CriarFaturado_SemSaldo_409Rollback(t *testing.T) {
+	pool, mock := novoMock(t)
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT INTO pedidos`).WillReturnResult(sqlmock.NewResult(9, 1))
+	mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(2, 1))
+	bug16Baixa(mock, 10, "SKU-10", 2)
+	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \?`).WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU-11"))
+	mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mock.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(78), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 0))
+	mock.ExpectRollback()
+
+	p, err := novosCasos(pool, escopoIrrestrito(t)).CriarPedido(context.Background(), admin(t), ler(bug16Dados("Faturado")))
+	assert.Nil(t, p)
+	assert.ErrorIs(t, err, catalogo.ErrEstoqueInsuficienteFaturamento)
+	assert.NoError(t, mock.ExpectationsWereMet(), "sem commit e sem releitura")
 }
 
 // BUG-20: falha no próprio INSERT do pedido também não chega à baixa.

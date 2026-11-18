@@ -82,3 +82,25 @@ var (
 	// pagamento quitado; para o perfil restrito, 409 (espelha a exclusão).
 	ErrPagamentoJaQuitadoNaoPodeSerEditado = kernel.NovoErro(kernel.KindConflito, "pagamento já quitado não pode ser editado")
 )
+
+// Erros do checkout da loja (ECOM-14). Mensagens fixas, sem valores (O6).
+var (
+	ErrCheckoutChaveInvalida      = kernel.NovoErro(kernel.KindInvalido, "chave do checkout inválida")
+	ErrCheckoutFormaInvalida      = kernel.NovoErro(kernel.KindInvalido, "forma_pagamento inválida (use: pix, cartao, boleto)")
+	ErrCheckoutCarrinhoVazio      = kernel.NovoErro(kernel.KindInvalido, "o carrinho deve ter ao menos um item")
+	ErrCheckoutItensDemais        = kernel.NovoErro(kernel.KindInvalido, "o carrinho deve ter no máximo 50 itens") // MaxItensCheckout
+	ErrCheckoutQuantidadeInvalida = kernel.NovoErro(kernel.KindInvalido, "quantidade deve estar entre 1 e 99 em todos os itens")
+	ErrCheckoutProdutoRepetido    = kernel.NovoErro(kernel.KindInvalido, "produto repetido no carrinho")
+	// ErrCheckoutProdutoIndisponivel: produto inativo ou inexistente (409).
+	ErrCheckoutProdutoIndisponivel = kernel.NovoErro(kernel.KindConflito, "um ou mais produtos não estão mais disponíveis na loja")
+	// ErrCheckoutSemEstoque (SEC-79): quantidade acima do disponível (409).
+	ErrCheckoutSemEstoque = kernel.NovoErro(kernel.KindConflito, "estoque insuficiente para um ou mais produtos do carrinho")
+	// ErrMuitosCheckouts (SEC-79): limite de checkouts por usuário/IP (429).
+	ErrMuitosCheckouts = kernel.NovoErro(kernel.KindBloqueado, "muitas tentativas de compra — tente novamente em alguns minutos")
+	// ErrCheckoutSemCliente: login sem cliente da loja (equipe) não compra.
+	ErrCheckoutSemCliente = kernel.NovoErro(kernel.KindProibido, "apenas clientes da loja podem finalizar compras")
+	// ErrCheckoutChaveEmUso: a chave já é de um pedido de outro cliente.
+	ErrCheckoutChaveEmUso = kernel.NovoErro(kernel.KindConflito, "checkout já utilizado; recarregue a página")
+	// ErrVendedorLojaAusente: falta o vendedor "Loja Online" (sql/33).
+	ErrVendedorLojaAusente = kernel.NovoErro(kernel.KindInterno, "erro interno")
+)

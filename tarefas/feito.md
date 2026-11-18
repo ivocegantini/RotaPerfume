@@ -12,6 +12,23 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: BUG-32 baixa do faturamento a partir do último saldo
+- Decisão do usuário: o dia novo parte do último saldo − quantidade; o saldo nunca fica negativo; sem saldo, não fatura (`catalogo.ErrEstoqueInsuficienteFaturamento`, 409, rollback do pedido).
+- `AjustarSaldoPorFaturamento`: trava o produto (mutex da baixa e do checkout), lê o último snapshot até o dia, UPDATE no mesmo dia ou INSERT do dia novo; itens baixados em ordem de produto. Substitui o upsert do BUG-21 (testes antigos reescritos); integração com 2 faturamentos simultâneos (1 baixa, 1 recusa). `make test-integration` e `lint` rc=0.
+
+## Avulso de 2026-11-18: SEC-79 limites do checkout
+- Limite: 10 tentativas por usuário e 30 por IP em 10 min (bloqueio 15 min, 429 + Retry-After), em memória (`adapters/ratelimit`), antes de qualquer SQL.
+- Estoque na tx: produto travado (FOR UPDATE, ids em ordem); disponível = último snapshot − pedidos `Loja` "Em separação"; acima → 409. Integração com disputa pela última unidade (1 venda, 1 recusa). `make test-integration`, `lint` rc=0. Achado: BUG-32.
+
+## Avulso de 2026-11-18: ECOM-14 checkout da loja (pedido + pagamento)
+- Migração 35 (`make db-fix-pedidos-chave-checkout`): `pedidos.chave_checkout` CHAR(36) NULL UNIQUE (idempotência); DDL 04 no estado final; aplicada no CasaOS :3307.
+- `POST /api/loja/checkout` (AnyRole; rotas 74): só produto/quantidade; cliente do token (FOR UPDATE), preço dos ativos no banco, pedido `Loja`/"Loja Online"/`Em separação` + pagamento `Em aberto` numa tx; mesma chave → 200 com o mesmo pedido; inativo 409, equipe 403.
+- "Finalizar pedido" ligado (chave UUID, confirmação com nº do pedido, carrinho limpo). `make test`, `lint`, `test-integration` e `test-frontend` (1917) rc=0. Gateway → ECOM-15.
+
+## Avulso de 2026-11-18: ECOM-13 botão Comprar e carrinho lateral
+- Botão "Comprar" no cartão da vitrine e na página do produto; carrinho na barra lateral direita (fixa no desktop, gaveta no celular pelo botão 🛒 do topo) com +/−, remover, total e "Ir para o pagamento" → `/checkout`.
+- Carrinho no `localStorage` (`lib/carrinho.ts`), validado na leitura (até 50 itens, 99 un.), limpo no "Sair". `/checkout`: resumo editável, forma de pagamento e "Finalizar pedido" desligado (ECOM-14). Só frontend; `make test-frontend` (1914) rc=0 com `NODE_ENV=test`.
+
 ## Avulso de 2026-11-18: ECOM-12 minhas compras (branch `ecom-12-minhas-compras`)
 - `GET /api/loja/minhas-compras` (AnyRole): produtos dos pedidos não cancelados do cliente ligado ao login (`clientes.usuario_id`), somados por produto; usuário só do token; ordenação por whitelist; equipe sem cliente → `[]`. Sem mudança de schema.
 - Tela `/minhas-compras` (tabela ordenável e paginada, link para o produto só se ativo; visitante vê "Entre na sua conta"); link "Minhas compras" no topo da loja. Postman e matriz de rotas (73) atualizados; `make test`, `test-integration` (CasaOS :3307, teste de integração ECOM-12) e `test-frontend` (1906) rc=0; query validada no dev :3307 com ONLY_FULL_GROUP_BY.

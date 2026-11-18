@@ -120,7 +120,9 @@ func esperarGravacaoDoPedido(m sqlmock.Sqlmock) {
 	m.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(2, 1))
 	for _, sku := range []string{"SKU-10", "SKU-11"} {
 		m.ExpectQuery(`SELECT sku FROM produtos WHERE id = \?`).WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow(sku))
-		m.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+		m.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+		m.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100)) // BUG-32: último saldo 100
 		m.ExpectExec(`INSERT INTO estoque`).WillReturnResult(sqlmock.NewResult(0, 1))
 	}
 	m.ExpectCommit()
@@ -179,8 +181,9 @@ func TestVendasapp_TxPedido_FalhaEmCadaPassoFazRollback(t *testing.T) {
 	mock.ExpectExec(`DELETE FROM itens_pedido`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido`).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery(`SELECT sku FROM produtos`).WithArgs(int64(10)).WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU-10"))
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WithArgs(time.Now().Format(kernel.LayoutData), "SKU-10").WillReturnError(errBanco)
+	mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mock.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+		WithArgs("SKU-10", time.Now().Format(kernel.LayoutData)).WillReturnError(errBanco)
 	mock.ExpectRollback()
 	_, err = novosCasos(pool, escopoIrrestrito(t)).AtualizarPedido(ctx, admin(t), 1, ler(d))
 	assert.ErrorIs(t, err, errBanco)

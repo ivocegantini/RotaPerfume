@@ -3,10 +3,11 @@
 // ECOM-11: pagina publica do produto, aberta pelo cartao da vitrine. Le
 // GET /api/loja/produtos/{id} (so ativos, sem custo) e mostra a descricao
 // completa como texto (sem HTML; as quebras de paragrafo sao mantidas).
+// ECOM-13: botao Comprar e o carrinho na barra lateral (LayoutLoja).
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { TopoLoja } from "@/components/loja/TopoLoja";
+import { BotaoComprar, LayoutLoja } from "@/components/loja/CarrinhoLateral";
 import { apiGetProdutoLoja } from "@/lib/api";
 import { ApiError } from "@/lib/apiError";
 import { urlImagemProduto } from "@/lib/imagemProduto";
@@ -60,9 +61,7 @@ export function PaginaProduto({ idBruto }: { idBruto: string | undefined }) {
     id === null ? { tipo: "nao-encontrado" } : carregado && carregado.id === id ? carregado.estado : { tipo: "carregando" };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <TopoLoja />
-      <main className="mx-auto max-w-6xl px-4 py-6">
+    <LayoutLoja>
         <Link href="/" className="mb-5 inline-block text-sm font-medium text-primary-600 hover:underline">
           ← Voltar para a loja
         </Link>
@@ -76,8 +75,7 @@ export function PaginaProduto({ idBruto }: { idBruto: string | undefined }) {
           </p>
         )}
         {estado.tipo === "ok" && <DetalheProduto p={estado.produto} />}
-      </main>
-    </div>
+    </LayoutLoja>
   );
 }
 
@@ -108,6 +106,9 @@ function DetalheProduto({ p }: { p: ProdutoLojaDetalhe }) {
           <h1 className="mt-1 text-2xl font-bold text-slate-900">{p.nome}</h1>
         </div>
         <p className="text-3xl font-bold text-primary-700">{moeda.format(Number(p.preco) || 0)}</p>
+        <div className="sm:max-w-xs">
+          <BotaoComprar produto={p} size="lg" fullWidth />
+        </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           {caracteristicas
             .filter(([, v]) => v)

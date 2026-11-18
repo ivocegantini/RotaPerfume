@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rotaperfumes/shared/catalogo"
 	"github.com/rotaperfumes/shared/db"
 	"github.com/rotaperfumes/shared/kernel"
 	"github.com/rotaperfumes/shared/vlog"
@@ -40,42 +41,57 @@ func (r *Estoques) SKUDoProduto(ctx context.Context, produtoID int64) (string, e
 	return sku, nil
 }
 
-// AjustarSaldoPorFaturamento aplica um DELTA ao saldo do sku no dia, para
-// uso EXCLUSIVO do faturamento de pedidos: `saldo = saldo - delta` no
-// próprio SQL, seguro sob concorrência (ao contrário do upsert absoluto do
-// ERP). Sem registro do dia, o INSERT parte de saldo 0 (saldo final =
-// -delta); o carry-over do dia anterior não é feito aqui. ruptura é
-// recalculada (saldo resultante <= 0).
-//
-// O SELECT … FOR UPDATE serializa dois faturamentos simultâneos do mesmo
-// (data_snapshot, sku) antes do upsert. Tem de rodar na tx do pedido.
+// SQL da baixa por faturamento (BUG-32), todas constantes.
+const (
+	// sqlTravarProduto: a linha do produto é o mutex da baixa (e do checkout,
+	// SEC-79). Travar só o último snapshot não basta: o 2º faturamento que
+	// esperava o lock seguiria com a linha antiga e colidiria no UNIQUE.
+	sqlTravarProduto = `SELECT id FROM produtos WHERE sku = ? FOR UPDATE`
+	// sqlUltimoSnapshotTravado: a última posição do sku até o dia, lida
+	// DEPOIS do lock do produto (leitura com lock: vê o último commit).
+	sqlUltimoSnapshotTravado  = `SELECT id, data_snapshot, saldo FROM estoque WHERE sku = ? AND data_snapshot <= ? ORDER BY data_snapshot DESC, id DESC LIMIT 1 FOR UPDATE`
+	sqlAtualizarSnapshotDoDia = `UPDATE estoque SET saldo = ?, ruptura = ? WHERE id = ?`
+	sqlCriarSnapshotDoDia     = `INSERT INTO estoque (data_snapshot, sku, saldo, ruptura) VALUES (?, ?, ?, ?)`
+)
+
+// AjustarSaldoPorFaturamento dá baixa de delta unidades do sku no dia, para
+// uso EXCLUSIVO do faturamento de pedidos (BUG-32, decisão do usuário):
+// parte do último saldo até o dia (sem snapshot: 0); o saldo novo nunca é
+// negativo (saldo < delta → catalogo.ErrEstoqueInsuficienteFaturamento, 409,
+// e a tx do pedido desfaz tudo). Último snapshot no próprio dia → UPDATE;
+// anterior → cria o dia com o saldo carregado menos a baixa. ruptura =
+// saldo resultante <= 0. Tem de rodar na tx do pedido.
 func (r *Estoques) AjustarSaldoPorFaturamento(ctx context.Context, sku string, dia time.Time, delta int) error {
 	data := dia.Format(kernel.LayoutData)
-	var existente int
-	err := r.q.QueryRowContext(ctx, `SELECT id FROM estoque WHERE data_snapshot = ? AND sku = ? FOR UPDATE`, data, sku).Scan(&existente)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var produtoID int64
+	err := r.q.QueryRowContext(ctx, sqlTravarProduto, sku).Scan(&produtoID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return errProdutoDaBaixa
+	}
+	if err != nil {
+		return fmt.Errorf("catalogomysql: lock produto para ajuste de faturamento: %w", db.SemValorDuplicado(err))
+	}
+	var id int64
+	var ultimo time.Time
+	var saldo int
+	err = r.q.QueryRowContext(ctx, sqlUltimoSnapshotTravado, sku, data).Scan(&id, &ultimo, &saldo)
+	semSnapshot := errors.Is(err, sql.ErrNoRows)
+	if err != nil && !semSnapshot {
 		return fmt.Errorf("catalogomysql: lock estoque para ajuste de faturamento: %w", db.SemValorDuplicado(err))
 	}
-	// VALUES(saldo) carrega a CONTRIBUIÇÃO (-delta), não o saldo final: no
-	// INSERT ela já é o saldo (0 - delta); no UPDATE, soma ao saldo atual.
-	//
-	// BUG-21: o MariaDB avalia as atribuições do ON DUPLICATE KEY UPDATE da
-	// esquerda para a direita (sem SIMULTANEOUS_ASSIGNMENT no sql_mode), e
-	// uma coluna já atribuída é lida com o valor NOVO. Com saldo antes de
-	// ruptura, "(saldo + VALUES(saldo)) <= 0" aplicava a baixa duas vezes.
-	// ruptura vem PRIMEIRO, calculada sobre o saldo antigo + a contribuição
-	// (= o saldo resultante): o resultado é o mesmo com avaliação da esquerda
-	// para a direita ou simultânea, então não depende do sql_mode.
-	const q = `
-		INSERT INTO estoque (data_snapshot, sku, saldo, ruptura)
-		VALUES (?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE
-			ruptura = (saldo + VALUES(saldo)) <= 0,
-			saldo = saldo + VALUES(saldo)`
-	contribuicao := -delta
-	if _, err = r.q.ExecContext(ctx, q, data, sku, contribuicao, contribuicao <= 0); err != nil {
+	novo := saldo - delta
+	if novo < 0 {
+		vlog.Printf(arqFaturamento, "Estoques.AjustarSaldoPorFaturamento", "decisão estoque_insuficiente delta=%d", delta)
+		return catalogo.ErrEstoqueInsuficienteFaturamento
+	}
+	if !semSnapshot && ultimo.Format(kernel.LayoutData) == data {
+		_, err = r.q.ExecContext(ctx, sqlAtualizarSnapshotDoDia, novo, novo <= 0, id)
+	} else {
+		_, err = r.q.ExecContext(ctx, sqlCriarSnapshotDoDia, data, sku, novo, novo <= 0)
+	}
+	if err != nil {
 		return fmt.Errorf("catalogomysql: ajustar saldo estoque por faturamento: %w", db.SemValorDuplicado(err))
 	}
-	vlog.Printf(arqFaturamento, "Estoques.AjustarSaldoPorFaturamento", "UPSERT estoque delta=%d", delta)
+	vlog.Printf(arqFaturamento, "Estoques.AjustarSaldoPorFaturamento", "baixa estoque delta=%d dia_existente=%t", delta, !semSnapshot && ultimo.Format(kernel.LayoutData) == data)
 	return nil
 }

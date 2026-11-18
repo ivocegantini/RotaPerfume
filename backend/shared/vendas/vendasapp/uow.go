@@ -1,10 +1,12 @@
 package vendasapp
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/rotaperfumes/shared/kernel"
@@ -216,6 +218,10 @@ func motivoBloqueio(err error) string {
 // baixarEstoque dá baixa de cada item no dia do faturamento (delta = a
 // quantidade). O wrap leva só o nome da operação (O6-iv).
 func (r TxPedido) baixarEstoque(ctx context.Context, itens []vendas.ItemPedido, quando time.Time) error {
+	// BUG-32: produtos em ordem crescente (o lock de cada produto não forma
+	// ciclo com outro faturamento ou checkout dos mesmos produtos).
+	itens = slices.Clone(itens)
+	slices.SortStableFunc(itens, func(a, b vendas.ItemPedido) int { return cmp.Compare(a.ProdutoID, b.ProdutoID) })
 	for _, it := range itens {
 		sku, err := r.Estoque.SKUDoProduto(ctx, it.ProdutoID)
 		if err != nil {

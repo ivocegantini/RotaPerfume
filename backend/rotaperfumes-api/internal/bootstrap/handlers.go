@@ -50,6 +50,15 @@ type Handlers struct {
 // lojaMaxPorMinuto é o limite por IP da vitrine pública (ECOM-10).
 const lojaMaxPorMinuto = 300
 
+// SEC-79: limites do POST /api/loja/checkout. A janela conta tentativas;
+// passou do teto, a chave fica bloqueada (429 com Retry-After).
+const (
+	checkoutMaxUsuario = 10
+	checkoutMaxIP      = 30
+	checkoutJanela     = 10 * time.Minute
+	checkoutBloqueio   = 15 * time.Minute
+)
+
 func NovosHandlers(pool *sql.DB, cfg *config.Config, email identidadeapp.EnviadorSenhaInicial) Handlers {
 	return NovosHandlersCom(pool, cfg, NovaIdentidade(pool, cfg, extPadrao(cfg, email)))
 }
@@ -69,6 +78,9 @@ func NovosHandlersCom(pool *sql.DB, cfg *config.Config, identidade *identidadeap
 	com := NovoComercialHTTP(comercialCasos)
 	escopo := comercialCasos.Escopo() // a mesma regra de escopo para Vendas e para o Dashboard
 	vendas := NovoVendasHTTP(NovoVendas(pool, escopo))
+	// SEC-79: checkouts por usuário e por IP (tentativas, com sucesso ou não).
+	vendas.Pedido.ComLimiteCheckout(ratelimit.Nova(checkoutMaxUsuario, checkoutJanela, checkoutBloqueio),
+		ratelimit.Nova(checkoutMaxIP, checkoutJanela, checkoutBloqueio), cfg.TrustProxyHeaders)
 	ident := NovoIdentidadeHTTP(identidade, cfg)
 	return Handlers{
 		Auth:           ident.Auth,

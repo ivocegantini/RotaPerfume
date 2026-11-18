@@ -6,6 +6,11 @@
   },
   "variable": [
     {
+      "key": "checkout_chave",
+      "value": "",
+      "description": "ECOM-14: UUID do checkout (gerado no pre-request; apague para uma compra nova)"
+    },
+    {
       "key": "base_url",
       "value": "http://localhost:8080"
     },
@@ -6169,6 +6174,62 @@
               ]
             },
             "description": "GET /api/loja/minhas-compras — **AnyRole** (sessão obrigatória). Produtos dos pedidos **não cancelados** do cliente da loja ligado ao usuário do token (`clientes.usuario_id`), somados por produto: `produto_id`, `sku`, `nome`, `imagem_url`, `ativo`, `quantidade`, `pedidos`, `total_gasto`, `ultima_compra` (AAAA-MM-DD).\n\nO usuário vem só do token (id na query é ignorado). Login sem cliente da loja (equipe) → `data: []`.\n\n**Erros:** 401 sem sessão."
+          },
+          "response": []
+        },
+        {
+          "name": "Finalizar Compra (AnyRole, ECOM-14)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('checkout_chave')) { pm.collectionVariables.set('checkout_chave', require('uuid').v4()); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 (novo) ou 200 (mesma chave)', function() { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "var d = pm.response.json().data;",
+                  "pm.test('Pedido da loja sem vendedor nem custo', function() {",
+                  "    pm.expect(d).to.have.property('pedido_id');",
+                  "    pm.expect(d.status).to.eql('Em separação');",
+                  "    pm.expect(d.status_pagamento).to.eql('Em aberto');",
+                  "    pm.expect(d).to.not.have.property('vendedor_id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chave\": \"{{checkout_chave}}\",\n  \"forma_pagamento\": \"pix\",\n  \"itens\": [\n    { \"produto_id\": 1, \"quantidade\": 2 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/loja/checkout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "loja",
+                "checkout"
+              ]
+            },
+            "description": "POST /api/loja/checkout — **AnyRole** (sessão obrigatória). Fecha o carrinho do cliente da loja ligado ao usuário do token. O corpo traz só `produto_id` e `quantidade` (1..99, até 50 itens, sem repetir), `forma_pagamento` (`pix`, `cartao`, `boleto`) e `chave` (UUID de idempotência).\n\nPreço e total vêm do banco (`preco_tabela` dos ativos). Cria o pedido (canal `Loja`, vendedor \"Loja Online\", status `Em separação`) e o pagamento `Em aberto` (PIX/cartão vencem hoje; boleto em 14 dias) numa única transação. Mesma chave → **200** com o mesmo pedido (`repetida: true`).\n\n**Estoque (SEC-79):** disponível = saldo do último snapshot − unidades em pedidos `Loja` \"Em separação\"; o produto é travado na tx (sem vender a mesma unidade duas vezes).\n\n**Limite (SEC-79):** 10 tentativas por usuário e 30 por IP em 10 min; acima, 429 por 15 min (`Retry-After`).\n\n**Erros:** 400 corpo inválido; 401 sem sessão; 403 login sem cliente da loja; 409 produto inativo/inexistente, estoque insuficiente ou chave de outro cliente; 429 limite de tentativas."
           },
           "response": []
         }

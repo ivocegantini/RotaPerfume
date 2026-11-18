@@ -131,6 +131,8 @@ func rotas(h Handlers) []httpx.Rota {
 		{Metodo: get, Padrao: "/api/loja/filtros", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.OpcoesFiltroLoja", Handler: h.Produto.OpcoesFiltroLoja},
 		// Minhas compras (ECOM-12): produtos comprados pelo usuário do token.
 		{Metodo: get, Padrao: "/api/loja/minhas-compras", Policy: todos, Arquivo: "compras_handler.go", Funcao: "PedidoHandler.MinhasCompras", Handler: h.Pedido.MinhasCompras},
+		// Checkout (ECOM-14): fecha o carrinho do usuário do token (preços do banco).
+		{Metodo: post, Padrao: "/api/loja/checkout", Policy: todos, Arquivo: "checkout_handler.go", Funcao: "PedidoHandler.FinalizarCompra", Handler: h.Pedido.FinalizarCompra},
 
 		// Imagem do produto (IMG-01): upload/remoção admin; leitura pública
 		// (aprovada pelo SecBrain), por handler próprio sem FileServer.

@@ -29,6 +29,9 @@
 --       status: Cancelado, Em separação, Entregue, Faturado
 --   - `valor_total` vira DECIMAL(15,2) para evitar erros de arredondamento
 --     de ponto flutuante em valores monetários.
+--   - ATUALIZAÇÃO (2026-11-18, ECOM-14): `chave_checkout` CHAR(36) NULL
+--     UNIQUE, a idempotência do checkout da loja (migração sql/35,
+--     make db-fix-pedidos-chave-checkout, para bancos já criados).
 --   - Índices para os filtros esperados pelo Backend/Frontend (tela de
 --     Pedidos master-detail): `status`, `canal`, `data_pedido`, `cliente_id`,
 --     `vendedor_id`.
@@ -49,9 +52,11 @@ CREATE TABLE IF NOT EXISTS `pedidos` (
     `canal` ENUM('App','Telefone','Visita','WhatsApp','Loja') NOT NULL COMMENT 'Canal de venda do pedido (Loja = checkout da loja online, ECOM-06)',
     `status` ENUM('Cancelado','Em separação','Entregue','Faturado') NOT NULL COMMENT 'Status do pedido',
     `valor_total` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Valor total do pedido em R$',
+    `chave_checkout` CHAR(36) NULL DEFAULT NULL COMMENT 'Chave de idempotência do checkout da loja (ECOM-14); NULL = pedido do CRM/ERP',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação do registro',
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de última atualização',
     PRIMARY KEY (`pedido_id_origem`),
+    UNIQUE KEY `uq_pedidos_chave_checkout` (`chave_checkout`),
     KEY `idx_pedidos_status` (`status`),
     KEY `idx_pedidos_canal` (`canal`),
     KEY `idx_pedidos_data_pedido` (`data_pedido`),

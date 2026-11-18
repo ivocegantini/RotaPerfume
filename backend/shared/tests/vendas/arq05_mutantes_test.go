@@ -16,6 +16,7 @@ package vendas_test
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"testing"
 	"time"
@@ -134,32 +135,32 @@ func nilSeVazio(r any) any {
 	return r
 }
 
-// A baixa por faturamento SOMA a contribuição (-delta) ao saldo existente
-// (nunca sobrescreve o saldo do dia) e recalcula a ruptura sobre o saldo
-// resultante; o SELECT … FOR UPDATE vem antes, na mesma conexão. BUG-21: a
-// ruptura é atribuída ANTES do saldo (o MariaDB avalia da esquerda para a
-// direita), para não aplicar a baixa duas vezes.
-func TestARQ05_AjusteFaturamento_UpsertSomaAoSaldo(t *testing.T) {
-	const upsertRe = `INSERT INTO estoque \(data_snapshot, sku, saldo, ruptura\)\s+VALUES \(\?, \?, \?, \?\)\s+` +
-		`ON DUPLICATE KEY UPDATE\s+ruptura = \(saldo \+ VALUES\(saldo\)\) <= 0,\s+saldo = saldo \+ VALUES\(saldo\)\s*$`
+// A baixa por faturamento (BUG-32, substitui o upsert do BUG-21) parte do
+// último saldo travado (FOR UPDATE, até o dia): no próprio dia, UPDATE da
+// linha; dia novo, INSERT com o saldo carregado − delta. Nunca negativo.
+func TestARQ05_AjusteFaturamento_PartedoUltimoSaldo(t *testing.T) {
+	const lockRe = `SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? ORDER BY data_snapshot DESC, id DESC LIMIT 1 FOR UPDATE`
 	dia := time.Date(2024, 3, 9, 15, 4, 5, 0, time.Local)
 	casos := []struct {
-		nome         string
-		delta        int
-		contribuicao int
-		ruptura      bool
+		nome    string
+		ultimo  time.Time
+		delta   int
+		escrita string
+		args    []driver.Value
 	}{
-		{"baixa de 3", 3, -3, true},
-		{"baixa zero", 0, 0, true},
-		{"delta negativo (entrada)", -2, 2, false},
+		{"dia novo: carrega o saldo", time.Date(2024, 3, 1, 0, 0, 0, 0, time.Local), 3,
+			`INSERT INTO estoque \(data_snapshot, sku, saldo, ruptura\) VALUES \(\?, \?, \?, \?\)$`, []driver.Value{"2024-03-09", "SKU-1", 7, false}},
+		{"mesmo dia: atualiza a linha", time.Date(2024, 3, 9, 0, 0, 0, 0, time.Local), 10,
+			`UPDATE estoque SET saldo = \?, ruptura = \? WHERE id = \?$`, []driver.Value{0, true, 7}},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {
 			pool, mock := novoMock(t)
-			mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-				WithArgs("2024-03-09", "SKU-1").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
-			mock.ExpectExec(upsertRe).WithArgs("2024-03-09", "SKU-1", c.contribuicao, c.ruptura).
-				WillReturnResult(sqlmock.NewResult(0, 2))
+			mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WithArgs("SKU-1").
+				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+			mock.ExpectQuery(lockRe).WithArgs("SKU-1", "2024-03-09").
+				WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(7, c.ultimo, 10))
+			mock.ExpectExec(c.escrita).WithArgs(c.args...).WillReturnResult(sqlmock.NewResult(0, 1))
 			require.NoError(t, catalogomysql.NovoEstoques(pool).AjustarSaldoPorFaturamento(context.Background(), "SKU-1", dia, c.delta))
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})

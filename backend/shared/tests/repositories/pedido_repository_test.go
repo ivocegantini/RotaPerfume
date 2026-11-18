@@ -613,8 +613,9 @@ func TestPedidoUpdateComItens_TransicaoParaFaturado_BaixaEstoque(t *testing.T) {
 	mock.ExpectQuery(`SELECT sku FROM produtos WHERE id = \? LIMIT 1`).
 		WithArgs(int64(2)).
 		WillReturnRows(sqlmock.NewRows([]string{"sku"}).AddRow("SKU2"))
-	mock.ExpectQuery(`SELECT id FROM estoque WHERE data_snapshot = \? AND sku = \? FOR UPDATE`).
-		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(`SELECT id FROM produtos WHERE sku = \? FOR UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	mock.ExpectQuery(`SELECT id, data_snapshot, saldo FROM estoque WHERE sku = \? AND data_snapshot <= \? .*FOR UPDATE`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "data_snapshot", "saldo"}).AddRow(int64(77), time.Date(2020, 1, 1, 0, 0, 0, 0, time.Local), 100)) // BUG-32: último saldo 100
 	mock.ExpectExec("INSERT INTO estoque").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
