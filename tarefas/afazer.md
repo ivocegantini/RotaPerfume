@@ -20,8 +20,9 @@
 
 ## IMG-02: site em produção sem imagens de produto — ALTA
 **Sintoma (2026-11-18):** nenhuma imagem aparece no site; o backup acusou o volume `rotaperfumes_produto_imagens` vazio (0 arquivos), e já estava vazio antes do `--recriar` do banco.
-**Investigar:** quantos `produtos.imagem` estão preenchidos (nome sem arquivo = imagem perdida; NULL = nunca gerada/enviada); se o volume montado na API é o do compose `rotaperfumes` (`PRODUTO_IMAGENS_DIR=/data/produtos-imagens`); se as imagens foram geradas só no dev (`make db-gerar-imagens-produtos`, IMG-01).
-**Ação:** conforme a causa: gerar/reenviar as imagens em produção pelo caso de uso do upload (guarda `CONFIRMO_PRODUCAO`), ou corrigir a montagem do volume; limpar referências órfãs; teste e conferência no site e no `--status` do backup.
+**Causa (confirmada):** 292 produtos, 0 com `produtos.imagem`: as imagens nunca foram geradas em produção (só no dev, IMG-01). Nada se perdeu. Volume único `rotaperfumes_produto_imagens`.
+**Restrição:** a 3306 está fechada (DEPLOY-10) e a imagem da API só traz o `server`: o `make db-gerar-imagens-produtos` não alcança a produção.
+**Opções (decisão do usuário):** (a) `deploy/gerar-imagens-producao.sh`: compila o `gerarimagens` num container (como o `seed-producao.sh`), roda na rede `rotaperfumes-db` com o volume (uid 65532) e a conta admin .20 via TLS, com confirmação e backup antes; (b) fotos reais pelo upload do admin.
 
 ## LOTE-43: spec da `lote-42` ainda não implementada — MÉDIA
 **Ação:** implementar conforme `tarefas/lote-43-spec.md`: BACKUP-03 (tolerância de relógio 300 s), BACKUP-04 (`parcial-*` na guarda), BACKUP-05 (retenção relê os pares), BACKUP-07 (`--trocar-dados`), SEC-73 (fingerprint da chave apt da Cloudflare por 2º canal), TST-28 (`-timeout=30m`). Depois do MERGE-01.
