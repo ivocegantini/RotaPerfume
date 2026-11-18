@@ -23,6 +23,9 @@ type Pedidos interface {
 	PorID(ctx context.Context, id int64) (*vendas.Pedido, error)
 	// Itens devolve os itens do pedido (nil sem linhas).
 	Itens(ctx context.Context, pedidoID int64) ([]vendas.ItemPedido, error)
+	// ComprasDoUsuario pagina os produtos comprados pelo login (ECOM-12),
+	// pelo cliente da loja ligado a ele; sem cliente, lista vazia.
+	ComprasDoUsuario(ctx context.Context, usuarioID int64, o kernel.Ordenacao[vendas.CampoCompra], p kernel.Pagina) (kernel.Resultado[vendas.ProdutoComprado], error)
 }
 
 // Pagamentos é o repositório de pagamentos fora da tx. Criação e exclusão

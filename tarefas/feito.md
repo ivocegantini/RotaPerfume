@@ -12,6 +12,10 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: ECOM-12 minhas compras (branch `ecom-12-minhas-compras`)
+- `GET /api/loja/minhas-compras` (AnyRole): produtos dos pedidos não cancelados do cliente ligado ao login (`clientes.usuario_id`), somados por produto; usuário só do token; ordenação por whitelist; equipe sem cliente → `[]`. Sem mudança de schema.
+- Tela `/minhas-compras` (tabela ordenável e paginada, link para o produto só se ativo; visitante vê "Entre na sua conta"); link "Minhas compras" no topo da loja. Postman e matriz de rotas (73) atualizados; `make test`, `test-integration` (CasaOS :3307, teste de integração ECOM-12) e `test-frontend` (1906) rc=0; query validada no dev :3307 com ONLY_FULL_GROUP_BY.
+
 ## Avulso de 2026-11-18: ECOM-11 página do produto
 - `produtos.descricao` → `nome` e nova `descricao` TEXT (migração 34, `make db-fix-produtos-nome-descricao`; DDL 10 no estado final); domínio valida até 5000 caracteres; API/front/Postman com `nome`, `produto_nome` e `?order_by=nome`.
 - `GET /api/loja/produtos/{id}` público (só ativo, inativo = 404 igual, limite por IP, cache `vitrine`); página `/produtos/[id]` aberta pelo cartão da vitrine; textarea "Descricao" no admin.

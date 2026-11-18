@@ -1,7 +1,7 @@
 "use client";
 
-// ECOM-10/11: topo da loja (vitrine e página do produto). Mostra Entrar/Criar
-// conta ao visitante e Ola/Sair (e Painel para a equipe) a quem esta logado.
+// ECOM-10/11/12: topo da loja. Mostra Entrar/Criar conta ao visitante e
+// Ola/Minhas compras/Sair (e Painel para a equipe) a quem esta logado.
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
@@ -25,7 +25,8 @@ const lerSessao = () => {
 };
 const sessaoNoServidor = () => null;
 
-function useSessaoLocal(): Pick<User, "nome" | "role"> | null {
+/** Sessao do cache local (so para a UI; a API decide o acesso). */
+export function useSessaoLocal(): Pick<User, "nome" | "role"> | null {
   const bruto = useSyncExternalStore(assinarSessao, lerSessao, sessaoNoServidor);
   if (!bruto) return null;
   try {
@@ -52,6 +53,9 @@ export function TopoLoja({ marcaComoTitulo = false }: { marcaComoTitulo?: boolea
           {sessao ? (
             <>
               <span className="hidden text-sm text-slate-600 sm:inline">Ola, {sessao.nome}</span>
+              <Link href="/minhas-compras" className="text-sm font-medium text-slate-700 hover:underline">
+                Minhas compras
+              </Link>
               {sessao.role !== "usuario" && (
                 <Link href={rotaInicial(sessao.role)} className="text-sm font-medium text-primary-600 hover:underline">
                   Painel
