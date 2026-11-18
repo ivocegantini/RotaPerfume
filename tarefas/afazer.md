@@ -7,6 +7,7 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
+| IMG-02 | ALTA | o site não mostra nenhuma imagem de produto (volume vazio em produção) | 🟡 BackBrain |
 | LOTE-43 | MÉDIA | BACKUP-03/04/05/07, SEC-73, TST-28 (`tarefas/lote-43-spec.md`) | 🟣 SecBrain |
 | DEPLOY-11 | BAIXA | fase 2 do `--dev-ip`: recusar a opção e remover a transição | 🟡 BackBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
@@ -16,6 +17,11 @@
 ## DEPLOY-11: fase 2 do `--dev-ip` — BAIXA
 **Contexto:** a porta 3306 foi fechada no servidor em 2026-11-18 (`--recriar` sem `--dev-ip`); a transição acabou.
 **Ação:** recusar o `--dev-ip` no `mariadb-docker.sh` (como o `--rede-lan`) e remover o código e a unit de firewall da transição; atualizar `docs/deploy-servidor.md` §3.3 e os testes.
+
+## IMG-02: site em produção sem imagens de produto — ALTA
+**Sintoma (2026-11-18):** nenhuma imagem aparece no site; o backup acusou o volume `rotaperfumes_produto_imagens` vazio (0 arquivos), e já estava vazio antes do `--recriar` do banco.
+**Investigar:** quantos `produtos.imagem` estão preenchidos (nome sem arquivo = imagem perdida; NULL = nunca gerada/enviada); se o volume montado na API é o do compose `rotaperfumes` (`PRODUTO_IMAGENS_DIR=/data/produtos-imagens`); se as imagens foram geradas só no dev (`make db-gerar-imagens-produtos`, IMG-01).
+**Ação:** conforme a causa: gerar/reenviar as imagens em produção pelo caso de uso do upload (guarda `CONFIRMO_PRODUCAO`), ou corrigir a montagem do volume; limpar referências órfãs; teste e conferência no site e no `--status` do backup.
 
 ## LOTE-43: spec da `lote-42` ainda não implementada — MÉDIA
 **Ação:** implementar conforme `tarefas/lote-43-spec.md`: BACKUP-03 (tolerância de relógio 300 s), BACKUP-04 (`parcial-*` na guarda), BACKUP-05 (retenção relê os pares), BACKUP-07 (`--trocar-dados`), SEC-73 (fingerprint da chave apt da Cloudflare por 2º canal), TST-28 (`-timeout=30m`). Depois do MERGE-01.
