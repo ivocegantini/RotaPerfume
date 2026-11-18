@@ -37,14 +37,26 @@ func img02Rodar(t *testing.T, args ...string) (string, int) {
 }
 
 // As guardas são cópia byte a byte das do seed-producao.sh (e, por tabela, do
-// mariadb-docker.sh: TST-17 e BACKUP-01 já conferem as duas).
+// mariadb-docker.sh: TST-17 e BACKUP-01 já conferem as duas). Lote 43: o
+// conferir_backup_recente daqui não aceita parcial-* (BACKUP-04: este script
+// grava no volume de imagens); as conferências do dump escolhido são as mesmas.
 func TestIMG02_GuardasCopiadasDoSeed(t *testing.T) {
 	sc, sp := img02Script(t), lerRaiz(t, "deploy", "seed-producao.sh")
-	for _, nome := range []string{"arquivo_secreto_ok", "conferir_dir_privado", "conferir_backup_recente", "conferir_ca_host", "conferir_container_rede"} {
-		re := regexp.MustCompile(`(?ms)^` + nome + `\(\) \{.*?^\}\n`)
-		f := re.FindString(sc)
+	funcao := func(texto, nome string) string {
+		f := regexp.MustCompile(`(?ms)^` + nome + `\(\) \{.*?^\}\n`).FindString(texto)
 		require.NotEmpty(t, f, nome)
-		assert.Equal(t, re.FindString(sp), f, nome)
+		return f
+	}
+	for _, nome := range []string{"arquivo_secreto_ok", "conferir_dir_privado", "conferir_ca_host", "conferir_container_rede"} {
+		assert.Equal(t, funcao(sp, nome), funcao(sc, nome), nome)
+	}
+	fs, fi := funcao(sp, "conferir_backup_recente"), funcao(sc, "conferir_backup_recente")
+	assert.NotContains(t, fi, "parcial")
+	pulo := regexp.MustCompile(`parcial|chave|melhor|BASH_REMATCH|=~|for f in "\$dir"|^\s*(done|else|fi|continue)$|^\s*local `)
+	for _, l := range strings.Split(fs, "\n") {
+		if !pulo.MatchString(l) {
+			assert.Contains(t, fi, l+"\n", "conferência igual à do seed")
+		}
 	}
 }
 

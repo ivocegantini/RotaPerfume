@@ -1,6 +1,6 @@
 # Chave do repositorio apt do cloudflared (DEPLOY-09): "CloudFlare Software Packaging 2025".
-# ATENCAO: este fingerprint veio SO do HTTPS da propria Cloudflare
-# (https://pkg.cloudflare.com/cloudflare-main.gpg, baixada em 2026-11-06). A pagina nao o
-# publica. Ainda precisa de CONFIRMACAO POR UM SEGUNDO CANAL antes de confiar nele.
+# Origem: https://pkg.cloudflare.com/cloudflare-main.gpg (HTTPS da Cloudflare, baixada em 2026-11-06).
+# SEC-73: confirmado em 2026-11-07 por um segundo canal: keyserver.ubuntu.com e keys.openpgp.org
+# servem a mesma chave primaria e a subchave 06C89DB3B80A8F4349697C76029E1444B7D9F50F.
 # Uma linha util: 40 hex maiusculos, sem espacos. Diferente da chave em cloudflare-apt.asc = o script encerra.
 CC94B39C77AE7342A68B89628A682D308D4E5E73

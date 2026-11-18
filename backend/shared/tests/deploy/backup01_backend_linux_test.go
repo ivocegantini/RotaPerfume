@@ -1089,9 +1089,6 @@ func TestBACKUP01_GuardaRecriar_Recusas(t *testing.T) {
 		{"pre-restauracao nao vale", func(t *testing.T, dir string) {
 			dumpRecente(t, dir, "pre-restauracao-"+carimboAgora(0)+".sql.gz")
 		}, "nenhum backup"},
-		{"parcial nao vale", func(t *testing.T, dir string) {
-			dumpRecente(t, dir, "parcial-rotaperfumes-"+carimboAgora(0)+".sql.gz")
-		}, "nenhum backup"},
 	}
 	for _, c := range casos {
 		t.Run(c.nome, func(t *testing.T) {

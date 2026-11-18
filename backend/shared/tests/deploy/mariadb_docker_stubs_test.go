@@ -43,6 +43,7 @@ case "$1" in
   inspect)
     [[ -f "$S/criado" ]] || exit 1
     case "$*" in
+      *.Mounts*) cat "$S/dados_montado" 2>/dev/null ;;
       *State.Running*) cat "$S/rodando" 2>/dev/null || echo true ;;
       *IPAMConfig*) cat "$S/ip" ;;
       *"len .NetworkSettings"*) echo 1 ;;
@@ -68,6 +69,7 @@ case "$1" in
           -p) IFS=: read -r h p _ <<<"$2"; portas="{\"3306/tcp\":[{\"HostIp\":\"$h\",\"HostPort\":\"$p\"}]}"; shift 2 ;;
           --read-only) ro=true; shift ;;
           --user) user=$2; shift 2 ;;
+          -v) [[ "$2" == *:/var/lib/mysql ]] && echo "bind|${2%:/var/lib/mysql}" >"$S/dados_montado"; shift 2 ;;
           *) shift ;;
         esac
       done
@@ -174,6 +176,8 @@ case "$op" in
   -I) r=$(norm "${rest[@]:1}"); { echo "-A $chain $r"; cat "$f"; } >"$f.tmp"; mv "$f.tmp" "$f" ;;
   -D) r=$(norm "${rest[@]}"); { grep -vxF -- "-A $chain $r" "$f" || true; } >"$f.tmp"; mv "$f.tmp" "$f" ;;
   -A) echo "-A $chain $(norm "${rest[@]}")" >>"$f" ;;
+  -F) : >"$f" ;;
+  -X) rm -f "$f" ;;
   *) echo "iptables stub: op $op" >&2; exit 2 ;;
 esac
 `

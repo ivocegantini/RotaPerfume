@@ -252,25 +252,7 @@ func TestLote42_Legado_QuoteReal(t *testing.T) {
 	assert.Equal(t, "outra@%\nsentinela\nmysql\n", o, "nada além das casaos é tocado")
 }
 
-// ---------------------------------------------------------------------------
-// 5. --porta sem --dev-ip
-// ---------------------------------------------------------------------------
-func TestLote42_PortaSemDevIP(t *testing.T) {
-	t.Run("recusa antes de mudar algo", func(t *testing.T) {
-		e := novoEnsaio(t)
-		r := e.rodar("--nova-ca", "--porta", "3307")
-		require.Error(t, r.err, r.out)
-		assert.Contains(t, r.out, "--porta so com --dev-ip")
-		assert.NotContains(t, e.log(), "docker build")
-		assert.NotContains(t, e.log(), "docker run")
-	})
-	t.Run("na transicao do --dev-ip segue aceita", func(t *testing.T) {
-		e := novoEnsaio(t)
-		e.instalarComPortaPublicada()
-		r := e.rodar("--dev-ip", "192.168.168.105", "--porta", "3306")
-		require.NoError(t, r.err, r.out)
-	})
-}
+// 5. --porta sem --dev-ip: saiu com a opção (DEPLOY-11, TestDEPLOY11_Ensaio_SemDevIP).
 
 // ---------------------------------------------------------------------------
 // 6. rotaperfumes-dba: TTY, --pull never, registro de reserva

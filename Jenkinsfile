@@ -132,8 +132,8 @@ pipeline {
                         backend/Dockerfile docs/deploy-servidor.md \
                       | docker run --rm -i -e CI=true -e CGO_ENABLED=0 -e GOFLAGS=-mod=readonly "$GO_TEST_IMAGE" sh -ec '
                           mkdir -p /src && tar -xf - -C /src
-                          cd /src/backend/shared && go vet ./... && go test ./...
-                          cd /src/backend/rotaperfumes-api && go vet ./... && go test ./...
+                          cd /src/backend/shared && go vet ./... && go test ./... -timeout=30m
+                          cd /src/backend/rotaperfumes-api && go vet ./... && go test ./... -timeout=30m
                         '
                 '''
             }

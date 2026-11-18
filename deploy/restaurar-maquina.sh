@@ -28,7 +28,7 @@
 #    0 recusas, pepper, espaco
 #    1 copia para entrada/ e verifica a COPIA (verificar-backup, conferir-imagens)
 #    2 mostra o que vai restaurar; digitar o hostname (e ANTIGA PARADA, com tunel)
-#    3 CA e mariadb-docker.sh, sem --dev-ip nem --recriar
+#    3 CA e mariadb-docker.sh, sem --recriar
 #    4 api.env novo: DB_SENHA e JWT_SECRET novos, pepper informado
 #    5 importa pela conta rotaperfumes-admin, compara contagens, zera refresh_tokens
 #    6 migracoes: confirmar

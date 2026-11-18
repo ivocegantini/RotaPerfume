@@ -39,8 +39,8 @@ sudo bash deploy/mariadb-docker.sh --help
 | `--ca-key ARQ` | chave da CA existente, na mídia offline. **Lida de lá, nunca copiada.** Exigida quando o certificado do servidor precisa ser (re)emitido |
 | `--nova-ca` | gera uma CA **nova** (primeira instalação ou troca de CA). Implica `--novo-cert`. Faz backup de `/etc/mysql/ssl` em `/etc/mysql/ssl.bak-AAAAMMDD-HHMMSS` |
 | `--novo-cert` | reemite só o certificado do servidor (mesma CA; exige a chave) |
-| `--dev-ip IP` | só transição (DEPLOY-10): aceito apenas se o container já publica a porta; recusado em instalação nova e com `--recriar`. Não publica porta nem cria conta |
-| `--recriar` | remove e recria o container (dados ficam em `/var/lib/rotaperfumes/mariadb`); com dados existentes, exige dump recente (`sudo rotaperfumes-backup-banco --agora`) ou `--sem-backup-motivo TEXTO` |
+| `--recriar` | remove e recria o container (dados ficam em `/var/lib/rotaperfumes/mariadb`); com dados existentes, exige dump recente (`sudo rotaperfumes-backup-banco --agora`) ou `--sem-backup-motivo TEXTO`. `--dados` diferente do atual é recusado, salvo `--trocar-dados` (BACKUP-07) |
+| `--dev-ip`, `--porta` | saíram (DEPLOY-11): o banco não publica porta |
 | `--imagem-base REF` | outra imagem base, formato `mariadb:<versão>@sha256:<64 hex>` |
 | `--sem-read-only` | só se o container não subir com `--read-only` |
 | `--casaos-native-motivo` | saiu (DEPLOY-10): recusada, com mensagem própria |
@@ -126,9 +126,7 @@ Esperado: `rotaperfumes_app@172.30.42.10` e `rotaperfumes_admin@172.30.42.20`, `
 
 **Pelo comando do DBA:** `echo 'SELECT CURRENT_USER()' | sudo rotaperfumes-dba` precisa trazer `rotaperfumes-admin@172.30.42.22`.
 
-Não há teste de `openssl s_client` na 3306 antiga: nenhuma conta aceita a origem, e o `mariadbd` responde com o erro 1130 antes do handshake. Por isso, na transição do `--dev-ip`, o script confere o certificado offline (`openssl verify -verify_ip`) e lê os primeiros bytes da porta publicada (greeting ou erro 1130).
-
-De uma máquina **fora** da lista `--dev-ip`, a conexão na 3306 não pode abrir (o `DROP` da chain `ROTAPERFUMES-DB`): `timeout 5 bash -c '</dev/tcp/192.168.168.106/3306' && echo ABERTA || echo bloqueada`.
+A 3306 não é publicada (DEPLOY-11, fechada em 2026-11-18). De qualquer máquina da LAN: `timeout 5 bash -c '</dev/tcp/192.168.168.106/3306' && echo ABERTA || echo fechada` precisa dar `fechada`.
 
 ## 5. Permissão para a API e o Jenkins lerem a CA (no HOST)
 

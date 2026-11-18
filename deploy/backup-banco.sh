@@ -29,11 +29,13 @@
 #   6. publica o par: imagens primeiro; o nome final do dump fecha o par
 #   7. retencao, por contagem de pares bons e por serie. Falha sem apagar nada,
 #      com o par novo intacto, se houver par com data futura, se ela fosse apagar o
-#      par novo ou se o novo ou um dos dois pares mais novos estiver corrompido.
+#      par novo ou se o novo, um par que fica na serie ou um dos dois mais novos
+#      estiver corrompido (BACKUP-05: rele todos os que ficam, so quando ha o que apagar).
 #
 # Falha nas imagens: o dump ja validado vira parcial-rotaperfumes-*.sql.gz,
-# guardado para uso manual. Nao conta como backup bom, nao dispara a retencao e
-# a guarda do --recriar nao o aceita; o script sai com erro. So os
+# guardado para uso manual. Nao conta como backup bom e nao dispara a retencao;
+# a guarda do --recriar e do seed --forcar o aceita, com aviso (BACKUP-04). O
+# script sai com erro. So os
 # $PARCIAIS_MANTER parciais mais novos ficam, para falhas repetidas nao encherem
 # o disco. Um SIGTERM ou SIGINT apaga os temporarios, inclusive o dump.
 #
@@ -455,9 +457,10 @@ conferir_par_publicado() { # dump -> define ERRO_DUMP
   gzip -t -- "$(par_imagens "$1")" 2>/dev/null || { ERRO_DUMP="imagens com gzip invalido ou truncado"; return 1; }
 }
 
-# Antes de apagar, confere o par novo e os dois mais novos do diretorio. So o novo
-# nao bastaria: ele acabou de ser validado, e um par anterior corrompido faria a
-# retencao apagar um par bom mais antigo para mante-lo. Os demais nao sao relidos.
+# Antes de apagar, rele o par novo, todos os pares que ficam na serie e os dois
+# mais novos de todas (BACKUP-05): um par mantido corrompido faria a retencao
+# apagar um par bom mais antigo. Os que saem nao sao relidos; sem nada a apagar,
+# nada e relido.
 aplicar_retencao() { # serie manter dump-recem-publicado
   local serie=$1 manter=$2 novo=$3 pares=() todos=() alvos=() i n alvo
   conferir_datas_dos_pares
@@ -469,11 +472,14 @@ aplicar_retencao() { # serie manter dump-recem-publicado
   done
   mapfile -t todos < <(listar_pares todos)
   alvos=("$novo")
+  for (( i = n; i < ${#pares[@]}; i++ )); do
+    [[ " ${alvos[*]} " == *" ${pares[i]} "* ]] || alvos+=("${pares[i]}")
+  done
   for (( i = ${#todos[@]} - 1; i >= 0 && i >= ${#todos[@]} - 2; i-- )); do
-    [[ "${todos[i]}" == "$novo" ]] || alvos+=("${todos[i]}")
+    [[ " ${alvos[*]} " == *" ${todos[i]} "* ]] || alvos+=("${todos[i]}")
   done
   for alvo in "${alvos[@]}"; do
-    conferir_par_publicado "$alvo" || die "o par ${alvo##*/} foi reprovado ($ERRO_DUMP): nada foi apagado e o par novo ficou intacto. Confira esse arquivo"
+    conferir_par_publicado "$alvo" || die "o par ${alvo##*/} foi reprovado ($ERRO_DUMP): nada foi apagado e o par novo ficou intacto. Confira esse arquivo; se estiver corrompido, mova o par (dump e imagens) para fora de $BACKUP_DIR"
   done
   for (( i = 0; i < n; i++ )); do
     rm -f -- "$(par_imagens "${pares[i]}")" "${pares[i]}"

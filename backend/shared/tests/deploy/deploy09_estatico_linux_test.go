@@ -30,7 +30,12 @@ func funcaoShell(t *testing.T, texto, nome string) string {
 func TestDEPLOY09_ChaveVersionadaProduzOFingerprint(t *testing.T) {
 	ferramentaObrigatoria(t, "gpg")
 	fp := arquivoObrigatorio(t, "deploy", "cloudflare-apt.fingerprint")
-	assert.Contains(t, strings.ToLower(fp), "confirmacao por um segundo canal")
+	// SEC-73: confirmado por um segundo canal (keyservers), com a subchave anotada.
+	baixo := strings.ToLower(fp)
+	assert.NotContains(t, baixo, "ainda precisa")
+	for _, s := range []string{"sec-73", "keyserver.ubuntu.com", "keys.openpgp.org", "06c89db3b80a8f4349697c76029e1444b7d9f50f"} {
+		assert.Contains(t, baixo, s)
+	}
 	util := []string{}
 	for _, l := range linhas(fp) {
 		if !strings.HasPrefix(l, "#") && strings.TrimSpace(l) != "" {
@@ -54,6 +59,14 @@ func TestDEPLOY09_ChaveVersionadaProduzOFingerprint(t *testing.T) {
 	}
 	require.Len(t, pubs, 1, "uma única chave")
 	assert.Equal(t, util[0], primaria[9])
+	// SEC-73: a subchave do comentário é a do .asc (fpr logo depois do sub:).
+	var subs []string
+	for i, l := range linhas(string(out)) {
+		if strings.HasPrefix(l, "sub:") && i+1 < len(linhas(string(out))) {
+			subs = append(subs, strings.Split(linhas(string(out))[i+1], ":")[9])
+		}
+	}
+	assert.Contains(t, subs, "06C89DB3B80A8F4349697C76029E1444B7D9F50F")
 	assert.Contains(t, string(out), "CloudFlare Software Packaging 2025")
 	assert.Contains(t, lerRaiz(t, "deploy", "cloudflare-apt.asc"), "BEGIN PGP PUBLIC KEY BLOCK")
 }

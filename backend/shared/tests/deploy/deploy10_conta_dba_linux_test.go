@@ -97,13 +97,13 @@ func TestDEPLOY10_Ensaio_ArquivosEReexecucao(t *testing.T) {
 }
 
 func TestDEPLOY10_Ensaio_RemoveCasaosEmQualquerHost(t *testing.T) {
-	for nome, transicao := range map[string]bool{"sem --dev-ip": false, "transicao do --dev-ip": true} {
+	for nome, reexecucao := range map[string]bool{"instalacao nova": false, "reexecucao": true} {
 		t.Run(nome, func(t *testing.T) {
 			e := novoEnsaio(t)
 			args := []string{"--nova-ca"}
-			if transicao {
-				e.instalarComPortaPublicada()
-				args = []string{"--dev-ip", "192.168.168.105"}
+			if reexecucao {
+				e.instalarSemPorta()
+				args = nil
 			}
 			e.setState("contas", contaLegadaA+
 				"rotaperfumes-admin\t%\nrotaperfumes-admin\t172.30.42.22\n"+
@@ -146,17 +146,17 @@ func TestDEPLOY10_Ensaio_CasaosSenha(t *testing.T) {
 	rel := filepath.Join(segredos, "casaos.senha")
 	t.Run("nunca e criado", func(t *testing.T) {
 		e := novoEnsaio(t)
-		e.instalarComPortaPublicada()
-		r := e.rodar("--dev-ip", "192.168.168.105")
+		e.instalarSemPorta()
+		r := e.rodar()
 		require.NoError(t, r.err, r.out)
 		assert.False(t, e.existe(rel))
 		assert.NotContains(t, r.out, "casaos.senha")
 	})
 	t.Run("existente fica intacto", func(t *testing.T) {
 		e := novoEnsaio(t)
-		e.instalarComPortaPublicada()
+		e.instalarSemPorta()
 		escrever(t, filepath.Join(e.dir, rel), "NaoEFormatoDeSenha!", 0o600)
-		r := e.rodar("--dev-ip", "192.168.168.105")
+		r := e.rodar()
 		require.NoError(t, r.err, "um arquivo fora do formato prova que ele nao e lido: %s", r.out)
 		assert.Equal(t, "NaoEFormatoDeSenha!", e.arq(rel))
 		assert.Equal(t, os.FileMode(0o600), modoDe(t, filepath.Join(e.dir, rel)))
@@ -176,48 +176,39 @@ func TestDEPLOY10_Ensaio_CasaosSenha(t *testing.T) {
 	})
 }
 
-// Fase 1 do --dev-ip: só com container que já publica a porta.
-func TestDEPLOY10_Ensaio_DevIPSoNaTransicao(t *testing.T) {
+// DEPLOY-11: o --dev-ip saiu. A migração de contas (backup, DBA, casaos fora)
+// roda numa reexecução sem opção; container com porta diverge e o --recriar
+// a fecha.
+func TestDEPLOY11_Ensaio_SemDevIP(t *testing.T) {
 	semMudanca := func(t *testing.T, e *ensaio) {
 		t.Helper()
 		log := e.log()
-		for _, s := range []string{"docker run", "docker rm", "docker build", "docker network create", "docker exec", "iptables-restore", "systemctl"} {
+		for _, s := range []string{"docker run", "docker rm", "docker build", "docker network create", "docker exec", "iptables", "systemctl"} {
 			assert.NotContains(t, log, s)
 		}
 		assert.Empty(t, e.state("sql"), "nenhum SQL")
 	}
-	t.Run("instalacao nova recusa", func(t *testing.T) {
+	for nome, args := range map[string][]string{
+		"instalacao nova":  {"--nova-ca", "--dev-ip", "192.168.168.105"},
+		"com --recriar":    {"--recriar", "--dev-ip", "192.168.168.105"},
+		"--porta sozinho":  {"--nova-ca", "--porta", "3307"},
+		"--porta com --ip": {"--ip", "192.168.168.106", "--porta", "3306"},
+	} {
+		t.Run("recusa "+nome, func(t *testing.T) {
+			e := novoEnsaio(t)
+			r := e.rodar(args...)
+			require.Error(t, r.err, r.out)
+			assert.Contains(t, r.out, "saiu (DEPLOY-11)")
+			assert.NotContains(t, r.out, "=== [1/", "falha antes da primeira etapa")
+			semMudanca(t, e)
+		})
+	}
+	t.Run("migra sem reiniciar", func(t *testing.T) {
 		e := novoEnsaio(t)
-		r := e.rodar("--nova-ca", "--dev-ip", "192.168.168.105")
-		require.Error(t, r.err, r.out)
-		assert.Contains(t, r.out, "--dev-ip recusado em instalacao nova (DEPLOY-10)")
-		semMudanca(t, e)
-		assert.False(t, e.existe(segredos), "nada gravado")
-	})
-	t.Run("--recriar recusa", func(t *testing.T) {
-		e := novoEnsaio(t)
-		e.instalarComPortaPublicada()
-		r := e.rodar("--dev-ip", "192.168.168.105", "--recriar")
-		require.Error(t, r.err, r.out)
-		assert.Contains(t, r.out, "--dev-ip nao combina com --recriar (DEPLOY-10)")
-		semMudanca(t, e)
-	})
-	t.Run("container sem porta recusa", func(t *testing.T) {
-		e := novoEnsaio(t)
-		require.NoError(t, e.rodar("--nova-ca").err)
-		_ = os.Remove(filepath.Join(e.dir, "state", "sql"))
-		r := e.rodar("--dev-ip", "192.168.168.105")
-		require.Error(t, r.err, r.out)
-		assert.Contains(t, r.out, "--dev-ip recusado (DEPLOY-10): o container rotaperfumes-mariadb nao publica porta")
-		semMudanca(t, e)
-	})
-	t.Run("migra sem reiniciar e sempre avisa", func(t *testing.T) {
-		e := novoEnsaio(t)
-		e.instalarComPortaPublicada()
+		e.instalarSemPorta()
 		e.setState("contas", "casaos\t192.168.168.105\n")
-		r := e.rodar("--dev-ip", "192.168.168.105")
+		r := e.rodar()
 		require.NoError(t, r.err, r.out)
-		assert.Contains(t, r.out, "--dev-ip e so transicao (DEPLOY-10)")
 		assert.NotContains(t, e.log(), "docker run -d ")
 		assert.NotContains(t, e.log(), "docker rm ")
 		sql := e.state("sql")
@@ -225,18 +216,17 @@ func TestDEPLOY10_Ensaio_DevIPSoNaTransicao(t *testing.T) {
 		assert.Contains(t, sql, "CREATE USER IF NOT EXISTS "+contaDBA)
 		assert.Contains(t, sql, "DROP USER IF EXISTS 'casaos'@'192.168.168.105';")
 		assert.True(t, e.existe(dbaComando), "instala o comando")
-		assert.Contains(t, e.state("chain_ROTAPERFUMES-DB"), "-s 192.168.168.105/32 -j RETURN", "a porta continua restrita")
 	})
-	t.Run("porta divergente pede --recriar sem --dev-ip", func(t *testing.T) {
+	t.Run("porta publicada pede --recriar", func(t *testing.T) {
 		e := novoEnsaio(t)
 		e.instalarComPortaPublicada()
 		e.setState("portas", `{"3306/tcp":[{"HostIp":"0.0.0.0","HostPort":"3306"}]}`+"\n")
-		r := e.rodar("--dev-ip", "192.168.168.105")
+		r := e.rodar()
 		require.Error(t, r.err, r.out)
-		assert.Contains(t, r.out, "rode de novo com --recriar, sem --dev-ip")
+		assert.Contains(t, r.out, "rode de novo com --recriar")
 		semMudanca(t, e)
 	})
-	t.Run("--recriar sem --dev-ip fecha a porta", func(t *testing.T) {
+	t.Run("--recriar fecha a porta", func(t *testing.T) {
 		e := novoEnsaio(t)
 		e.instalarComPortaPublicada()
 		r := e.rodar("--recriar")
@@ -325,6 +315,7 @@ func TestDEPLOY10_Docs(t *testing.T) {
 		assert.Contains(t, texto, "`172.30.42.22`", nome)
 		assert.NotRegexp(t, regexp.MustCompile(`casaos\.senha[^\n]{0,200}shred|shred[^\n]{0,200}casaos\.senha`), texto, nome)
 	}
-	assert.Contains(t, ds, "sudo bash deploy/mariadb-docker.sh --dev-ip 192.168.168.105")
+	assert.Contains(t, ds, "sudo bash deploy/mariadb-docker.sh\n")
+	assert.NotContains(t, ds, "sudo bash deploy/mariadb-docker.sh --dev-ip")
 	assert.Contains(t, ds, "echo 'SELECT CURRENT_USER()' | sudo rotaperfumes-dba")
 }

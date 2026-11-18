@@ -12,6 +12,16 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Lote 43 de 2026-11-18: LOTE-43 e DEPLOY-11
+> Testes: `make -k test` rc=0 (0 FAIL), sem `GO_TEST_FLAGS`; `shellcheck` ok. Spec em `tarefas/lote-43-spec.md`.
+- BACKUP-03: folga de 300 s (`TOLERANCIA_RELOGIO_S`) na "data futura" das guardas do `--recriar`, do seed e do `gerar-imagens-producao.sh`.
+- BACKUP-04: `parcial-*` vale na guarda do `--recriar`/`seed --forcar`, com aviso; o mais novo pelo carimbo, sem recuar. O `gerar-imagens-producao.sh` segue recusando (grava no volume de imagens).
+- BACKUP-05: a retenção relê todos os pares que ficam na série antes de apagar; par reprovado → nada apagado.
+- BACKUP-07: `--dados` diferente do datadir do container é recusado no `--recriar`; `--recriar --trocar-dados` só com `mysql/` no destino, guarda sempre e `dados_antes=`/`dados=` no registro.
+- TST-28: `-timeout=30m` antes de `$(GO_TEST_FLAGS)` no Makefile e no Jenkinsfile (o último `-timeout` vale, conferido).
+- SEC-73: fingerprint da chave apt da Cloudflare dado como confirmado (keyservers, subchave conferida no teste). R1: o keys.openpgp.org não mostrava a UID; risco aceito pelo usuário (2026-11-07, reaprovado em 2026-11-18).
+- DEPLOY-11: `--dev-ip`/`--porta` recusados; código da transição e leitura da porta removidos; unit e chain antigas são removidas pelo script, depois do container sem porta.
+
 ## Avulso de 2026-11-18: IMG-02 (imagens de produto na produção)
 - Causa: as imagens nunca foram geradas em produção (292 produtos, 0 com imagem); a 3306 fechada impedia o `make db-gerar-imagens-produtos`. Correção: `deploy/gerar-imagens-producao.sh` (build isolado; roda na rede do banco, uid 65532, read-only, conta admin .20 via TLS).
 - Servidor: `--confirmar` gerou 292/292, 0 falhas; backup `--agora` com 292 imagens. Correção posterior: a conferência contava 0 (find como root sem CAP_DAC_OVERRIDE); agora roda como o dono do volume e com pipefail.
