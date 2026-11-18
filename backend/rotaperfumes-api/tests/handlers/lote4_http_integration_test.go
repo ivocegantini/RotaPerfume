@@ -159,7 +159,7 @@ func TestIntegracaoHTTP_BUG06_InativarBody(t *testing.T) {
 	c := novoItCtx(t)
 
 	prodSKU := c.nome("SKU")
-	res, err := c.db.Exec(`INSERT INTO produtos (sku, descricao, categoria, marca, preco_tabela, custo_unitario, unidade, ativo)
+	res, err := c.db.Exec(`INSERT INTO produtos (sku, nome, categoria, marca, preco_tabela, custo_unitario, unidade, ativo)
 		VALUES (?, ?, 'Teste', 'Teste', 1, 1, 'UN', 1)`, prodSKU, c.nome("PROD"))
 	require.NoError(t, err)
 	prodID, _ := res.LastInsertId()

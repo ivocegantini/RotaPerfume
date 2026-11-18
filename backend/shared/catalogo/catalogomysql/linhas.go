@@ -32,8 +32,8 @@ func colunaProduto(c catalogo.CampoProduto) string {
 	switch c {
 	case catalogo.OrdemProdutoSKU:
 		return "sku"
-	case catalogo.OrdemProdutoDescricao:
-		return "descricao"
+	case catalogo.OrdemProdutoNome:
+		return "nome"
 	case catalogo.OrdemProdutoCategoria:
 		return "categoria"
 	case catalogo.OrdemProdutoMarca:

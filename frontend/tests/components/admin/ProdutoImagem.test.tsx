@@ -39,7 +39,7 @@ const NORMAL: MeResponse = { ...ADMIN, id: 2, role: "normal" };
 const IMG = "/api/public/produtos/imagens/0b6c1d2e-1111-4222-8333-944455556666.png";
 
 const produto: Produto = {
-  id: 50, sku: "P50", descricao: "Perfume 50", categoria: "C", marca: "M", nota_olfativa: "",
+  id: 50, sku: "P50", nome: "Perfume 50", descricao: "", categoria: "C", marca: "M", nota_olfativa: "",
   preco_tabela: 10, custo_unitario: 5, unidade: "UN", data_lancamento: null, ativo: true,
   imagem_url: IMG, created_at: "", updated_at: "",
 };
@@ -191,7 +191,7 @@ describe("ProdutoModal - secao de imagem", () => {
 describe("Produtos - miniatura na tabela", () => {
   it("renderiza miniatura so para imagem_url da rota publica", async () => {
     api.apiListProdutos.mockResolvedValue({
-      data: [produto, { ...produto, id: 51, descricao: "Sem foto", imagem_url: null }],
+      data: [produto, { ...produto, id: 51, nome: "Sem foto", imagem_url: null }],
       page: 1, limit: 20, total: 2, pages: 1,
     });
     render(<ProdutosPage />);

@@ -272,7 +272,7 @@ const detalhePedido = (id: number) => ({
     {
       item_id_origem: 1,
       produto_id: 50,
-      produto_descricao: "Perfume 50",
+      produto_nome: "Perfume 50",
       produto_sku: "P50",
       quantidade: 2,
       preco_praticado: 10,
@@ -296,7 +296,7 @@ beforeEach(() => {
     { id: 100, razao_social: "Cliente 100", cnpj: "", segmento: "", cidade: "", uf: "SP", carteira_id: 1, data_inicio: "", data_fim: null },
   ]);
   api.apiListProdutos.mockResolvedValue(
-    pagina([{ id: 50, sku: "P50", descricao: "Perfume 50", preco_tabela: 10, ativo: true }])
+    pagina([{ id: 50, sku: "P50", nome: "Perfume 50", preco_tabela: 10, ativo: true }])
   );
   api.apiGetPedido.mockImplementation(async (id: number) => detalhePedido(id));
   // Lista de pedidos tambem alimenta o select do PagamentoModal.

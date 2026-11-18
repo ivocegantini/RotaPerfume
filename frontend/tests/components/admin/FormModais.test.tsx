@@ -79,7 +79,7 @@ const estoque: Estoque = {
   id: 5,
   data_snapshot: "2026-09-01T00:00:00Z",
   sku: "SKU-5",
-  produto_descricao: "Perfume",
+  produto_nome: "Perfume",
   saldo: 12,
   ruptura: false,
   created_at: "",
@@ -89,7 +89,8 @@ const estoque: Estoque = {
 const produto: Produto = {
   id: 50,
   sku: "P50",
-  descricao: "Perfume 50",
+  nome: "Perfume 50",
+  descricao: "Texto completo",
   categoria: "Perfumaria",
   marca: "Marca X",
   nota_olfativa: "Floral",
@@ -190,9 +191,10 @@ const CASOS: Caso[] = [
     tituloNovo: "Novo Produto",
     tituloEditar: "Editar Produto",
     botaoCriar: "Criar produto",
-    campoLivre: "Descricao",
+    campoLivre: "Nome",
     camposNovo: {
       SKU: "",
+      Nome: "",
       Descricao: "",
       Categoria: "",
       Marca: "",
@@ -203,7 +205,8 @@ const CASOS: Caso[] = [
       "Data de lancamento": "",
     },
     camposEditar: {
-      Descricao: "Perfume 50",
+      Nome: "Perfume 50",
+      Descricao: "Texto completo",
       Categoria: "Perfumaria",
       Marca: "Marca X",
       "Nota olfativa": "Floral",
@@ -214,7 +217,7 @@ const CASOS: Caso[] = [
     },
     preencherValido: async (u) => {
       await type(u, "SKU", "P77");
-      await type(u, "Descricao", "Novo");
+      await type(u, "Nome", "Novo");
       await type(u, "Categoria", "Cat");
       await type(u, "Marca", "M");
       await type(u, "Preco de tabela", "10");

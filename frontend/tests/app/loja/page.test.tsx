@@ -13,8 +13,8 @@ vi.mock("@/lib/api", () => ({
 
 import LojaPage from "@/app/loja/page";
 
-const produto = (id: number, descricao: string): ProdutoLoja => ({
-  id, sku: `SKU-${id}`, descricao, categoria: "Perfumaria", marca: "Marca X", nota_olfativa: "Citrico",
+const produto = (id: number, nome: string): ProdutoLoja => ({
+  id, sku: `SKU-${id}`, nome, categoria: "Perfumaria", marca: "Marca X", nota_olfativa: "Citrico",
   preco: 99.9, unidade: "UN", imagem_url: null,
 });
 
@@ -30,7 +30,7 @@ describe("LojaPage", () => {
     render(<LojaPage />);
     expect(await screen.findByText("Perfume Azul")).toBeInTheDocument();
     expect(screen.getByText(/99,90/)).toBeInTheDocument();
-    expect(listarMock).toHaveBeenCalledWith(1, 24, "", "descricao", "asc", SEM_FILTRO);
+    expect(listarMock).toHaveBeenCalledWith(1, 24, "", "nome", "asc", SEM_FILTRO);
   });
 
   it("busca e ordenacao refazem a consulta", async () => {
@@ -38,7 +38,7 @@ describe("LojaPage", () => {
     await screen.findByText("Perfume Azul");
     await userEvent.type(screen.getByLabelText("Buscar produtos"), "azul");
     await userEvent.click(screen.getByRole("button", { name: "Buscar" }));
-    await waitFor(() => expect(listarMock).toHaveBeenLastCalledWith(1, 24, "azul", "descricao", "asc", SEM_FILTRO));
+    await waitFor(() => expect(listarMock).toHaveBeenLastCalledWith(1, 24, "azul", "nome", "asc", SEM_FILTRO));
     await userEvent.selectOptions(screen.getByLabelText("Ordenar"), "preco_tabela:desc");
     await waitFor(() => expect(listarMock).toHaveBeenLastCalledWith(1, 24, "azul", "preco_tabela", "desc", SEM_FILTRO));
   });
@@ -63,14 +63,14 @@ describe("LojaPage - filtros (ECOM-04)", () => {
     await userEvent.selectOptions(screen.getByLabelText("Marca"), "Marca X");
     await userEvent.selectOptions(screen.getByLabelText("Nota olfativa"), "Oud");
     await waitFor(() =>
-      expect(listarMock).toHaveBeenLastCalledWith(1, 24, "", "descricao", "asc", {
+      expect(listarMock).toHaveBeenLastCalledWith(1, 24, "", "nome", "asc", {
         categoria: "Bakhoor",
         marca: "Marca X",
         nota_olfativa: "Oud",
       })
     );
     await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    await waitFor(() => expect(listarMock).toHaveBeenLastCalledWith(1, 24, "", "descricao", "asc", SEM_FILTRO));
+    await waitFor(() => expect(listarMock).toHaveBeenLastCalledWith(1, 24, "", "nome", "asc", SEM_FILTRO));
     expect(screen.queryByRole("button", { name: "Limpar filtros" })).not.toBeInTheDocument();
   });
 

@@ -40,7 +40,7 @@ var casosOrdenacaoProduto = []struct {
 }{
 	{"tudo vazio usa default", "", "", "ORDER BY id ASC"},
 	{"campo válido asc", "sku", "asc", "ORDER BY sku ASC"},
-	{"campo válido desc", "descricao", "desc", "ORDER BY descricao DESC"},
+	{"campo válido desc", "nome", "desc", "ORDER BY nome DESC"},
 	{"DESC maiúsculo", "marca", "DESC", "ORDER BY marca DESC"},
 	{"case misto em dir (DeSc)", "marca", "DeSc", "ORDER BY marca DESC"},
 	{"campo case-insensitive", "PRECO_TABELA", "asc", "ORDER BY preco_tabela ASC"},

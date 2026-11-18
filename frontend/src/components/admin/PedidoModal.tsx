@@ -520,7 +520,7 @@ export function PedidoModal({
       { value: "", label: "Selecione um produto" },
       ...produtos.map((p) => ({
         value: String(p.id),
-        label: `#${p.id} - ${p.descricao}`,
+        label: `#${p.id} - ${p.nome}`,
       })),
     ],
     [produtos]

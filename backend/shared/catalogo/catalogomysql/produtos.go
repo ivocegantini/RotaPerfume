@@ -15,9 +15,9 @@ import (
 
 const arqProdutos = "produtos.go"
 
-// produtoColunas: nota_olfativa e imagem são NULLable e viram ""
+// produtoColunas: descricao, nota_olfativa e imagem são NULLable e viram ""
 // (COALESCE); data_lancamento é NULLable e vira nil (sql.NullTime).
-const produtoColunas = `id, sku, descricao, categoria, marca, COALESCE(nota_olfativa, ''), preco_tabela, custo_unitario, unidade, data_lancamento, ativo, COALESCE(imagem, ''), created_at, updated_at`
+const produtoColunas = `id, sku, nome, COALESCE(descricao, ''), categoria, marca, COALESCE(nota_olfativa, ''), preco_tabela, custo_unitario, unidade, data_lancamento, ativo, COALESCE(imagem, ''), created_at, updated_at`
 
 // Produtos é o repositório de produtos (porta catalogoapp.Produtos). Cada
 // método executa a própria consulta: sem cache entre requests (R4).
@@ -68,7 +68,7 @@ func whereProduto(f catalogo.FiltroProduto) (string, []any) {
 		args = append(args, *f.Ativo)
 	}
 	if f.Busca != "" {
-		conds = append(conds, "(descricao LIKE ? ESCAPE '!' OR sku LIKE ? ESCAPE '!')")
+		conds = append(conds, "(nome LIKE ? ESCAPE '!' OR sku LIKE ? ESCAPE '!')")
 		like := db.TermoContem(f.Busca) // SEC-25: '%' e '_' literais
 		args = append(args, like, like)
 	}
@@ -105,9 +105,9 @@ func (r *Produtos) ExisteSKU(ctx context.Context, sku catalogo.SKU) (bool, error
 // Inserir grava o produto e preenche p.ID.
 func (r *Produtos) Inserir(ctx context.Context, p *catalogo.Produto) error {
 	const q = `
-		INSERT INTO produtos (sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	res, err := r.q.ExecContext(ctx, q, p.SKU.String(), p.Descricao, p.Categoria, p.Marca,
+		INSERT INTO produtos (sku, nome, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	res, err := r.q.ExecContext(ctx, q, p.SKU.String(), p.Nome, nullString(p.Descricao), p.Categoria, p.Marca,
 		nullString(p.NotaOlfativa), p.PrecoTabela.String(), p.CustoUnitario.String(), p.Unidade, nullTime(p.DataLancamento), p.Ativo)
 	if err != nil {
 		if db.ChaveDuplicada(err, "uk_produtos_sku") {
@@ -128,9 +128,9 @@ func (r *Produtos) Inserir(ctx context.Context, p *catalogo.Produto) error {
 func (r *Produtos) Atualizar(ctx context.Context, id int64, c catalogo.CamposProduto) error {
 	const q = `
 		UPDATE produtos
-		SET descricao = ?, categoria = ?, marca = ?, nota_olfativa = ?, preco_tabela = ?, custo_unitario = ?, unidade = ?, data_lancamento = ?
+		SET nome = ?, descricao = ?, categoria = ?, marca = ?, nota_olfativa = ?, preco_tabela = ?, custo_unitario = ?, unidade = ?, data_lancamento = ?
 		WHERE id = ?`
-	return r.exec(ctx, "atualizar produto", "UPDATE produtos", q, c.Descricao, c.Categoria, c.Marca,
+	return r.exec(ctx, "atualizar produto", "UPDATE produtos", q, c.Nome, nullString(c.Descricao), c.Categoria, c.Marca,
 		nullString(c.NotaOlfativa), c.PrecoTabela.String(), c.CustoUnitario.String(), c.Unidade, nullTime(c.DataLancamento), id)
 }
 
@@ -218,7 +218,7 @@ func nullTime(t *time.Time) sql.NullTime {
 func scanProduto(s linha) (*catalogo.Produto, error) {
 	var p catalogo.Produto
 	var dataLancamento sql.NullTime
-	err := s.Scan(&p.ID, &p.SKU, &p.Descricao, &p.Categoria, &p.Marca, &p.NotaOlfativa,
+	err := s.Scan(&p.ID, &p.SKU, &p.Nome, &p.Descricao, &p.Categoria, &p.Marca, &p.NotaOlfativa,
 		&p.PrecoTabela, &p.CustoUnitario, &p.Unidade, &dataLancamento, &p.Ativo, &p.Imagem, &p.CreatedAt, &p.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, catalogo.ErrProdutoNaoEncontrado

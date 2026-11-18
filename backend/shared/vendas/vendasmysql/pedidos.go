@@ -21,7 +21,7 @@ const pedidoColunas = `p.pedido_id_origem, p.cliente_id, p.vendedor_id, p.data_p
 const pedidoFrom = ` FROM pedidos p JOIN clientes c ON c.cliente_id_origem = p.cliente_id JOIN vendedores v ON v.id = p.vendedor_id`
 
 // itemPedidoColunas traz o item de pedido + sku/descrição do produto via JOIN.
-const itemPedidoColunas = `i.item_id_origem, i.pedido_id, i.produto_id, i.quantidade, i.preco_praticado, i.desconto_pct, i.valor_bruto, i.created_at, i.updated_at, pr.sku, pr.descricao`
+const itemPedidoColunas = `i.item_id_origem, i.pedido_id, i.produto_id, i.quantidade, i.preco_praticado, i.desconto_pct, i.valor_bruto, i.created_at, i.updated_at, pr.sku, pr.nome`
 
 // itemPedidoFrom é o FROM + JOIN comum às queries de itens de pedido.
 const itemPedidoFrom = ` FROM itens_pedido i JOIN produtos pr ON pr.id = i.produto_id`
@@ -145,7 +145,7 @@ func (r *Pedidos) Itens(ctx context.Context, pedidoID int64) ([]vendas.ItemPedid
 func scanItem(s db.Linha) (*vendas.ItemPedido, error) {
 	return db.LerUma(s, vendas.ErrPedidoNaoEncontrado, "vendasmysql: scan item_pedido", func(it *vendas.ItemPedido) []any {
 		return []any{&it.ItemIDOrigem, &it.PedidoID, &it.ProdutoID, &it.Quantidade, &it.PrecoPraticado,
-			&it.DescontoPct, &it.ValorBruto, &it.CreatedAt, &it.UpdatedAt, &it.ProdutoSKU, &it.ProdutoDescricao}
+			&it.DescontoPct, &it.ValorBruto, &it.CreatedAt, &it.UpdatedAt, &it.ProdutoSKU, &it.ProdutoNome}
 	})
 }
 

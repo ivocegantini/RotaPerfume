@@ -19,6 +19,9 @@ import { validarDinheiro } from "@/lib/dinheiro";
 
 const F = "ProdutoModal.tsx";
 
+// ECOM-11: limite da descrição completa (o backend valida igual, em caracteres).
+const MAX_DESCRICAO = 5000;
+
 interface ProdutoModalProps {
   open: boolean;
   mode: "create" | "edit";
@@ -39,6 +42,8 @@ export function ProdutoModal({
 }: ProdutoModalProps) {
   vlog(F, "ProdutoModal", "criando estado sku, modo:", mode);
   const [sku, setSku] = useState("");
+  vlog(F, "ProdutoModal", "criando estado nome");
+  const [nome, setNome] = useState("");
   vlog(F, "ProdutoModal", "criando estado descricao");
   const [descricao, setDescricao] = useState("");
   vlog(F, "ProdutoModal", "criando estado categoria");
@@ -72,8 +77,10 @@ export function ProdutoModal({
     if (mode === "edit" && produto) {
       vlog(F, "ProdutoModal.reset", "preenchendo SKU");
       setSku(produto.sku);
+      vlog(F, "ProdutoModal.reset", "preenchendo nome");
+      setNome(produto.nome);
       vlog(F, "ProdutoModal.reset", "preenchendo descrição");
-      setDescricao(produto.descricao);
+      setDescricao(produto.descricao || "");
       vlog(F, "ProdutoModal.reset", "preenchendo categoria");
       setCategoria(produto.categoria);
       vlog(F, "ProdutoModal.reset", "preenchendo marca");
@@ -93,6 +100,8 @@ export function ProdutoModal({
     } else {
       vlog(F, "ProdutoModal.reset", "limpando SKU");
       setSku("");
+      vlog(F, "ProdutoModal.reset", "limpando nome");
+      setNome("");
       vlog(F, "ProdutoModal.reset", "limpando descrição");
       setDescricao("");
       vlog(F, "ProdutoModal.reset", "limpando categoria");
@@ -124,10 +133,16 @@ export function ProdutoModal({
       setError("SKU e obrigatorio.");
       return;
     }
-    vlog(F, "ProdutoModal.handleSubmit", "validando descrição");
-    if (!descricao.trim()) {
-      vlog(F, "ProdutoModal.handleSubmit", "descrição ausente");
-      setError("Descricao e obrigatoria.");
+    vlog(F, "ProdutoModal.handleSubmit", "validando nome");
+    if (!nome.trim()) {
+      vlog(F, "ProdutoModal.handleSubmit", "nome ausente");
+      setError("Nome e obrigatorio.");
+      return;
+    }
+    vlog(F, "ProdutoModal.handleSubmit", "validando tamanho da descrição");
+    if (Array.from(descricao.trim()).length > MAX_DESCRICAO) {
+      vlog(F, "ProdutoModal.handleSubmit", "descrição longa demais");
+      setError(`Descricao deve ter no maximo ${MAX_DESCRICAO} caracteres.`);
       return;
     }
     vlog(F, "ProdutoModal.handleSubmit", "validando categoria");
@@ -173,6 +188,7 @@ export function ProdutoModal({
       vlog(F, "ProdutoModal.handleSubmit", "enviando produto, modo:", mode);
       await onSubmit({
         sku: sku.trim(),
+        nome: nome.trim(),
         descricao: descricao.trim(),
         categoria: categoria.trim(),
         marca: marca.trim(),
@@ -216,13 +232,31 @@ export function ProdutoModal({
         )}
 
         <Input
-          label="Descricao"
-          value={descricao}
-          onChange={(e) => setDescricao(e.target.value)}
+          label="Nome"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
           placeholder="Ex: Perfume Exemplo 100ml"
           required
           autoFocus={mode === "edit"}
         />
+
+        <div className="w-full">
+          <label htmlFor="produto-descricao" className="mb-1.5 block text-sm font-medium text-slate-700">
+            Descricao
+          </label>
+          <textarea
+            id="produto-descricao"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            maxLength={MAX_DESCRICAO}
+            rows={5}
+            placeholder="Descricao completa exibida na pagina do produto (opcional)"
+            className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-200"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            {Array.from(descricao).length}/{MAX_DESCRICAO} caracteres
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
@@ -415,7 +449,7 @@ function ImagemProdutoSecao({ open, produto, onImagemAlterada }: ImagemProdutoSe
 
   const handleRemover = async () => {
     vlog(F, "ImagemProdutoSecao.handleRemover", "pedindo confirmação de remoção");
-    if (!window.confirm(`Remover a imagem do produto "${produto.descricao}"?`)) return;
+    if (!window.confirm(`Remover a imagem do produto "${produto.nome}"?`)) return;
     vlog(F, "ImagemProdutoSecao.handleRemover", "removendo imagem, produto:", produto.id);
     setEnviando("remover");
     setErro(null);
@@ -463,7 +497,7 @@ function ImagemProdutoSecao({ open, produto, onImagemAlterada }: ImagemProdutoSe
           // eslint-disable-next-line @next/next/no-img-element -- IMG-01: imagem servida pela API (rota publica), sem otimizacao do next/image
           <img
             src={urlExibida}
-            alt={previewUrl ? `Pre-visualizacao: ${produto.descricao}` : produto.descricao}
+            alt={previewUrl ? `Pre-visualizacao: ${produto.nome}` : produto.nome}
             loading="lazy"
             decoding="async"
             className="h-28 w-28 flex-shrink-0 rounded-lg border border-slate-200 bg-slate-50 object-cover"

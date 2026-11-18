@@ -44,7 +44,7 @@ describe("Home (/) - vitrine publica (ECOM-10)", () => {
   beforeEach(() => {
     localStorage.clear();
     api.apiListProdutosLoja.mockResolvedValue({
-      data: [{ id: 1, sku: "S1", descricao: "Perfume Azul", categoria: "C", marca: "M", nota_olfativa: "", preco: 10, unidade: "UN", imagem_url: null }],
+      data: [{ id: 1, sku: "S1", nome: "Perfume Azul", categoria: "C", marca: "M", nota_olfativa: "", preco: 10, unidade: "UN", imagem_url: null }],
       page: 1, limit: 24, total: 1, pages: 1,
     });
     api.apiOpcoesFiltroLoja.mockResolvedValue({ categorias: [], marcas: [], notas_olfativas: [] });

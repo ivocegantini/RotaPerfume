@@ -50,7 +50,7 @@ function cliente(id: number): ClienteResumo {
   };
 }
 const produto = {
-  id: 50, sku: "P50", descricao: "Perfume 50", categoria: "Perfumaria", marca: "Marca X",
+  id: 50, sku: "P50", nome: "Perfume 50", categoria: "Perfumaria", marca: "Marca X",
   nota_olfativa: "Floral", preco_tabela: 99.9, custo_unitario: 40, unidade: "UN",
   data_lancamento: "2024-03-01", ativo: true, imagem_url: null, created_at: "", updated_at: "",
 } as Produto;

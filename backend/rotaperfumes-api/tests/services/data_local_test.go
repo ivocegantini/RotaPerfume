@@ -231,7 +231,7 @@ func dlParsers() []dlParserCaso {
 			db, mock := dlNewDB(t)
 			mock.ExpectExec(`INSERT INTO produtos`).WillReturnResult(sqlmock.NewResult(6, 1))
 			p, err := novosCasosCatalogo(db).CriarProduto(ctx, catalogo.DadosProduto{
-				SKU: "SKU-1", Descricao: "Perfume", Categoria: "EDP", Marca: "M", Unidade: "UN",
+				SKU: "SKU-1", Nome: "Perfume", Categoria: "EDP", Marca: "M", Unidade: "UN",
 				DataLancamento: data,
 			})
 			require.NoError(t, err)
@@ -369,7 +369,7 @@ func TestBUG01_DataInvalidaContinuaRejeitada(t *testing.T) {
 			assert.ErrorIs(t, err, vendas.ErrDataPedidoInvalida)
 
 			_, err = novosCasosCatalogo(db).CriarProduto(ctx, catalogo.DadosProduto{
-				SKU: "S", Descricao: "D", Categoria: "C", Marca: "M", Unidade: "UN", DataLancamento: s,
+				SKU: "S", Nome: "D", Categoria: "C", Marca: "M", Unidade: "UN", DataLancamento: s,
 			})
 			assert.ErrorIs(t, err, catalogo.ErrDataLancamentoInvalida)
 

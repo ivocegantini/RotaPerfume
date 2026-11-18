@@ -72,7 +72,7 @@ func TestExports_ContratoComOsCSVsDeOrigem(t *testing.T) {
 		filepath.Join("crm", "carteira.csv"):      "carteira_id,cliente_id,vendedor_id,data_inicio,data_fim",
 		filepath.Join("crm", "oportunidades.csv"): "oportunidade_id,cliente_id,vendedor_id,origem,data_abertura,etapa,probabilidade_pct,valor_estimado,data_fechamento,ciclo_dias,motivo_perda",
 		filepath.Join("crm", "visitas.csv"):       "visita_id,cliente_id,vendedor_id,data_visita,resultado,duracao_min",
-		filepath.Join("erp", "produtos.csv"):      "sku,descricao,categoria,marca,nota_olfativa,preco_tabela,custo_unitario,unidade,ativo,data_lancamento",
+		filepath.Join("erp", "produtos.csv"):      "sku,nome,categoria,marca,nota_olfativa,preco_tabela,custo_unitario,unidade,ativo,data_lancamento",
 		filepath.Join("erp", "pedidos.csv"):       "pedido_id,cliente_id,vendedor_id,data_pedido,canal,status,valor_total",
 		filepath.Join("erp", "itens_pedido.csv"):  "item_id,pedido_id,sku,quantidade,preco_praticado,desconto_pct,valor_bruto",
 		filepath.Join("erp", "pagamentos.csv"):    "pagamento_id,pedido_id,forma_pagamento,parcelas,valor,taxa_pct,valor_liquido,data_vencimento,data_pagamento,status_pagamento",

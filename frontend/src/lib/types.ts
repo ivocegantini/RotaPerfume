@@ -154,13 +154,18 @@ export interface CadastroResponse {
 export interface ProdutoLoja {
   id: number;
   sku: string;
-  descricao: string;
+  nome: string;
   categoria: string;
   marca: string;
   nota_olfativa: string;
   preco: number;
   unidade: string;
   imagem_url: string | null;
+}
+
+// ECOM-11: GET /api/loja/produtos/{id} — a página do produto ("" = sem descrição).
+export interface ProdutoLojaDetalhe extends ProdutoLoja {
+  descricao: string;
 }
 
 // ECOM-04: GET /api/loja/filtros (valores dos produtos ativos).
@@ -350,6 +355,8 @@ export interface ClienteDashboardMetrics {
 export interface Produto {
   id: number;
   sku: string;
+  nome: string;
+  /** ECOM-11: descrição completa da página do produto ("" = sem descrição). */
   descricao: string;
   categoria: string;
   marca: string;
@@ -370,7 +377,8 @@ export interface Produto {
 // (a rota de edicao nao permite alterar sku).
 export interface ProdutoInput {
   sku: string;
-  descricao: string;
+  nome: string;
+  descricao?: string; // ECOM-11: opcional, até 5000 caracteres
   categoria: string;
   marca: string;
   nota_olfativa?: string;
@@ -408,7 +416,7 @@ export interface Pedido {
 }
 
 // Item de pedido, como retornado dentro de itens de GET /api/pedidos/{id}.
-// produto_sku/produto_descricao vem via JOIN no backend.
+// produto_sku/produto_nome vem via JOIN no backend.
 export interface ItemPedido {
   item_id_origem: number;
   pedido_id: number;
@@ -420,7 +428,7 @@ export interface ItemPedido {
   created_at: string;
   updated_at: string;
   produto_sku: string;
-  produto_descricao: string;
+  produto_nome: string;
 }
 
 // Pedido com itens, retornado por GET /api/pedidos/{id} (e pelo POST/PUT).
@@ -671,7 +679,7 @@ export interface Estoque {
   id: number;
   data_snapshot: string; // formato AAAA-MM-DD
   sku: string;
-  produto_descricao: string;
+  produto_nome: string;
   saldo: number;
   ruptura: boolean;
   created_at: string;

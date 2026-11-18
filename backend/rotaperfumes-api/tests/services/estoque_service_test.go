@@ -27,7 +27,7 @@ func newEstoqueTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 }
 
 func estoqueColunasHeader() []string {
-	return []string{"id", "data_snapshot", "sku", "produto_descricao", "saldo", "ruptura", "created_at", "updated_at"}
+	return []string{"id", "data_snapshot", "sku", "produto_nome", "saldo", "ruptura", "created_at", "updated_at"}
 }
 
 func estoqueRows(id int64, saldo int, ruptura bool) *sqlmock.Rows {

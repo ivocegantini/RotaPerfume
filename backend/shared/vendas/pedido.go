@@ -98,17 +98,17 @@ type Pedido struct {
 // ItemPedido é uma linha do pedido (com sku e descrição do produto na
 // leitura, via JOIN). ValorBruto é sempre calculado pelo domínio (V-03).
 type ItemPedido struct {
-	ItemIDOrigem     int64
-	PedidoID         int64
-	ProdutoID        int64
-	Quantidade       int
-	PrecoPraticado   kernel.Dinheiro
-	DescontoPct      float64
-	ValorBruto       kernel.Dinheiro
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ProdutoSKU       string
-	ProdutoDescricao string
+	ItemIDOrigem   int64
+	PedidoID       int64
+	ProdutoID      int64
+	Quantidade     int
+	PrecoPraticado kernel.Dinheiro
+	DescontoPct    float64
+	ValorBruto     kernel.Dinheiro
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ProdutoSKU     string
+	ProdutoNome    string
 }
 
 // DadosItem é um item do comando de criação/edição.

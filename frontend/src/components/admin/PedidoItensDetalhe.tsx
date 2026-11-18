@@ -92,7 +92,7 @@ export function PedidoItensDetalhe({
                 {detalhe.itens.map((item) => (
                   <tr key={item.item_id_origem} className="hover:bg-slate-50">
                     <td className="px-4 py-2 text-sm text-slate-700">
-                      #{item.produto_id} - {item.produto_descricao}{" "}
+                      #{item.produto_id} - {item.produto_nome}{" "}
                       <span className="text-xs text-slate-400">
                         ({item.produto_sku})
                       </span>

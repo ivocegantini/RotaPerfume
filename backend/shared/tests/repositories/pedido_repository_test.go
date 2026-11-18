@@ -27,7 +27,7 @@ func pedidoRow(idOrigem, clienteID, vendedorID int64, dataPedido time.Time, cana
 
 var itemPedidoColumns = []string{
 	"item_id_origem", "pedido_id", "produto_id", "quantidade", "preco_praticado",
-	"desconto_pct", "valor_bruto", "created_at", "updated_at", "produto_sku", "produto_descricao",
+	"desconto_pct", "valor_bruto", "created_at", "updated_at", "produto_sku", "produto_nome",
 }
 
 func itemPedidoRow(idOrigem, pedidoID, produtoID int64, quantidade int, preco, desconto, valorBruto float64, created, updated time.Time, sku, descricao string) []driver.Value {

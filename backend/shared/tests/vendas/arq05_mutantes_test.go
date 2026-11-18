@@ -174,8 +174,8 @@ func TestARQ05_NB3_DuplicadaNoUpdateDoProdutoSemValor(t *testing.T) {
 		re     string
 		gravar func(db *sql.DB) error
 	}{
-		"Atualizar": {`UPDATE produtos\s+SET descricao`, func(db *sql.DB) error {
-			return catalogomysql.NovoProdutos(db).Atualizar(ctx, 5, catalogo.CamposProduto{Descricao: "D"})
+		"Atualizar": {`UPDATE produtos\s+SET nome`, func(db *sql.DB) error {
+			return catalogomysql.NovoProdutos(db).Atualizar(ctx, 5, catalogo.CamposProduto{Nome: "D"})
 		}},
 		"DefinirAtivo": {`UPDATE produtos SET ativo = \? WHERE id = \?`, func(db *sql.DB) error {
 			return catalogomysql.NovoProdutos(db).DefinirAtivo(ctx, 5, true)

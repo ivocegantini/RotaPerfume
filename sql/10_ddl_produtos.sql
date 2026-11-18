@@ -31,6 +31,9 @@
 --     Bancos criados antes recebem os três pela migração
 --     sql/26_alter_produtos_imagem.sql (make db-fix-produtos-imagem), que
 --     não roda no db-up/db-reset.
+--   - ATUALIZAÇÃO (2026-11-18, ECOM-11): a antiga `descricao` virou `nome` e
+--     nasceu `descricao` TEXT NULL (descrição completa). Bancos existentes:
+--     sql/34_alter_produtos_nome_descricao.sql (make db-fix-produtos-nome-descricao).
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -43,7 +46,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 CREATE TABLE IF NOT EXISTS `produtos` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID interno do produto',
     `sku` VARCHAR(40) NOT NULL COMMENT 'SKU original do produto no CSV de origem (dados/erp/produtos.csv)',
-    `descricao` VARCHAR(255) NOT NULL COMMENT 'Descrição/nome do produto',
+    `nome` VARCHAR(255) NOT NULL COMMENT 'Nome do produto (vitrine, pedidos e estoque)',
+    `descricao` TEXT NULL DEFAULT NULL COMMENT 'Descrição completa do produto (página da loja); NULL = sem descrição',
     `categoria` VARCHAR(80) NOT NULL COMMENT 'Categoria do produto (ex: Eau de Parfum)',
     `marca` VARCHAR(80) NOT NULL COMMENT 'Marca do produto',
     `nota_olfativa` VARCHAR(80) NULL COMMENT 'Nota olfativa predominante (ex: Cardamomo, Jasmim)',

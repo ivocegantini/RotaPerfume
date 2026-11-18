@@ -94,7 +94,7 @@ func setupServidorComCache(t *testing.T, arm cache.Armazem) (*httptest.Server, *
 func esperarVitrine(mock sqlmock.Sqlmock) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE ativo = \?`).WithArgs(true).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE ativo = \? ORDER BY descricao ASC LIMIT \? OFFSET \?`).
+	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE ativo = \? ORDER BY nome ASC LIMIT \? OFFSET \?`).
 		WithArgs(true, 20, 0).WillReturnRows(produtoRowsForHandler())
 }
 

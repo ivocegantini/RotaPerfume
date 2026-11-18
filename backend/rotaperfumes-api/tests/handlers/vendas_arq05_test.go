@@ -47,8 +47,8 @@ type (
 	}
 	legadoItemPedidoDetalhe struct {
 		legadoItemPedido
-		ProdutoSKU       string `json:"produto_sku"`
-		ProdutoDescricao string `json:"produto_descricao"`
+		ProdutoSKU  string `json:"produto_sku"`
+		ProdutoNome string `json:"produto_nome"`
 	}
 	legadoPedidoDetalhe struct {
 		legadoPedidoListagem
@@ -94,7 +94,7 @@ func TestARQ05_ContratoJSON_ByteAByte(t *testing.T) {
 		assert.Equal(t, envelopeComercialLegado(t, map[string]any{"success": true, "data": legadoPedidoDetalhe{
 			legadoPedidoListagem: cabecalho, Itens: []legadoItemPedidoDetalhe{{legadoItemPedido: legadoItemPedido{
 				ItemIDOrigem: 1, PedidoID: 7, ProdutoID: 10, Quantidade: 2, PrecoPraticado: 100, DescontoPct: 10, ValorBruto: 180,
-				CreatedAt: quando, UpdatedAt: quando}, ProdutoSKU: "SKU-10", ProdutoDescricao: "Perfume"}}}}), body)
+				CreatedAt: quando, UpdatedAt: quando}, ProdutoSKU: "SKU-10", ProdutoNome: "Perfume"}}}}), body)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 

@@ -46,7 +46,7 @@ func dataFiltro(t *testing.T, s string) *kernel.Data {
 }
 
 var estoqueColumns = []string{
-	"id", "data_snapshot", "sku", "produto_descricao", "saldo", "ruptura", "created_at", "updated_at",
+	"id", "data_snapshot", "sku", "produto_nome", "saldo", "ruptura", "created_at", "updated_at",
 }
 
 func estoqueRow(id int64, dataSnapshot time.Time, sku string, descricao string, saldo int, ruptura bool, created, updated time.Time) []driver.Value {
@@ -81,7 +81,7 @@ func TestEstoqueList_SemFiltro(t *testing.T) {
 	assert.Equal(t, 2, total)
 	assert.Len(t, registros, 2)
 	assert.Equal(t, catalogo.SKU("SKU1"), registros[0].SKU)
-	assert.Equal(t, "Perfume 1", registros[0].ProdutoDescricao)
+	assert.Equal(t, "Perfume 1", registros[0].ProdutoNome)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -384,7 +384,7 @@ func TestEstoqueGetByID_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, catalogo.SKU("SKU1"), e.SKU)
-	assert.Equal(t, "Perfume 1", e.ProdutoDescricao)
+	assert.Equal(t, "Perfume 1", e.ProdutoNome)
 	assert.Equal(t, 10, e.Saldo)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

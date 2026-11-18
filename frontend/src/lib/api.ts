@@ -6,6 +6,7 @@ import {
   FiltrosLoja,
   OpcoesFiltroLoja,
   ProdutoLoja,
+  ProdutoLojaDetalhe,
   LoginRequest,
   LoginResponse,
   User,
@@ -218,7 +219,7 @@ export async function apiListProdutosLoja(
   page = 1,
   limit = 24,
   q = "",
-  orderBy?: "descricao" | "marca" | "preco_tabela",
+  orderBy?: "nome" | "marca" | "preco_tabela",
   orderDir?: "asc" | "desc",
   filtros: FiltrosLoja = {}
 ): Promise<Paginado<ProdutoLoja[]>> {
@@ -231,6 +232,12 @@ export async function apiListProdutosLoja(
   if (orderBy) qs.set("order_by", orderBy);
   if (orderDir) qs.set("order_dir", orderDir);
   return listarPaginado<ProdutoLoja[]>(`/api/loja/produtos?${qs.toString()}`, page, limit);
+}
+
+// ECOM-11: GET /api/loja/produtos/{id} — página pública do produto (só ativos).
+export async function apiGetProdutoLoja(id: number): Promise<ProdutoLojaDetalhe> {
+  vlog(F, "apiGetProdutoLoja", "buscando produto da loja, id:", id);
+  return fetchWithAuth<ProdutoLojaDetalhe>(`/api/loja/produtos/${id}`, { method: "GET" });
 }
 
 // ECOM-04: GET /api/loja/filtros — opcoes de categoria, marca e nota olfativa.

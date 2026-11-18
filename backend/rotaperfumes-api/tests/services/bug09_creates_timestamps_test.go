@@ -75,14 +75,14 @@ func bug09Casos() []bug09Caso {
 			nome: "produto",
 			id:   11,
 			antesDoInsert: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec(`INSERT INTO produtos \(sku, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo\)`).
-					WithArgs("SKU-001", "Perfume Teste", "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), true).
+				mock.ExpectExec(`INSERT INTO produtos \(sku, nome, descricao, categoria, marca, nota_olfativa, preco_tabela, custo_unitario, unidade, data_lancamento, ativo\)`).
+					WithArgs("SKU-001", "Perfume Teste", nil, "Perfumaria", "Marca X", "Cítrico", "99.90", "45.00", "UN", sqlmock.AnyArg(), true).
 					WillReturnResult(sqlmock.NewResult(11, 1))
 			},
 			reGetByID: `SELECT ` + produtoColunasRegex + ` FROM produtos WHERE id = \? LIMIT 1`,
 			linhaGravada: func(id int64, criado, atualizado time.Time) *sqlmock.Rows {
 				return sqlmock.NewRows(produtoColunasHeader()).
-					AddRow(id, "SKU-001", "Descricao Do Banco", "Perfumaria", "Marca X", "Cítrico",
+					AddRow(id, "SKU-001", "Descricao Do Banco", "", "Perfumaria", "Marca X", "Cítrico",
 						"99.90", "45.00", "UN", criado, true, "", criado, atualizado)
 			},
 			criar: func(db *sql.DB, verbose bool) (*bug09Resultado, error) {
@@ -91,7 +91,7 @@ func bug09Casos() []bug09Caso {
 				if err != nil || p == nil {
 					return nil, err
 				}
-				return &bug09Resultado{p.ID, p.CreatedAt, p.UpdatedAt, p.Descricao}, nil
+				return &bug09Resultado{p.ID, p.CreatedAt, p.UpdatedAt, p.Nome}, nil
 			},
 			marcadorBanco:   "Descricao Do Banco",
 			marcadorMemoria: "Perfume Teste",
@@ -210,7 +210,7 @@ func bug09Casos() []bug09Caso {
 				if err != nil || e == nil {
 					return nil, err
 				}
-				return &bug09Resultado{e.ID, e.CreatedAt, e.UpdatedAt, e.ProdutoDescricao}, nil
+				return &bug09Resultado{e.ID, e.CreatedAt, e.UpdatedAt, e.ProdutoNome}, nil
 			},
 			marcadorBanco:   "Perfume Teste",
 			marcadorMemoria: "",

@@ -227,7 +227,7 @@ const TELAS: Tela[] = [
       id,
       data_snapshot: "2026-09-01",
       sku: `SKU${id}`,
-      produto_descricao: "",
+      produto_nome: "",
       saldo: 5,
       ruptura: false,
     }),
@@ -244,7 +244,7 @@ const TELAS: Tela[] = [
     linha: (id) => ({
       id,
       sku: `P${id}`,
-      descricao: `Perfume ${id}`,
+      nome: `Perfume ${id}`,
       categoria: "Perf",
       marca: "M",
       nota_olfativa: "",
@@ -632,7 +632,7 @@ const COLUNA_ID: ColunaId[] = [
   { nome: "pagamentos", nomeHeader: "Forma", nomeTexto: "PIX", ordenarId: ["pagamento_id", "asc"] },
   { nome: "clientes", nomeHeader: "Razao Social", nomeTexto: "Loja 100", ordenarId: ["id", "desc"] },
   { nome: "estoque", nomeHeader: "SKU", nomeTexto: "SKU100", ordenarId: ["id", "asc"] },
-  { nome: "produtos", nomeHeader: "Descricao", nomeTexto: "Perfume 100", ordenarId: ["id", "desc"] },
+  { nome: "produtos", nomeHeader: "Nome", nomeTexto: "Perfume 100", ordenarId: ["id", "desc"] },
   { nome: "oportunidades", nomeHeader: null, nomeTexto: null, ordenarId: ["id", "asc"] },
   { nome: "visitas", nomeHeader: null, nomeTexto: null, ordenarId: ["id", "asc"] },
 ];

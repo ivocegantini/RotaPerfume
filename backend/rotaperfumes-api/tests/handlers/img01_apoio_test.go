@@ -168,7 +168,7 @@ type capturaArg struct{ v *driver.Value }
 func (c capturaArg) Match(v driver.Value) bool { *c.v = v; return true }
 
 func img01LinhaProduto(imagem string) *sqlmock.Rows {
-	return sqlmock.NewRows(produtoColunasHeaderForHandler()).AddRow(int64(1), "SKU-001", "Perfume Teste", "Perfumaria",
+	return sqlmock.NewRows(produtoColunasHeaderForHandler()).AddRow(int64(1), "SKU-001", "Perfume Teste", "", "Perfumaria",
 		"Marca X", "Cítrico", "99.9", "45.0", "UN", nil, true, imagem, arq02Criado, arq02Atualizado)
 }
 

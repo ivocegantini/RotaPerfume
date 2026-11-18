@@ -16,7 +16,7 @@ const arqEstoques = "estoques.go"
 
 // estoqueColunas inclui a descrição do produto (LEFT JOIN: um snapshot cujo
 // SKU não exista mais em produtos não some da listagem).
-const estoqueColunas = `e.id, e.data_snapshot, e.sku, COALESCE(p.descricao, '') AS produto_descricao, e.saldo, e.ruptura, e.created_at, e.updated_at`
+const estoqueColunas = `e.id, e.data_snapshot, e.sku, COALESCE(p.nome, '') AS produto_nome, e.saldo, e.ruptura, e.created_at, e.updated_at`
 const estoqueFrom = ` FROM estoque e LEFT JOIN produtos p ON p.sku = e.sku`
 
 // estoqueRanked numera os snapshots de cada SKU do mais recente para o mais
@@ -51,7 +51,7 @@ func (r *Estoques) Historico(ctx context.Context, f catalogo.FiltroEstoque, p ke
 func (r *Estoques) UltimaPosicao(ctx context.Context, f catalogo.FiltroEstoque, p kernel.Pagina) (kernel.Resultado[catalogo.RegistroEstoque], error) {
 	w, args := whereEstoque(f)
 	countQ := "SELECT COUNT(*) FROM (" + estoqueRanked + w + ") ranked WHERE rn = 1"
-	q := "SELECT id, data_snapshot, sku, produto_descricao, saldo, ruptura, created_at, updated_at FROM (" +
+	q := "SELECT id, data_snapshot, sku, produto_nome, saldo, ruptura, created_at, updated_at FROM (" +
 		estoqueRanked + w + ") ranked WHERE rn = 1" + ordemEstoqueRanked(f.Ordenacao) + " LIMIT ? OFFSET ?"
 	return r.listar(ctx, "listar estoque última posição", "Estoques.UltimaPosicao", countQ, q, args, p)
 }
@@ -148,7 +148,7 @@ func (r *Estoques) AtualizarSaldo(ctx context.Context, id int64, saldo int, rupt
 
 func scanEstoque(s linha) (*catalogo.RegistroEstoque, error) {
 	var e catalogo.RegistroEstoque
-	err := s.Scan(&e.ID, &e.DataSnapshot, &e.SKU, &e.ProdutoDescricao, &e.Saldo, &e.Ruptura, &e.CreatedAt, &e.UpdatedAt)
+	err := s.Scan(&e.ID, &e.DataSnapshot, &e.SKU, &e.ProdutoNome, &e.Saldo, &e.Ruptura, &e.CreatedAt, &e.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, catalogo.ErrEstoqueNaoEncontrado
 	}

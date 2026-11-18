@@ -40,7 +40,7 @@ func TestECOM01_Loja_SoAtivosESemCusto(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE ativo = \?`).WithArgs(true).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE ativo = \? ORDER BY descricao ASC LIMIT \? OFFSET \?`).
+	mock.ExpectQuery(`SELECT `+produtoColunasRegex+` FROM produtos WHERE ativo = \? ORDER BY nome ASC LIMIT \? OFFSET \?`).
 		WithArgs(true, 20, 0).WillReturnRows(produtoRowsForHandler())
 
 	// ?ativo=false e order_by=custo_unitario são ignorados na vitrine.
@@ -52,7 +52,7 @@ func TestECOM01_Loja_SoAtivosESemCusto(t *testing.T) {
 	data := como[[]any](t, decodeResponse(t, raw)["data"])
 	require.Len(t, data, 1)
 	item := como[map[string]any](t, data[0])
-	assert.Equal(t, "Perfume Teste", item["descricao"])
+	assert.Equal(t, "Perfume Teste", item["nome"])
 	assert.Contains(t, item, "preco")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -303,7 +303,7 @@ func TestECOM04_Loja_FiltraCategoriaMarcaENota(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE categoria = \? AND marca = \? AND nota_olfativa = \? AND ativo = \?`).
 		WithArgs("Bakhoor", "Marca X", "Oud", true).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`FROM produtos WHERE categoria = \? AND marca = \? AND nota_olfativa = \? AND ativo = \? ORDER BY descricao ASC LIMIT`).
+	mock.ExpectQuery(`FROM produtos WHERE categoria = \? AND marca = \? AND nota_olfativa = \? AND ativo = \? ORDER BY nome ASC LIMIT`).
 		WithArgs("Bakhoor", "Marca X", "Oud", true, 20, 0).WillReturnRows(produtoRowsForHandler())
 
 	resp := getLoja(t, server.URL+"/api/loja/produtos?categoria=Bakhoor&marca=Marca+X&nota_olfativa=Oud", tok)
@@ -454,7 +454,7 @@ func TestECOM10_Vitrine_SemLogin_200(t *testing.T) {
 	defer db.Close()
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos WHERE ativo = \?`).WithArgs(true).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`FROM produtos WHERE ativo = \? ORDER BY descricao ASC`).WithArgs(true, 20, 0).
+	mock.ExpectQuery(`FROM produtos WHERE ativo = \? ORDER BY nome ASC`).WithArgs(true, 20, 0).
 		WillReturnRows(produtoRowsForHandler())
 	resp, err := http.Get(server.URL + "/api/loja/produtos")
 	require.NoError(t, err)

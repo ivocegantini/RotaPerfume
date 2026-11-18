@@ -117,10 +117,10 @@ func TestIMG01_Repo_PorID_LeImagem(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	agora := time.Now()
-	cols := []string{"id", "sku", "descricao", "categoria", "marca", "nota_olfativa", "preco_tabela", "custo_unitario",
+	cols := []string{"id", "sku", "nome", "descricao", "categoria", "marca", "nota_olfativa", "preco_tabela", "custo_unitario",
 		"unidade", "data_lancamento", "ativo", "imagem", "created_at", "updated_at"}
 	mock.ExpectQuery(`COALESCE\(imagem, ''\).+FROM produtos WHERE id = \?`).WithArgs(int64(5)).
-		WillReturnRows(sqlmock.NewRows(cols).AddRow(int64(5), "SKU-1", "D", "C", "M", "", "1.0", "1.0", "UN", nil, true, img01Nome, agora, agora))
+		WillReturnRows(sqlmock.NewRows(cols).AddRow(int64(5), "SKU-1", "D", "", "C", "M", "", "1.0", "1.0", "UN", nil, true, img01Nome, agora, agora))
 	p, err := catalogomysql.NovoProdutos(db).PorID(context.Background(), 5)
 	require.NoError(t, err)
 	assert.Equal(t, img01Nome, p.Imagem)

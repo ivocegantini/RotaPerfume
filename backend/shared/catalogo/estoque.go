@@ -14,12 +14,12 @@ type RegistroEstoque struct {
 	ID           int64
 	DataSnapshot time.Time // meia-noite em time.Local (BUG-01)
 	SKU          SKU
-	// ProdutoDescricao vem do JOIN com produtos (só leitura).
-	ProdutoDescricao string
-	Saldo            int
-	Ruptura          bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// ProdutoNome vem do JOIN com produtos (só leitura).
+	ProdutoNome string
+	Saldo       int
+	Ruptura     bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // DadosEstoque é a entrada crua de um ajuste manual (o comando).

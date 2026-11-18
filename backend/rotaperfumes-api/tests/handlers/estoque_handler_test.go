@@ -12,7 +12,7 @@ import (
 )
 
 func estoqueColunasHeaderForHandler() []string {
-	return []string{"id", "data_snapshot", "sku", "produto_descricao", "saldo", "ruptura", "created_at", "updated_at"}
+	return []string{"id", "data_snapshot", "sku", "produto_nome", "saldo", "ruptura", "created_at", "updated_at"}
 }
 
 func estoqueRowsForHandler(id int64, saldo int, ruptura bool) *sqlmock.Rows {

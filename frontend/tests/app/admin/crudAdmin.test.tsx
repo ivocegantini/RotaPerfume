@@ -214,7 +214,7 @@ describe("Vendedores - CRUD", () => {
 // ─── Produtos ─────────────────────────────────────────────────────────────────
 
 const perfume = {
-  id: 50, sku: "P50", descricao: "Perfume 50", categoria: "C", marca: "M", nota_olfativa: "",
+  id: 50, sku: "P50", nome: "Perfume 50", categoria: "C", marca: "M", nota_olfativa: "",
   preco_tabela: 10, custo_unitario: 5, unidade: "UN", data_lancamento: null, ativo: true,
 };
 
@@ -237,7 +237,7 @@ describe("Produtos - CRUD", () => {
   });
 
   it("editar atualiza a linha", async () => {
-    api.apiUpdateProduto.mockResolvedValue({ ...perfume, descricao: "Perfume Novo" });
+    api.apiUpdateProduto.mockResolvedValue({ ...perfume, nome: "Perfume Novo" });
     render(<ProdutosPage />);
     await screen.findByText("Perfume 50");
     await esperarDebounce();
@@ -249,7 +249,7 @@ describe("Produtos - CRUD", () => {
   });
 
   it("criar recarrega a lista", async () => {
-    api.apiCreateProduto.mockResolvedValue({ ...perfume, id: 51, descricao: "Outro" });
+    api.apiCreateProduto.mockResolvedValue({ ...perfume, id: 51, nome: "Outro" });
     render(<ProdutosPage />);
     await screen.findByText("Perfume 50");
     await esperarDebounce();
@@ -257,7 +257,7 @@ describe("Produtos - CRUD", () => {
     const d = await dialogo();
     const w = within(d);
     await userEvent.type(w.getByLabelText("SKU"), "P51");
-    await userEvent.type(w.getByLabelText("Descricao"), "Outro");
+    await userEvent.type(w.getByLabelText("Nome"), "Outro");
     await userEvent.type(w.getByLabelText("Categoria"), "C");
     await userEvent.type(w.getByLabelText("Marca"), "M");
     await userEvent.type(w.getByLabelText("Preco de tabela"), "1");
@@ -270,7 +270,7 @@ describe("Produtos - CRUD", () => {
 
 // ─── Estoque ──────────────────────────────────────────────────────────────────
 
-const registro = { id: 5, data_snapshot: "2026-09-01", sku: "SKU-5", produto_descricao: "Perfume", saldo: 3, ruptura: false };
+const registro = { id: 5, data_snapshot: "2026-09-01", sku: "SKU-5", produto_nome: "Perfume", saldo: 3, ruptura: false };
 
 describe("Estoque - CRUD (admin)", () => {
   beforeEach(() => {
@@ -520,14 +520,14 @@ describe("FE-10 - recarga que falha depois da acao", () => {
 
   it("produtos: criar", async () => {
     api.apiListProdutos.mockResolvedValueOnce(pagina([perfume])).mockRejectedValueOnce(new TypeError(ERRO_REDE));
-    api.apiCreateProduto.mockResolvedValue({ ...perfume, id: 51, descricao: "Outro" });
+    api.apiCreateProduto.mockResolvedValue({ ...perfume, id: 51, nome: "Outro" });
     render(<ProdutosPage />);
     await screen.findByText("Perfume 50");
     await esperarDebounce();
     await userEvent.click(screen.getByRole("button", { name: "+ Novo Produto" }));
     const w = within(await dialogo());
     await userEvent.type(w.getByLabelText("SKU"), "P51");
-    await userEvent.type(w.getByLabelText("Descricao"), "Outro");
+    await userEvent.type(w.getByLabelText("Nome"), "Outro");
     await userEvent.type(w.getByLabelText("Categoria"), "C");
     await userEvent.type(w.getByLabelText("Marca"), "M");
     await userEvent.type(w.getByLabelText("Preco de tabela"), "1");
@@ -753,7 +753,7 @@ describe("BUG-17 - bloqueio do toggle de produto", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const outro = { ...perfume, id: 51, sku: "P51", descricao: "Perfume 51" };
+    const outro = { ...perfume, id: 51, sku: "P51", nome: "Perfume 51" };
     api.apiListProdutos.mockResolvedValue(pagina([perfume, outro]));
     api.apiToggleProdutoStatus.mockImplementation(async (id: number, ativo: boolean) => ({
       ...(id === 50 ? perfume : outro),

@@ -33,7 +33,7 @@ func newPedidoTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 
 const pedidoColunasRegex = `p\.pedido_id_origem, p\.cliente_id, p\.vendedor_id, p\.data_pedido, p\.canal, p\.status, p\.valor_total, p\.created_at, p\.updated_at, c\.razao_social, v\.nome`
 const pedidoFromRegex = ` FROM pedidos p JOIN clientes c ON c\.cliente_id_origem = p\.cliente_id JOIN vendedores v ON v\.id = p\.vendedor_id`
-const itemPedidoColunasRegex = `i\.item_id_origem, i\.pedido_id, i\.produto_id, i\.quantidade, i\.preco_praticado, i\.desconto_pct, i\.valor_bruto, i\.created_at, i\.updated_at, pr\.sku, pr\.descricao`
+const itemPedidoColunasRegex = `i\.item_id_origem, i\.pedido_id, i\.produto_id, i\.quantidade, i\.preco_praticado, i\.desconto_pct, i\.valor_bruto, i\.created_at, i\.updated_at, pr\.sku, pr\.nome`
 const itemPedidoFromRegex = ` FROM itens_pedido i JOIN produtos pr ON pr\.id = i\.produto_id`
 
 func pedidoColunasHeader() []string {
@@ -56,7 +56,7 @@ func emptyPedidoRows() *sqlmock.Rows {
 func itemPedidoColunasHeader() []string {
 	return []string{
 		"item_id_origem", "pedido_id", "produto_id", "quantidade",
-		"preco_praticado", "desconto_pct", "valor_bruto", "created_at", "updated_at", "produto_sku", "produto_descricao",
+		"preco_praticado", "desconto_pct", "valor_bruto", "created_at", "updated_at", "produto_sku", "produto_nome",
 	}
 }
 

@@ -512,7 +512,7 @@ func TestIntegracaoHTTP_BUG04_PutSemAlteracao(t *testing.T) {
 
 	sku := c.nome("SKU")
 	prodBody := map[string]any{
-		"sku": sku, "descricao": c.nome("PROD"), "categoria": "Teste", "marca": "Teste", "nota_olfativa": "Floral",
+		"sku": sku, "nome": c.nome("PROD"), "categoria": "Teste", "marca": "Teste", "nota_olfativa": "Floral",
 		"preco_tabela": 10.5, "custo_unitario": 5.25, "unidade": "UN", "data_lancamento": "2024-01-01",
 	}
 	prodID := criar(t, "/api/produtos", "id", prodBody)
@@ -722,7 +722,7 @@ func TestIntegracaoHTTP_RISCO01_Data20181104(t *testing.T) {
 			tabela: "produtos", colID: "id", colData: "data_lancamento", campoData: "data_lancamento",
 			body: func() map[string]any {
 				return map[string]any{
-					"sku": c.nome("P1811"), "descricao": c.nome("P1811"), "categoria": "Teste", "marca": "Teste",
+					"sku": c.nome("P1811"), "nome": c.nome("P1811"), "categoria": "Teste", "marca": "Teste",
 					"preco_tabela": 1, "custo_unitario": 1, "unidade": "UN", "data_lancamento": d,
 				}
 			},

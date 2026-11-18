@@ -111,8 +111,9 @@ var matrizRotas = []rotaMatriz{
 	{"POST /api/auth/reset-password", politicaAnyRole, p("/api/auth/reset-password"), true},
 	{"GET /api/auth/me", politicaAnyRole, p("/api/auth/me"), true},
 	// Loja (ECOM-01)
-	{"GET /api/loja/produtos", politicaPublic, p("/api/loja/produtos"), false}, // ECOM-10: vitrine pública
-	{"GET /api/loja/filtros", politicaPublic, p("/api/loja/filtros"), false},   // ECOM-04/10
+	{"GET /api/loja/produtos", politicaPublic, p("/api/loja/produtos"), false},        // ECOM-10: vitrine pública
+	{"GET /api/loja/produtos/{id}", politicaPublic, p("/api/loja/produtos/1"), false}, // ECOM-11: página do produto
+	{"GET /api/loja/filtros", politicaPublic, p("/api/loja/filtros"), false},          // ECOM-04/10
 	// Usuários / admin
 	{"GET /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
 	{"POST /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
@@ -326,12 +327,12 @@ func TestARQ00_Matriz_CobreTodasAsRotasDeRoutesGo(t *testing.T) {
 	assert.Empty(t, faltando, "rotas registradas no router SEM política na matriz ARQ-00 — adicione-as a matrizRotas")
 	assert.Empty(t, sobrando, "rotas na matriz ARQ-00 que NÃO estão mais no router — remova-as ou corrija o padrão")
 	assert.Empty(t, divergentes, "política registrada no router diverge da matriz ARQ-00")
-	assert.Len(t, registradas, 71, "a API registra 71 padrões (12 Public, 34 Authenticated, 23 AdminOnly, 2 AnyRole)")
+	assert.Len(t, registradas, 72, "a API registra 72 padrões (13 Public, 34 Authenticated, 23 AdminOnly, 2 AnyRole)")
 	porPolitica := map[politicaRota]int{}
 	for _, rt := range registradas {
 		porPolitica[politicaDe(rt.Policy)]++
 	}
-	assert.Equal(t, map[politicaRota]int{politicaPublic: 12, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 2}, porPolitica,
+	assert.Equal(t, map[politicaRota]int{politicaPublic: 13, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 2}, porPolitica,
 		"contagem por política registrada no router")
 }
 
@@ -356,7 +357,7 @@ func TestARQ00_Matriz_Sanidade(t *testing.T) {
 		}
 	}
 	sort.Strings(publicas)
-	assert.Equal(t, []string{"GET /api/loja/filtros", "GET /api/loja/produtos", "GET /api/public/produtos/imagens/{arquivo}", "GET /health", "POST /api/auth/cadastro", "POST /api/auth/confirmar-email", "POST /api/auth/google", "POST /api/auth/google/cadastro", "POST /api/auth/login", "POST /api/auth/logout", "POST /api/auth/reenviar-confirmacao", "POST /api/auth/refresh"}, publicas)
+	assert.Equal(t, []string{"GET /api/loja/filtros", "GET /api/loja/produtos", "GET /api/loja/produtos/{id}", "GET /api/public/produtos/imagens/{arquivo}", "GET /health", "POST /api/auth/cadastro", "POST /api/auth/confirmar-email", "POST /api/auth/google", "POST /api/auth/google/cadastro", "POST /api/auth/login", "POST /api/auth/logout", "POST /api/auth/reenviar-confirmacao", "POST /api/auth/refresh"}, publicas)
 }
 
 // ---------------------------------------------------------------------------

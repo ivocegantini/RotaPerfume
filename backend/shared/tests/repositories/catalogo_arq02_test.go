@@ -27,7 +27,7 @@ func TestCatalogomysql_QuerierObrigatorio(t *testing.T) {
 // sua coluna (whitelist completa, C-02), nas duas direções.
 func TestCatalogomysql_ColunaProduto_TodosOsCampos(t *testing.T) {
 	colunas := map[catalogo.CampoProduto]string{
-		catalogo.OrdemProdutoID: "id", catalogo.OrdemProdutoSKU: "sku", catalogo.OrdemProdutoDescricao: "descricao",
+		catalogo.OrdemProdutoID: "id", catalogo.OrdemProdutoSKU: "sku", catalogo.OrdemProdutoNome: "nome",
 		catalogo.OrdemProdutoCategoria: "categoria", catalogo.OrdemProdutoMarca: "marca",
 		catalogo.OrdemProdutoPrecoTabela: "preco_tabela", catalogo.OrdemProdutoCustoUnitario: "custo_unitario",
 		catalogo.OrdemProdutoDataLancamento: "data_lancamento", catalogo.OrdemProdutoAtivo: "ativo",
@@ -103,7 +103,7 @@ func TestCatalogomysql_ErroDeScanNaListagem(t *testing.T) {
 		defer db.Close()
 		mock.ExpectQuery(`SELECT COUNT`).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
 		mock.ExpectQuery(`FROM produtos`).WillReturnRows(sqlmock.NewRows(produtoColumns).
-			AddRow("não-numérico", "S", "D", "C", "M", "", "1.0", "1.0", "UN", nil, true, "", nil, nil))
+			AddRow("não-numérico", "S", "D", "", "C", "M", "", "1.0", "1.0", "UN", nil, true, "", nil, nil))
 		itens, _, err := listarProdutos(catalogomysql.NovoProdutos(db), ctx, catalogo.FiltroProduto{})
 		assert.Error(t, err)
 		assert.Nil(t, itens)
@@ -126,7 +126,7 @@ func TestCatalogomysql_FiltrosCombinadosEPagina(t *testing.T) {
 	db, mock := newMock(t)
 	defer db.Close()
 	nao := false
-	where := `WHERE categoria = \? AND marca = \? AND ativo = \? AND \(descricao LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`
+	where := `WHERE categoria = \? AND marca = \? AND ativo = \? AND \(nome LIKE \? ESCAPE '!' OR sku LIKE \? ESCAPE '!'\)`
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM produtos `+where).
 		WithArgs("C", "M", false, "%b%", "%b%").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(11))
 	mock.ExpectQuery(`FROM produtos `+where+` ORDER BY id ASC LIMIT \? OFFSET \?`).
