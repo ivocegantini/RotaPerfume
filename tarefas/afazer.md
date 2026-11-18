@@ -7,14 +7,9 @@
 
 | Card | Prioridade | Situação | Responsável |
 | --- | --- | --- | --- |
-| DEPLOY-12 | MÉDIA | aplicar o Lote 43 no servidor (execução assistida) | 🟡 BackBrain |
 | DEP-03 | BAIXA | acompanhamento do upstream | 🟢 FrontBrain |
 
 ---
-
-## DEPLOY-12: aplicar o Lote 43 no servidor — MÉDIA
-**Ação (no servidor, checkout atualizado):** `sudo bash deploy/backup-banco.sh --instalar` (BACKUP-05) e `sudo bash deploy/mariadb-docker.sh`, sem `--recriar` (remove a unit e a chain do firewall antigo, DEPLOY-11).
-**Conferir:** `systemctl status rotaperfumes-db-firewall` (unit não encontrada) e `sudo iptables -S ROTAPERFUMES-DB` (chain inexistente).
 
 ## DEP-03: vulnerabilidades de dev restantes no frontend — BAIXA (acompanhamento)
 **Status (2026-11-18):** `npm audit --omit=dev`: 0. Só dev: 12 altas (GHSA-fc5q-39xc-vjpf, `picomatch` <=4.0.7, via vite/vitest/tinyglobby e `fast-glob` do `eslint-config-next`) e 6 moderadas (`minimatch` via `typescript-eslint` 8.73.0). O 4.0.7 é a última versão: o upstream ainda não corrigiu.

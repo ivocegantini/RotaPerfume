@@ -12,6 +12,13 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: DEPLOY-13 (imagem do container alinhada)
+- `rotaperfumes-backup-banco --agora` ok (15:54Z, dump validado, 292 imagens) e `mariadb-docker.sh --recriar` do `/root/rotaperfumes-main`: container na `rotaperfumes-mariadb:11.4-5e73baf8179b` (11.4.13), sem o aviso de imagem diferente; TLS 1.3, sem-TLS recusado, DBA ok, fingerprint da CA confere. Segue o aviso antigo do uid 999 (`dnsmasq`).
+
+## Avulso de 2026-11-18: DEPLOY-12 (Lote 43 no servidor)
+- Checkout novo `/root/rotaperfumes-main` (clone da `main`, `52240ee`); o `/root/rotaperfumes` antigo não é git (item 6 do DEPLOY-08).
+- `backup-banco.sh --instalar` (1º backup ok, 12:23Z) e `mariadb-docker.sh` sem `--recriar`: unit e chain do firewall antigo removidas (`not-found`, chain inexistente), container sem restart, TLS e DBA ok. Aviso de imagem diferente → DEPLOY-13.
+
 ## Lote 43 de 2026-11-18: LOTE-43 e DEPLOY-11
 > Testes: `make -k test` rc=0 (0 FAIL), sem `GO_TEST_FLAGS`; `shellcheck` ok. Spec em `tarefas/lote-43-spec.md`.
 - BACKUP-03: folga de 300 s (`TOLERANCIA_RELOGIO_S`) na "data futura" das guardas do `--recriar`, do seed e do `gerar-imagens-producao.sh`.
