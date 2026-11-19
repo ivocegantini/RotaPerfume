@@ -116,7 +116,8 @@ pipeline {
                 // le frontend/.nvmrc, frontend/Dockerfile, frontend/package*.json e
                 // frontend/tests (estagio "Testes Frontend"). SEC-47/SEC-58 leem o
                 // backend/Dockerfile e scripts/; BACKUP-01/SEC-51 leem o
-                // docs/deploy-servidor.md. Ficam de fora os dumps e o api.env
+                // docs/deploy-servidor.md; o ECOM-11 le o dados/erp/produtos.csv
+                // (catalogo, sem segredos). Ficam de fora os dumps e o api.env
                 // (segredo) do deploy/.
                 // CI-02: bash e gpg faltando no GO_TEST_IMAGE falham o teste
                 // (precisaBash, SEC-58); os testes com unshare continuam pulando no
@@ -127,7 +128,7 @@ pipeline {
                     git archive --format=tar HEAD -- \
                         backend/shared backend/rotaperfumes-api sql Makefile deploy scripts Jenkinsfile .gitignore \
                         frontend/.nvmrc frontend/Dockerfile frontend/package.json frontend/package-lock.json frontend/tests \
-                        backend/Dockerfile docs/deploy-servidor.md \
+                        backend/Dockerfile docs/deploy-servidor.md dados/erp/produtos.csv \
                       | docker run --rm -i -e CI=true -e CGO_ENABLED=0 -e GOFLAGS=-mod=readonly "$GO_TEST_IMAGE" sh -ec '
                           mkdir -p /src && tar -xf - -C /src
                           cd /src/backend/shared && go vet ./... && go test ./... -timeout=30m
