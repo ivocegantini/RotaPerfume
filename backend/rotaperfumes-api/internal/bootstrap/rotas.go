@@ -129,8 +129,9 @@ func rotas(h Handlers) []httpx.Rota {
 		{Metodo: get, Padrao: "/api/loja/produtos", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.ListProdutosLoja", Handler: h.Produto.ListProdutosLoja},
 		{Metodo: get, Padrao: "/api/loja/produtos/{id}", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.GetProdutoLoja", Handler: h.Produto.GetProdutoLoja},
 		{Metodo: get, Padrao: "/api/loja/filtros", Policy: publica, Arquivo: fLoja, Funcao: "ProdutoHandler.OpcoesFiltroLoja", Handler: h.Produto.OpcoesFiltroLoja},
-		// Minhas compras (ECOM-12): produtos comprados pelo usuário do token.
+		// Minhas compras (ECOM-12/16): pedidos do usuário do token e o detalhe de um.
 		{Metodo: get, Padrao: "/api/loja/minhas-compras", Policy: todos, Arquivo: "compras_handler.go", Funcao: "PedidoHandler.MinhasCompras", Handler: h.Pedido.MinhasCompras},
+		{Metodo: get, Padrao: "/api/loja/minhas-compras/{id}", Policy: todos, Arquivo: "compras_handler.go", Funcao: "PedidoHandler.MinhaCompra", Handler: h.Pedido.MinhaCompra},
 		// Checkout (ECOM-14): fecha o carrinho do usuário do token (preços do banco).
 		{Metodo: post, Padrao: "/api/loja/checkout", Policy: todos, Arquivo: "checkout_handler.go", Funcao: "PedidoHandler.FinalizarCompra", Handler: h.Pedido.FinalizarCompra},
 

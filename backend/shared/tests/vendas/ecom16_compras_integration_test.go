@@ -1,9 +1,9 @@
 package vendas_test
 
-// ECOM-12: integração (INTEGRATION=1; senão t.Skip; SEC-50: integracao.Abrir
-// recusa a produção) do Pedidos.ComprasDoUsuario no MariaDB real, com
-// ONLY_FULL_GROUP_BY na sessão: soma por produto, pedido Cancelado fora,
-// ordenação e paginação, e o login de outra pessoa não vê nada.
+// ECOM-12/16: integração (INTEGRATION=1; senão t.Skip; SEC-50: integracao.Abrir
+// recusa a produção) do Pedidos.ComprasDoUsuario/CompraDoUsuario no MariaDB
+// real: um pedido por linha com os nomes dos produtos (sem repetir), ordenação
+// e paginação, detalhe com itens e pagamento, e o outro login não vê nada.
 // Dados "ZZ-TEST-ECOM12-*", apagados no t.Cleanup.
 
 import (
@@ -23,7 +23,7 @@ import (
 	"github.com/rotaperfumes/shared/vendas/vendasmysql"
 )
 
-type idsECOM12 struct{ usuario, outro, cliente, vendedor, prodA, prodB, prodC int64 }
+type idsECOM12 struct{ usuario, outro, cliente, vendedor, prodA, prodB, prodC, p1, p2, p3 int64 }
 
 func inserirECOM12(t *testing.T, db *sql.DB, q string, args ...any) int64 {
 	t.Helper()
@@ -34,8 +34,8 @@ func inserirECOM12(t *testing.T, db *sql.DB, q string, args ...any) int64 {
 	return id
 }
 
-// dadosECOM12: A em 2 pedidos (3 + 2 un.), B em 1 pedido (1 un., produto
-// inativo), C só num pedido Cancelado (não aparece).
+// dadosECOM12: p1 (01/10, A duas vezes + B inativo, R$ 40), p2 (10/11, A,
+// R$ 20, com pagamento) e p3 (15/11, Cancelado, C, R$ 90).
 func dadosECOM12(t *testing.T, db *sql.DB) idsECOM12 {
 	t.Helper()
 	n := time.Now().UnixNano()
@@ -52,15 +52,18 @@ func dadosECOM12(t *testing.T, db *sql.DB) idsECOM12 {
 			fmt.Sprintf("E12-%d-%s", n%1e12, sufixo), tag+"-"+sufixo, ativo)
 	}
 	ids.prodA, ids.prodB, ids.prodC = produto("A", true), produto("B", false), produto("C", true)
-	pedido := func(dia, status string) int64 {
-		return inserirECOM12(t, db, `INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total) VALUES (?, ?, ?, 'Loja', ?, '0.00')`, ids.cliente, ids.vendedor, dia, status)
+	pedido := func(dia, status, total string) int64 {
+		return inserirECOM12(t, db, `INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total) VALUES (?, ?, ?, 'Loja', ?, ?)`, ids.cliente, ids.vendedor, dia, status, total)
 	}
 	item := func(pedidoID, produtoID int64, qtd int, bruto string) {
 		inserirECOM12(t, db, `INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto) VALUES (?, ?, ?, '10.00', 0, ?)`, pedidoID, produtoID, qtd, bruto)
 	}
-	p1, p2, p3 := pedido("2026-10-01", "Entregue"), pedido("2026-11-10", "Faturado"), pedido("2026-11-15", "Cancelado")
-	item(p1, ids.prodA, 3, "30.00")
+	p1, p2, p3 := pedido("2026-10-01", "Entregue", "40.00"), pedido("2026-11-10", "Faturado", "20.00"), pedido("2026-11-15", "Cancelado", "90.00")
+	ids.p1, ids.p2, ids.p3 = p1, p2, p3
+	item(p1, ids.prodA, 2, "20.00")
 	item(p1, ids.prodB, 1, "10.00")
+	item(p1, ids.prodA, 1, "10.00") // mesmo produto em 2 itens: o nome sai uma vez
+	inserirECOM12(t, db, `INSERT INTO pagamentos (pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento) VALUES (?, 'PIX', 1, '20.00', '1.00', '19.80', '2026-11-10', NULL, 'Em aberto')`, p2)
 	item(p2, ids.prodA, 2, "20.00")
 	item(p3, ids.prodC, 9, "90.00")
 
@@ -69,6 +72,7 @@ func dadosECOM12(t *testing.T, db *sql.DB) idsECOM12 {
 			q   string
 			arg int64
 		}{
+			{"DELETE FROM pagamentos WHERE pedido_id IN (SELECT pedido_id_origem FROM pedidos WHERE cliente_id = ?)", ids.cliente},
 			{"DELETE FROM pedidos WHERE cliente_id = ?", ids.cliente}, // itens vão em cascata
 			{"DELETE FROM clientes WHERE cliente_id_origem = ?", ids.cliente},
 			{"DELETE FROM vendedores WHERE id = ?", ids.vendedor},
@@ -90,42 +94,55 @@ func dadosECOM12(t *testing.T, db *sql.DB) idsECOM12 {
 	return ids
 }
 
-func TestIntegracaoECOM12_ComprasDoUsuario(t *testing.T) {
+func TestIntegracaoECOM16_ComprasDoUsuario(t *testing.T) {
 	db := integracao.Abrir(t)
 	ctx := context.Background()
 	ids := dadosECOM12(t, db)
 
-	conn, err := db.Conn(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	_, err = conn.ExecContext(ctx, "SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'ONLY_FULL_GROUP_BY')")
-	require.NoError(t, err)
-	repo := vendasmysql.NovoPedidos(conn)
+	repo := vendasmysql.NovoPedidos(db)
 
 	res, err := repo.ComprasDoUsuario(ctx, ids.usuario, vendas.OrdenacaoCompraPadrao(), kernel.NovaPagina(1, 20))
 	require.NoError(t, err)
-	assert.Equal(t, 2, res.Total, "C só está em pedido Cancelado")
-	require.Len(t, res.Itens, 2)
-	a, b := res.Itens[0], res.Itens[1] // última compra desc: A (10/11) antes de B (01/10)
-	assert.Equal(t, ids.prodA, a.ProdutoID)
-	assert.Equal(t, 5, a.Quantidade)
-	assert.Equal(t, 2, a.Pedidos)
-	assert.Equal(t, "50.00", a.TotalGasto.String())
-	assert.Equal(t, "2026-11-10", a.UltimaCompra.Format("2006-01-02"))
-	assert.True(t, a.Ativo)
-	assert.Equal(t, ids.prodB, b.ProdutoID)
-	assert.Equal(t, 1, b.Quantidade)
-	assert.False(t, b.Ativo)
+	assert.Equal(t, 3, res.Total)
+	require.Len(t, res.Itens, 3)
+	// data desc: p3 (15/11), p2 (10/11), p1 (01/10); o cancelado aparece com o status.
+	assert.Equal(t, []int64{ids.p3, ids.p2, ids.p1}, []int64{res.Itens[0].PedidoID, res.Itens[1].PedidoID, res.Itens[2].PedidoID})
+	assert.Equal(t, "Cancelado", res.Itens[0].Status)
+	p1 := res.Itens[2]
+	assert.Equal(t, "2026-10-01", p1.Data.Format("2006-01-02"))
+	assert.Equal(t, "40.00", p1.ValorTotal.String())
+	require.Len(t, p1.Produtos, 2, "A repetido sai uma vez")
+	assert.True(t, strings.HasSuffix(p1.Produtos[0], "-A"))
+	assert.True(t, strings.HasSuffix(p1.Produtos[1], "-B"))
 
-	asc := kernel.ParseOrdenacao("quantidade", "asc", vendas.CamposOrdenacaoCompra(), vendas.OrdenacaoCompraPadrao())
+	asc := kernel.ParseOrdenacao("valor_total", "asc", vendas.CamposOrdenacaoCompra(), vendas.OrdenacaoCompraPadrao())
 	res, err = repo.ComprasDoUsuario(ctx, ids.usuario, asc, kernel.NovaPagina(1, 1))
 	require.NoError(t, err)
-	assert.Equal(t, 2, res.Total)
+	assert.Equal(t, 3, res.Total)
 	require.Len(t, res.Itens, 1)
-	assert.Equal(t, ids.prodB, res.Itens[0].ProdutoID, "menor quantidade primeiro, 1 por página")
+	assert.Equal(t, ids.p2, res.Itens[0].PedidoID, "menor total primeiro, 1 por página")
 
 	res, err = repo.ComprasDoUsuario(ctx, ids.outro, vendas.OrdenacaoCompraPadrao(), kernel.NovaPagina(1, 20))
 	require.NoError(t, err)
 	assert.Equal(t, 0, res.Total, "outro login não vê as compras alheias")
 	assert.Empty(t, res.Itens)
+
+	d, err := repo.CompraDoUsuario(ctx, ids.usuario, ids.p1)
+	require.NoError(t, err)
+	require.Len(t, d.Itens, 3)
+	assert.Equal(t, ids.prodA, d.Itens[0].ProdutoID)
+	assert.Equal(t, 2, d.Itens[0].Quantidade)
+	assert.Equal(t, "20.00", d.Itens[0].ValorBruto.String())
+	assert.False(t, d.Itens[1].Ativo)
+	assert.Empty(t, d.Pagamentos)
+
+	d, err = repo.CompraDoUsuario(ctx, ids.usuario, ids.p2)
+	require.NoError(t, err)
+	require.Len(t, d.Pagamentos, 1)
+	assert.Equal(t, "PIX", d.Pagamentos[0].Forma)
+	assert.Equal(t, "Em aberto", d.Pagamentos[0].Status)
+	assert.Nil(t, d.Pagamentos[0].DataPagamento)
+
+	_, err = repo.CompraDoUsuario(ctx, ids.outro, ids.p1)
+	assert.ErrorIs(t, err, vendas.ErrPedidoNaoEncontrado, "pedido alheio = 404")
 }

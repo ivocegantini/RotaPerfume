@@ -187,20 +187,47 @@ export interface CompraFinalizada {
   itens: { produto_id: number; nome: string; quantidade: number; preco: number; valor: number }[];
 }
 
-// ECOM-12: item de GET /api/loja/minhas-compras (produtos comprados, somados por produto).
-export interface ProdutoComprado {
+// ECOM-16: linha de GET /api/loja/minhas-compras (um pedido do usuario).
+export interface Compra {
+  pedido_id: number;
+  data: string; // AAAA-MM-DD
+  status: string;
+  valor_total: number;
+  produtos: string[]; // nomes, na ordem dos itens, sem repetir
+}
+
+export type OrdemCompra = "data" | "pedido_id" | "valor_total";
+
+// ECOM-16: GET /api/loja/minhas-compras/{id} (itens e pagamento; sem custo/taxa).
+export interface ItemComprado {
   produto_id: number;
   sku: string;
   nome: string;
   imagem_url: string | null;
   ativo: boolean; // inativo: sem link para a pagina do produto
   quantidade: number;
-  pedidos: number;
-  total_gasto: number;
-  ultima_compra: string; // AAAA-MM-DD
+  preco_praticado: number;
+  desconto_pct: number;
+  valor_bruto: number;
 }
 
-export type OrdemCompra = "ultima_compra" | "nome" | "quantidade" | "pedidos" | "total_gasto";
+export interface PagamentoComprado {
+  forma_pagamento: string;
+  parcelas: number;
+  valor: number;
+  data_vencimento: string; // AAAA-MM-DD
+  data_pagamento: string | null;
+  status_pagamento: string;
+}
+
+export interface CompraDetalhe {
+  pedido_id: number;
+  data: string;
+  status: string;
+  valor_total: number;
+  itens: ItemComprado[];
+  pagamentos: PagamentoComprado[];
+}
 
 // ECOM-04: GET /api/loja/filtros (valores dos produtos ativos).
 export interface OpcoesFiltroLoja {

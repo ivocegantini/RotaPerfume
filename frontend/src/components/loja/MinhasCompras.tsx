@@ -1,24 +1,25 @@
 "use client";
 
-// ECOM-12: "Minhas compras" — produtos dos pedidos nao cancelados do usuario
-// logado (GET /api/loja/minhas-compras), em tabela ordenavel e paginada no
-// servidor. Visitante sem sessao ve o convite para entrar (nem chama a API).
+// ECOM-12/16: "Minhas compras" — um pedido por linha (ID, data, produtos,
+// status, total) do usuario logado (GET /api/loja/minhas-compras), ordenavel
+// e paginado no servidor. A linha abre /minhas-compras/{id} (itens e
+// pagamento). Visitante sem sessao ve o convite para entrar (nem chama a API).
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Paginador } from "@/components/ui/Paginador";
-import { Column, Table } from "@/components/ui/Table";
+import { Badge, Column, Table } from "@/components/ui/Table";
 import { TopoLoja, useSessaoLocal } from "@/components/loja/TopoLoja";
 import { apiMinhasCompras, type Paginado } from "@/lib/api";
-import { urlImagemProduto } from "@/lib/imagemProduto";
 import { useUltimaResposta } from "@/lib/useListaSegura";
-import type { OrdemCompra, ProdutoComprado } from "@/lib/types";
+import type { Compra, OrdemCompra } from "@/lib/types";
 import { vlog } from "@/lib/vlog";
 
 const FILE = "MinhasCompras.tsx";
 const POR_PAGINA = 20;
-const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+export const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 /** "AAAA-MM-DD" → "DD/MM/AAAA" (sem fuso: a data ja e do pedido). */
 export function dataCompra(iso: string): string {
@@ -26,52 +27,46 @@ export function dataCompra(iso: string): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
 }
 
-function Produto({ c }: { c: ProdutoComprado }) {
-  const img = urlImagemProduto(c.imagem_url);
-  const rotulo = `${c.produto_id} - ${c.nome}`;
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="text-lg font-bold text-slate-300" aria-hidden="true">
-            {c.nome.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </div>
-      <div>
-        {c.ativo ? (
-          <Link href={`/produtos/${c.produto_id}`} className="font-medium text-primary-700 hover:underline">
-            {rotulo}
-          </Link>
-        ) : (
-          <span className="font-medium text-slate-900">{rotulo}</span>
-        )}
-        <p className="text-xs text-slate-500">
-          SKU {c.sku}
-          {!c.ativo && " · indisponivel na loja"}
-        </p>
-      </div>
-    </div>
-  );
+/** Cor do status do pedido. */
+export function StatusPedido({ status }: { status: string }) {
+  const cor = status === "Cancelado" ? "red" : status === "Entregue" ? "green" : status === "Faturado" ? "blue" : "yellow";
+  return <Badge color={cor}>{status}</Badge>;
 }
 
-const colunas: Column<ProdutoComprado>[] = [
-  { key: "nome", header: "Produto", sortable: true, render: (c) => <Produto c={c} /> },
-  { key: "quantidade", header: "Unidades", sortable: true, align: "right" },
-  { key: "pedidos", header: "Pedidos", sortable: true, align: "right" },
-  { key: "total_gasto", header: "Total gasto", sortable: true, align: "right", render: (c) => moeda.format(Number(c.total_gasto) || 0) },
-  { key: "ultima_compra", header: "Ultima compra", sortable: true, align: "right", render: (c) => dataCompra(c.ultima_compra) },
+const urlCompra = (c: Compra) => `/minhas-compras/${c.pedido_id}`;
+
+const colunas: Column<Compra>[] = [
+  {
+    key: "pedido_id",
+    header: "Pedido",
+    sortable: true,
+    render: (c) => (
+      <Link href={urlCompra(c)} className="font-medium text-primary-700 hover:underline">
+        #{c.pedido_id}
+      </Link>
+    ),
+  },
+  { key: "data", header: "Data", sortable: true, render: (c) => dataCompra(c.data) },
+  {
+    key: "produtos",
+    header: "Produtos",
+    render: (c) => (
+      <span className="block max-w-md truncate" title={c.produtos.join(", ")}>
+        {c.produtos.join(", ") || "—"}
+      </span>
+    ),
+  },
+  { key: "status", header: "Status", render: (c) => <StatusPedido status={c.status} /> },
+  { key: "valor_total", header: "Total", sortable: true, align: "right", render: (c) => moeda.format(Number(c.valor_total) || 0) },
 ];
 
 export function MinhasCompras() {
+  const router = useRouter();
   const sessao = useSessaoLocal();
   const executar = useUltimaResposta();
   const [pagina, setPagina] = useState(1);
-  const [ordem, setOrdem] = useState<{ campo: OrdemCompra; dir: "asc" | "desc" }>({ campo: "ultima_compra", dir: "desc" });
-  const [res, setRes] = useState<Paginado<ProdutoComprado[]> | null>(null);
+  const [ordem, setOrdem] = useState<{ campo: OrdemCompra; dir: "asc" | "desc" }>({ campo: "data", dir: "desc" });
+  const [res, setRes] = useState<Paginado<Compra[]> | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const logado = sessao !== null;
 
@@ -90,7 +85,7 @@ export function MinhasCompras() {
     );
   }, [logado, pagina, ordem, executar]);
 
-  function ordenar(chave: keyof ProdutoComprado | string) {
+  function ordenar(chave: keyof Compra | string) {
     const campo = chave as OrdemCompra;
     vlog(FILE, "MinhasCompras.ordenar", "trocando ordenacao:", campo);
     setOrdem((o) => ({ campo, dir: o.campo === campo && o.dir === "desc" ? "asc" : "desc" }));
@@ -110,7 +105,7 @@ export function MinhasCompras() {
             <Link href="/login" className="font-medium text-primary-600 hover:underline">
               Entre na sua conta
             </Link>{" "}
-            para ver os produtos que voce comprou.
+            para ver as suas compras.
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -122,13 +117,14 @@ export function MinhasCompras() {
             <Table
               columns={colunas}
               data={res?.data ?? []}
-              keyExtractor={(c) => c.produto_id}
+              keyExtractor={(c) => c.pedido_id}
               loading={!res && !erro} // so a 1a carga; depois mantem as linhas
-              emptyMessage="Voce ainda nao comprou nenhum produto."
+              emptyMessage="Voce ainda nao fez nenhuma compra."
               sortKey={ordem.campo}
               sortDir={ordem.dir}
               onSort={ordenar}
               erroCarga={erro !== null}
+              onRowClick={(c) => router.push(urlCompra(c))}
             />
             <Paginador pagina={res?.page ?? 1} paginas={res?.pages ?? 1} onIrPara={setPagina} />
           </div>

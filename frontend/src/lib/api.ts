@@ -7,7 +7,8 @@ import {
   OpcoesFiltroLoja,
   ProdutoLoja,
   ProdutoLojaDetalhe,
-  ProdutoComprado,
+  Compra,
+  CompraDetalhe,
   OrdemCompra,
   LoginRequest,
   LoginResponse,
@@ -244,17 +245,24 @@ export async function apiGetProdutoLoja(id: number): Promise<ProdutoLojaDetalhe>
   return fetchWithAuth<ProdutoLojaDetalhe>(`/api/loja/produtos/${id}`, { method: "GET" });
 }
 
-// ECOM-12: GET /api/loja/minhas-compras — produtos comprados pelo usuario logado
+// ECOM-12/16: GET /api/loja/minhas-compras — pedidos do usuario logado
 // (o usuario vem do token; nada de id na query).
 export async function apiMinhasCompras(
   page = 1,
   limit = 20,
-  orderBy: OrdemCompra = "ultima_compra",
+  orderBy: OrdemCompra = "data",
   orderDir: "asc" | "desc" = "desc"
-): Promise<Paginado<ProdutoComprado[]>> {
+): Promise<Paginado<Compra[]>> {
   vlog(F, "apiMinhasCompras", "buscando compras do usuario, pagina/ordem:", page, orderBy, orderDir);
   const qs = new URLSearchParams({ page: String(page), limit: String(limit), order_by: orderBy, order_dir: orderDir });
-  return listarPaginado<ProdutoComprado[]>(`/api/loja/minhas-compras?${qs.toString()}`, page, limit);
+  return listarPaginado<Compra[]>(`/api/loja/minhas-compras?${qs.toString()}`, page, limit);
+}
+
+// ECOM-16: GET /api/loja/minhas-compras/{id} — itens e pagamento de um pedido
+// do usuario logado (de outra pessoa: 404).
+export async function apiMinhaCompra(id: number): Promise<CompraDetalhe> {
+  vlog(F, "apiMinhaCompra", "buscando detalhe da compra, id:", id);
+  return fetchWithAuth<CompraDetalhe>(`/api/loja/minhas-compras/${id}`, { method: "GET" });
 }
 
 // ECOM-14: POST /api/loja/checkout — fecha o carrinho do usuario logado
