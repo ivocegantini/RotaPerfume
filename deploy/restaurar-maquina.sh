@@ -334,7 +334,7 @@ IP ou hostname diferente de $IP_VERSIONADO / $HOST_VERSIONADO:
     Makefile                                          PRODUCAO_HOSTS_LAN (guarda)
     backend/shared/testkit/integracao/integracao.go   ProducaoHostsLAN (guarda)
   Comentarios e exemplos (sem efeito no site, atualize se quiser):
-    deploy/api.env.example deploy/db-ca.fingerprint deploy/dump-local.ps1
+    deploy/api.env.example deploy/db-ca.fingerprint
     deploy/seed-producao.sh deploy/restaurar-maquina.sh
   No Secret file e no painel: CORS_ALLOWED_ORIGINS, TURNSTILE_HOSTNAMES e os
   hostnames do Turnstile.

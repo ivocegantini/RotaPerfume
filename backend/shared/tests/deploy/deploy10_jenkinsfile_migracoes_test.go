@@ -18,15 +18,20 @@ var migracoesDEPLOY10 = []string{
 	"27_alter_usuarios_role_usuario.sql", "28_ddl_confirmacoes_email.sql",
 	"29_alter_usuarios_email_confirmacao.sql", "30_alter_clientes_loja.sql",
 	"31_alter_clientes_numero_complemento.sql", "33_alter_pedidos_canal_loja.sql",
+	"34_alter_produtos_nome_descricao.sql", "35_alter_pedidos_chave_checkout.sql",
 }
 
 func TestDEPLOY10_Jenkinsfile_MigracoesAntesDoDeploy(t *testing.T) {
 	jf := lerRaiz(t, "Jenkinsfile")
-	iDump := strings.Index(jf, "stage('Importar dump')")
+	iTestes := strings.Index(jf, "stage('Testes Frontend')")
+	iCA := strings.Index(jf, "stage('CA do banco')")
 	iMig := strings.Index(jf, "stage('Migracoes')")
 	iDeploy := strings.Index(jf, "stage('Deploy')")
 	require.GreaterOrEqual(t, iMig, 0)
-	assert.Less(t, iDump, iMig, "depois do Importar dump (dump antigo volta o schema)")
+	assert.Less(t, iTestes, iMig, "depois dos testes: build vermelho não altera o banco")
+	assert.Less(t, iCA, iMig, "depois da validação da CA")
+	// DEPLOY-15: o estágio "Importar dump" e seus parâmetros saíram.
+	assert.NotRegexp(t, `(?i)importar dump|IMPORTAR_DUMP|DUMP_PATH|zcat`, jf)
 	assert.Less(t, iMig, iDeploy, "antes de subir a API nova")
 	assert.Equal(t, 1, strings.Count(jf, "stage('Migracoes')"))
 

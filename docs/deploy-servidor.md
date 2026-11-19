@@ -1,6 +1,6 @@
 # Deploy no servidor da LAN (`ivo-inspiron-15-3530`) com Docker + Jenkins
 
-> Card **DEPLOY-01** (Lote 13, 2026-09-30); banco em Docker desde o Lote 30 (DEPLOY-06, DOC-08, 2026-11-02); instalação inicial da produção reescrita no **DEPLOY-07** (Lote 33, 2026-11-04). Arquivos envolvidos: `Jenkinsfile`, `deploy/docker-compose.yml`, `deploy/Caddyfile`, `deploy/Dockerfile.caddy`, `deploy/api.env.example`, `deploy/mariadb-docker.sh`, `deploy/backup-mariadb.sh`, `deploy/seed-producao.sh`, `deploy/validar-ca-banco.sh`, `deploy/db-ca.fingerprint`, `deploy/dump-local.ps1`, `deploy/setup-servidor.sh`, `sql/ordem-ddl.txt`, `backend/Dockerfile`, `frontend/Dockerfile`. O antigo `deploy/mariadb-setup.sql` saiu do repositório (SEC-39).
+> Card **DEPLOY-01** (Lote 13, 2026-09-30); banco em Docker desde o Lote 30 (DEPLOY-06, DOC-08, 2026-11-02); instalação inicial da produção reescrita no **DEPLOY-07** (Lote 33, 2026-11-04). Arquivos envolvidos: `Jenkinsfile`, `deploy/docker-compose.yml`, `deploy/Caddyfile`, `deploy/Dockerfile.caddy`, `deploy/api.env.example`, `deploy/mariadb-docker.sh`, `deploy/backup-mariadb.sh`, `deploy/seed-producao.sh`, `deploy/validar-ca-banco.sh`, `deploy/db-ca.fingerprint`, `deploy/setup-servidor.sh`, `sql/ordem-ddl.txt`, `backend/Dockerfile`, `frontend/Dockerfile`. O antigo `deploy/mariadb-setup.sql` saiu do repositório (SEC-39).
 >
 > **Primeira instalação da produção?** Siga a **[seção 11 (Instalação inicial da produção, DEPLOY-07)](#11-instalação-inicial-da-produção-deploy-07)** **antes** do primeiro deploy da `main`: MariaDB 11.4 novo com CA própria, seed com o admin e os 42 vendedores inativos, fingerprint da CA commitado e credenciais do Jenkins. Sem a rede `rotaperfumes-db` e o container `rotaperfumes-mariadb`, o estágio `CA do banco` para o job (e o `docker compose up` falharia).
 >
@@ -25,7 +25,7 @@ A instalação tem **duas partes**, nesta ordem:
 
 As **duas credenciais do Jenkins** continuam sendo cadastradas **à mão**: o `setup-servidor.sh` não cria, não altera e não apaga credenciais. Ele pausa, mostra as instruções e depois só **confere** (por leitura) se elas existem.
 
-**Antes:** faça commit e push dos arquivos de deploy para o `main`, gere o dump (seção 7.1), se houver dados a levar, e deixe o Jenkins com os plugins Pipeline, Git e Credentials Binding. O Jenkins pode ser **nativo** (serviço systemd `jenkins`) ou **em container** (DEPLOY-04; o da produção roda em container), com os requisitos da seção 2.
+**Antes:** faça commit e push dos arquivos de deploy para o `main` e deixe o Jenkins com os plugins Pipeline, Git e Credentials Binding. O Jenkins pode ser **nativo** (serviço systemd `jenkins`) ou **em container** (DEPLOY-04; o da produção roda em container), com os requisitos da seção 2.
 
 1. **No servidor, o banco** (uma vez; reexecutável):
    ```bash
@@ -34,33 +34,32 @@ As **duas credenciais do Jenkins** continuam sendo cadastradas **à mão**: o `s
    sudo bash deploy/mariadb-docker.sh --ca-key /media/<pendrive>/ca-key.pem
    ```
    O banco não publica porta: o DBA entra por SSH no servidor, com `sudo rotaperfumes-dba` (seção 3.4). O `--dev-ip` e o `--porta` saíram (DEPLOY-11, seção 3.3). Numa instalação nova, o seed inicial é o `deploy/seed-producao.sh` (seção 11, passo 6), nunca o `make db-seed`.
-2. **No Windows**, na raiz do projeto, copie o dump e o `.env` para o `/tmp` do servidor:
+2. **No Windows**, na raiz do projeto, copie o `.env` para o `/tmp` do servidor:
    ```powershell
-   scp deploy\dumps\rotaperfumes-AAAAMMDD-HHMMSS.sql.gz .env SEU_USUARIO@ivo-inspiron-15-3530:/tmp/
+   scp backend\.env SEU_USUARIO@ivo-inspiron-15-3530:/tmp/
    ```
 3. **No servidor**, baixe e rode o script:
    ```bash
    curl -fsSLO https://raw.githubusercontent.com/residentivo/RotaPerfume/main/deploy/setup-servidor.sh
-   sudo bash setup-servidor.sh --env /tmp/.env --dump /tmp/rotaperfumes-AAAAMMDD-HHMMSS.sql.gz \
+   sudo bash setup-servidor.sh --env /tmp/.env \
      --turnstile-site-key SUA_SITE_KEY --remove-inputs
    ```
-   Opções: `--site-host` (padrão `ivo-inspiron-15-3530`), `--site-ip` (`192.168.168.106`), `--https-port` (`8443`), `--jenkins-url` (`http://localhost:8888`), `--jenkins-container NOME` (padrão: detectado pela imagem `jenkins/*`; sem container = Jenkins nativo), `--db-container` (`rotaperfumes-mariadb`), `--db-segredos` (`/root/rotaperfumes-mariadb`), `--skip-build` e `--remove-inputs` (apaga o `.env` e o dump originais no final). As antigas `--apenas-banco` e `--skip-mysql` **saíram** (DEPLOY-06): o script recusa e aponta para o `mariadb-docker.sh`. Veja `bash setup-servidor.sh --help`.
-4. O script executa 9 etapas e mostra o andamento como `[n/9]` (numeração contínua com Jenkins nativo ou em container):
-   1. **Pré-checagens:** root via `sudo` (a partir do seu usuário), comandos (`docker`, `curl`, `openssl`, `gzip`, `install`, `getent`), `docker compose` ≥ 2.17, integridade do dump (`gzip -t`), Jenkins nativo ou em container e o **banco do `mariadb-docker.sh`**: container `rotaperfumes-mariadb` rodando, na rede `rotaperfumes-db`, e as senhas `rotaperfumes_app.senha`/`rotaperfumes_admin.senha` em `/root/rotaperfumes-mariadb`. Faltando algo, para e manda rodar o `mariadb-docker.sh`.
+   Opções: `--site-host` (padrão `ivo-inspiron-15-3530`), `--site-ip` (`192.168.168.106`), `--https-port` (`8443`), `--jenkins-url` (`http://localhost:8888`), `--jenkins-container NOME` (padrão: detectado pela imagem `jenkins/*`; sem container = Jenkins nativo), `--db-container` (`rotaperfumes-mariadb`), `--db-segredos` (`/root/rotaperfumes-mariadb`), `--skip-build` e `--remove-inputs` (apaga o `.env` original no final). A `--dump` saiu (DEPLOY-15). As antigas `--apenas-banco` e `--skip-mysql` **saíram** (DEPLOY-06): o script recusa e aponta para o `mariadb-docker.sh`. Veja `bash setup-servidor.sh --help`.
+4. O script executa 8 etapas e mostra o andamento como `[n/8]` (numeração contínua com Jenkins nativo ou em container):
+   1. **Pré-checagens:** root via `sudo` (a partir do seu usuário), comandos (`docker`, `curl`, `openssl`, `install`, `getent`), `docker compose` ≥ 2.17, Jenkins nativo ou em container e o **banco do `mariadb-docker.sh`**: container `rotaperfumes-mariadb` rodando, na rede `rotaperfumes-db`, e as senhas `rotaperfumes_app.senha`/`rotaperfumes_admin.senha` em `/root/rotaperfumes-mariadb`. Faltando algo, para e manda rodar o `mariadb-docker.sh`.
    2. **Jenkins com acesso ao Docker:** nativo, coloca o usuário `jenkins` no grupo `docker` (só reinicia o Jenkins se o grupo mudou); em container, só confere que ele alcança o Docker do host e tem o `docker compose` ≥ 2.17 (não altera o container).
    3. **Firewall (ufw):** só libera a `HTTPS_PORT` (8443) se o ufw estiver ativo; inativo, só avisa e sugere comandos (nunca ativa o ufw). O banco não passa pelo ufw: o script não publica a porta do MariaDB; a porta de uma instalação anterior é restringida na chain `DOCKER-USER` até o `--recriar` (o ufw não enxerga portas publicadas pelo Docker).
-   4. **Dump:** Jenkins nativo, instala em `/opt/rotaperfumes/dumps/rotaperfumes.sql.gz` (`root:jenkins`, 640). Em container, usa esse caminho se ele estiver num bind do Jenkins; senão copia para `/var/jenkins_home/rotaperfumes-dumps/` (dono do Jenkins, 600) e ajusta o `DUMP_PATH` do build.
-   5. **`api.env`:** gera `~/rotaperfumes-api.env` (600) a partir do seu `.env`. Define `DB_HOST=rotaperfumes-mariadb`, `DB_PORT=3306`, `DB_NAME=rotaperfumes`, `DB_USUARIO=rotaperfumes_app`, `DB_SENHA` (lida de `/root/rotaperfumes-mariadb/rotaperfumes_app.senha`, nunca impressa), um `JWT_SECRET` novo (48 bytes aleatórios em base64), `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HEADERS=true` e `COOKIE_SECURE=true` (SEC-21: sempre `true` no servidor). As demais chaves, inclusive `PASSWORD_PEPPER`, vêm do seu `.env` (o pepper precisa ser o que gerou os hashes do dump). Avisa (só o nome da chave) de valores com `$` sem aspas simples, de `TURNSTILE_SECRET_KEY` vazia e de secret de teste do Turnstile.
-   6. **Job Jenkins:** pede seu usuário e um **API token** (Jenkins → seu usuário → Security → API Token), confere os plugins e cria ou atualiza o job `rotaperfumes-deploy`.
-   7. **Pausa para as credenciais manuais.** Siga as instruções da tela:
+   4. **`api.env`:** gera `~/rotaperfumes-api.env` (600) a partir do seu `.env`. Define `DB_HOST=rotaperfumes-mariadb`, `DB_PORT=3306`, `DB_NAME=rotaperfumes`, `DB_USUARIO=rotaperfumes_app`, `DB_SENHA` (lida de `/root/rotaperfumes-mariadb/rotaperfumes_app.senha`, nunca impressa), um `JWT_SECRET` novo (48 bytes aleatórios em base64), `CORS_ALLOWED_ORIGINS`, `TRUST_PROXY_HEADERS=true` e `COOKIE_SECURE=true` (SEC-21: sempre `true` no servidor). As demais chaves, inclusive `PASSWORD_PEPPER`, vêm do seu `.env` (o pepper precisa ser o que gerou os hashes do banco). Avisa (só o nome da chave) de valores com `$` sem aspas simples, de `TURNSTILE_SECRET_KEY` vazia e de secret de teste do Turnstile.
+   5. **Job Jenkins:** pede seu usuário e um **API token** (Jenkins → seu usuário → Security → API Token), confere os plugins e cria ou atualiza o job `rotaperfumes-deploy`.
+   6. **Pausa para as credenciais manuais.** Siga as instruções da tela:
       1. No Windows: `scp SEU_USUARIO@ivo-inspiron-15-3530:rotaperfumes-api.env .`
       2. Jenkins → Gerenciar Jenkins → Credentials → System → Global credentials → **Add Credentials**. Kind **Secret file**, ID `rotaperfumes-api-env`, arquivo `rotaperfumes-api.env`.
       3. **Add Credentials** de novo. Kind **Username with password**, ID `rotaperfumes-db-admin`, usuário `rotaperfumes_admin`, senha = conteúdo de `/root/rotaperfumes-mariadb/rotaperfumes_admin.senha` (leia no servidor com `sudo cat`, sem colar em chat ou log).
       4. Apague o `rotaperfumes-api.env` do Windows.
 
       Tecle ENTER. O script confere as duas credenciais e, se estiverem cadastradas, apaga o `~/rotaperfumes-api.env` do servidor.
-   8. **Primeiro build:** dispara com `IMPORTAR_DUMP=true` (quando há `--dump`) e mostra o log ao vivo. Se o build não terminar em `SUCCESS`, o script sai com erro.
-   9. **Resumo:** URL de acesso, exporta a CA do Caddy para `~/rotaperfumes-caddy-root.crt` (instale no Windows como na seção 8), lembra do Turnstile e de apagar o dump.
+   7. **Primeiro build:** dispara o job e mostra o log ao vivo. Se o build não terminar em `SUCCESS`, o script sai com erro.
+   8. **Resumo:** URL de acesso, exporta a CA do Caddy para `~/rotaperfumes-caddy-root.crt` (instale no Windows como na seção 8) e lembra do Turnstile.
 5. **Reexecução:** os dois scripts podem ser rodados de novo. O `mariadb-docker.sh` não troca senhas (ficam nos arquivos). O `setup-servidor.sh` sempre gera um `api.env` com `JWT_SECRET` novo (derruba as sessões abertas): **atualize** a credencial no Jenkins (abra a credencial → **Update** → envie o arquivo novo). Ele só confere se as credenciais existem, não o conteúdo.
 6. **Confira o `JWT_SECRET` do Secret file (SEC-18, Lote 24):** a API **não sobe** com `JWT_SECRET` menor que 32 bytes ou igual ao placeholder do `.env.example` (log `config: JWT_SECRET é obrigatório (mínimo de 32 bytes)`), nem com `JWT_TTL` menor ou igual a zero. O `api.env` gerado pelo script já atende. Se o Secret file foi criado antes do Lote 24 ou editado à mão, confira antes do próximo deploy (para gerar: `openssl rand -base64 48`). Confira também que `COOKIE_SECURE` não está `false` e que **não** há `DB_TLS_REQUIRED=false` (SEC-42).
 
@@ -93,7 +92,7 @@ Navegador (LAN)                          Navegador (internet)
         nenhuma porta nova; 192.168.168.106:3306 só até o --recriar da migração (DEPLOY-10)
 ```
 
-- O **Jenkins** (`http://ivo-inspiron-15-3530:8888/`) clona `residentivo/RotaPerfume` (branch `main`) e roda o `Jenkinsfile`, com estes estágios: `Checkout` → `Testes Go` (vet + test dentro de `GO_TEST_IMAGE`, Debian fixada por digest, com bash e gpg; CI-02. Código por `git archive HEAD`, só o que está commitado; SEC-62) → `Testes Frontend` (TST-18: `npm ci`, `npm run lint` e `npm test` do `frontend/` dentro de `NODE_IMAGE`, fixada por digest; código por `git archive HEAD` no stdin, sem bind mount nem segredos; SEC-62) → `Build` (imagens do compose; só o `GOOGLE_CLIENT_ID` é lido do `api.env` para o bundle do frontend, DEPLOY-10) → `CA do banco` (valida a CA do banco no host contra `deploy/db-ca.fingerprint` e contra o certificado servido pela rede interna, seção 3.5) → `Importar dump` (só com `IMPORTAR_DUMP=true`) → `Migracoes` (DEPLOY-10: `sql/27` a `31` e `33`, idempotentes, com a conta admin pelo mesmo cliente do `Importar dump`) → `Deploy` (`up -d`) → `Smoke test` (`/api/health` e `/login` pelo Caddy, acessando direto `https://SITE_IP:HTTPS_PORT`, e `/api/health` no mesmo endereço com um Host qualquer, como faz o tunnel).
+- O **Jenkins** (`http://ivo-inspiron-15-3530:8888/`) clona `residentivo/RotaPerfume` (branch `main`) e roda o `Jenkinsfile`, com estes estágios: `Checkout` → `Testes Go` (vet + test dentro de `GO_TEST_IMAGE`, Debian fixada por digest, com bash e gpg; CI-02. Código por `git archive HEAD`, só o que está commitado; SEC-62) → `Testes Frontend` (TST-18: `npm ci`, `npm run lint` e `npm test` do `frontend/` dentro de `NODE_IMAGE`, fixada por digest; código por `git archive HEAD` no stdin, sem bind mount nem segredos; SEC-62) → `Build` (imagens do compose; só o `GOOGLE_CLIENT_ID` é lido do `api.env` para o bundle do frontend, DEPLOY-10) → `CA do banco` (valida a CA do banco no host contra `deploy/db-ca.fingerprint` e contra o certificado servido pela rede interna, seção 3.5) → `Migracoes` (DEPLOY-10: `sql/27` a `31`, `33`, `34` e `35`, idempotentes, com a conta admin pela rede interna; depois dos testes, então build vermelho não altera o banco) → `Deploy` (`up -d`) → `Smoke test` (`/api/health` e `/login` pelo Caddy, acessando direto `https://SITE_IP:HTTPS_PORT`, e `/api/health` no mesmo endereço com um Host qualquer, como faz o tunnel).
 - A API e o frontend **não** publicam porta no host. Só o Caddy publica a `HTTPS_PORT` (8443), que atende a LAN, `https://localhost:8443` no próprio servidor e o **Cloudflare Tunnel**. O banco não publica porta (a 3306 antiga só até o `--recriar` da migração, DEPLOY-10).
 - **Cloudflare Tunnel:** no `cloudflared` do host, aponte o hostname público para a porta 8443 do servidor (hoje `https://192.168.168.106:8443`) com **No TLS Verify** ligado (`noTLSVerify: true`), porque o certificado é da CA interna do Caddy. Hosts desconhecidos caem no site curinga do Caddy. O Caddy só aceita o header `CF-Connecting-IP` (IP real do visitante) de conexões vindas do próprio servidor (o `SITE_IP` ou o gateway docker `172.16.0.0/12`). Cadastre também o domínio do tunnel no Turnstile.
 - **HTTPS é obrigatório:** os cookies de autenticação são `Secure` (`COOKIE_SECURE=true`, o default; desde o SEC-21 a decisão não depende mais do `Host` da requisição). Por HTTP o login "funciona", mas a sessão não se mantém. (Pelo tunnel o navegador fala HTTPS com a Cloudflare, então funciona.)
@@ -107,8 +106,6 @@ Navegador (LAN)                          Navegador (internet)
 | `SITE_IP` | `192.168.168.106` | IP da LAN (o Caddy também aceita esse IP; usado no smoke test) |
 | `HTTPS_PORT` | `8443` | Porta HTTPS publicada pelo Caddy |
 | `TURNSTILE_SITE_KEY` | `0x4AAAAAAFACjc-LtM9NWlvP` | Site key **pública** do Turnstile, embutida no bundle |
-| `IMPORTAR_DUMP` | `false` | Importa o dump no MariaDB do container `rotaperfumes-mariadb`. **Sobrescreve as tabelas** |
-| `DUMP_PATH` | `/opt/rotaperfumes/dumps/rotaperfumes.sql.gz` | Caminho do dump visível para o agente Jenkins |
 
 **Constantes do `environment` (não são parâmetros):** `DB_TLS_CA_HOST_PATH=/etc/mysql/ssl/ca.pem` (SEC-40; caminho absoluto no **host**), `DB_REDE=rotaperfumes-db`, `DB_HOST_INTERNO=rotaperfumes-mariadb`, `DB_HOST_PORT=3306` (porta interna do container), `DB_CLIENTE_IP=172.30.42.20`, `GO_IMAGE`, `GO_TEST_IMAGE`, `NODE_IMAGE` e `DB_CLIENT_IMAGE` (fixadas por digest, SEC-31, seção 3.6). Os antigos parâmetros `DB_TLS_CA_HOST_PATH` e `DB_TLS_SERVER_NAME` saíram: o nome conferido no certificado é sempre `rotaperfumes-mariadb`.
 
@@ -117,7 +114,7 @@ Navegador (LAN)                          Navegador (internet)
 | ID | Tipo | Conteúdo |
 |---|---|---|
 | `rotaperfumes-api-env` | Secret file | `.env` de produção da API (modelo: `deploy/api.env.example`), com `DB_USUARIO=rotaperfumes_app` e a senha de `/root/rotaperfumes-mariadb/rotaperfumes_app.senha` |
-| `rotaperfumes-db-admin` | Username with password | `rotaperfumes_admin` + senha de `/root/rotaperfumes-mariadb/rotaperfumes_admin.senha` (usada pelo `Importar dump` e pelo `Migracoes`, DEPLOY-10) |
+| `rotaperfumes-db-admin` | Username with password | `rotaperfumes_admin` + senha de `/root/rotaperfumes-mariadb/rotaperfumes_admin.senha` (usada pelo `CA do banco` e pelo `Migracoes`, DEPLOY-10) |
 
 ---
 
@@ -184,7 +181,7 @@ No fim, imprime o fingerprint da CA (formato do `deploy/db-ca.fingerprint`), ond
 ### 3.2 Rede `rotaperfumes-db`
 
 - `docker network create --subnet 172.30.42.0/24 --gateway 172.30.42.1 --ip-range 172.30.42.128/25`, idempotente (o script aborta se a rede já existir com outra subnet; `--rede-docker` muda a faixa).
-- IPs fixos: **MariaDB `.2`**, **API `.10`** (`ipv4_address` no `docker-compose.yml`, rede declarada `external: true`), **admin/import `.20`** (cliente do estágio `Importar dump` e do teste do script). IPs dinâmicos só em `.128-.255`, para nada ocupar os fixos.
+- IPs fixos: **MariaDB `.2`**, **API `.10`** (`ipv4_address` no `docker-compose.yml`, rede declarada `external: true`), **admin/import `.20`** (clientes dos estágios `CA do banco` e `Migracoes` e do teste do script). IPs dinâmicos só em `.128-.255`, para nada ocupar os fixos.
 - A API fala com `rotaperfumes-mariadb:3306` (nome do container, que está no SAN); `DB_HOST`, `DB_PORT`, `DB_TLS_CA` e `DB_TLS_SERVER_NAME` são fixados no `environment` do compose e ganham do `api.env`.
 - **A rede e o container precisam existir antes do `docker compose up`**: sem a rede externa o compose falha (`network rotaperfumes-db declared as external, but could not be found`).
 
@@ -238,12 +235,12 @@ A cada build, o estágio **`CA do banco`**:
 1. confere que `deploy/db-ca.fingerprint` existe e imprime os fingerprints aceitos;
 2. roda `deploy/validar-ca-banco.sh` (enviado por stdin) num container descartável de `DB_CLIENT_IMAGE` (traz `bash` e `openssl`), como **uid 65532** (o da API distroless), na rede `rotaperfumes-db`, com o arquivo do host em `--mount type=bind,...,readonly` (caminho inexistente é erro, em vez de virar diretório). Se o uid 65532 não conseguir ler, a API também não conseguiria, e o job para;
 3. o script recusa qualquer bloco PEM que não seja `CERTIFICATE` (uma chave privada não pode ser montada na API), separa **cada** certificado e valida todos: parse, `-checkend 0` (vencido = falha), aviso de 30 dias e de `CA:TRUE`, subject e fingerprint no log, e **todo** certificado precisa estar em `deploy/db-ca.fingerprint` (SEC-40; um fora da lista = falha);
-4. **confere a CA contra o servidor**, antes de parar a API ou importar: `openssl s_client -starttls mysql -connect rotaperfumes-mariadb:3306 -CAfile <CA> -verify_return_error -verify_hostname rotaperfumes-mariadb`. O container de validação usa `--ip 172.30.42.20` (conta `rotaperfumes_admin`; de um IP sem conta o `mariadbd` responde com o erro 1130 antes do greeting) e exige handshake real (`Cipher is` ≠ `(NONE)`, certificado do peer presente) além do `Verify return code: 0 (ok)` (DEPLOY-08). Se a CA não validar o certificado servido hoje para esse nome, o job para e nada é alterado;
+4. **confere a CA contra o servidor**, antes das migrações: `openssl s_client -starttls mysql -connect rotaperfumes-mariadb:3306 -CAfile <CA> -verify_return_error -verify_hostname rotaperfumes-mariadb`. O container de validação usa `--ip 172.30.42.20` (conta `rotaperfumes_admin`; de um IP sem conta o `mariadbd` responde com o erro 1130 antes do greeting) e exige handshake real (`Cipher is` ≠ `(NONE)`, certificado do peer presente) além do `Verify return code: 0 (ok)` (DEPLOY-08). Se a CA não validar o certificado servido hoje para esse nome, o job para e nada é alterado;
 5. grava o sha256 do arquivo em `deploy/db-ca.sha256` (apagado no `post`).
 
 No estágio **Deploy**, o pipeline exporta `DB_CA_SHA256` e o compose o grava na label `rotaperfumes.db-ca-sha256` do serviço `api`. O `docker compose up -d` não recria o container quando só o conteúdo de um arquivo montado muda (e o bind fica preso ao inode antigo quando o arquivo é substituído); com a label, CA nova significa container novo, já com a CA atual.
 
-O estágio **`Importar dump`** roda o cliente `mariadb` de `DB_CLIENT_IMAGE` com `--network rotaperfumes-db --ip 172.30.42.20`, `-h rotaperfumes-mariadb -P 3306`, `--ssl-ca=/etc/rotaperfumes/db-ca.pem --ssl-verify-server-cert`, `--local-infile=0` e a senha por `MYSQL_PWD` (nunca no argv).
+O estágio **`Migracoes`** roda o cliente `mariadb` de `DB_CLIENT_IMAGE` com `--network rotaperfumes-db --ip 172.30.42.20`, `-h rotaperfumes-mariadb -P 3306`, `--ssl-ca=/etc/rotaperfumes/db-ca.pem --ssl-verify-server-cert`, `--local-infile=0` e a senha por `MYSQL_PWD` (nunca no argv).
 
 Na API, `DB_TLS_CA` definido liga o TLS verificado com **TLS 1.3 mínimo** (TST-12); arquivo ilegível ou sem certificado derruba a subida (`config: DB_TLS_CA inválido ...`), e CA errada, vencida ou nome fora do SAN derrubam a conexão (`x509: ...`); não há queda para texto claro. Sem `DB_TLS_CA` e com `DB_HOST` fora do loopback, a API não sobe (SEC-42, `ErrDBTLSObrigatorio`), salvo `DB_TLS_REQUIRED=false`, que **nunca** deve ir para produção. O log de subida mostra `[server] TLS do banco: ligado (ca=..., server_name=rotaperfumes-mariadb, min=TLS1.3)` e `[db] conexão MariaDB estabelecida (host=<DSN mascarado>, tls=ligado (custom))`.
 
@@ -320,7 +317,7 @@ Caminho: **Gerenciar Jenkins → Credentials → System → Global credentials (
      Com menos de 32 bytes, ou com o placeholder do exemplo, a API não sobe (SEC-18, Lote 24).
    - `COOKIE_SECURE=true` (SEC-21, Lote 24; é o default se a chave faltar). Nunca `false` no servidor: com `false` os cookies de sessão saem sem `Secure`.
    - `TURNSTILE_SECRET_KEY` = secret key **real** do Turnstile (secret de teste impede a subida, SEC-37; ver seção 4, item 5).
-   - `PASSWORD_PEPPER` = pepper das senhas (SEC-13). Use **o mesmo do `.env` que gerou os hashes do dump importado**: com outro valor, nenhuma senha Argon2id do dump funciona (hashes bcrypt antigos continuam valendo e migram no próximo login). Num banco novo, gere com `openssl rand -base64 48`. Sem ele, ou com menos de 32 bytes, a API não sobe. Depois de definido, **não troque**.
+   - `PASSWORD_PEPPER` = pepper das senhas (SEC-13). Use **o mesmo do `.env` que gerou os hashes do banco** (na produção, o do `seed-producao.sh`): com outro valor, nenhuma senha Argon2id funciona (hashes bcrypt antigos continuam valendo e migram no próximo login). Num banco novo, gere com `openssl rand -base64 48`. Sem ele, ou com menos de 32 bytes, a API não sobe. Depois de definido, **não troque**.
    - `SMTP_*` e `SECURITY_ALERT_EMAILS`, se for enviar e-mails. Se ficarem vazios, os e-mails vão só para o log.
    - Se mudar `SITE_HOST`/`HTTPS_PORT`, ajuste também o `CORS_ALLOWED_ORIGINS`.
    - Se algum valor tiver `$`, coloque-o entre aspas **simples**. Isso vale só para este Secret file; o `.env` lido pelo `Makefile` recusa `$` em qualquer valor (SEC-59, seção 3.8).
@@ -354,53 +351,13 @@ Kind **Username with password**: o usuário do GitHub e um **Personal Access Tok
 3. Salve.
 4. Antes de rodar, faça **commit e push** dos arquivos de deploy para o `main`. O Jenkins só enxerga o que está no GitHub.
 
-> Na **primeira** execução, o Jenkins ainda não conhece os parâmetros: o botão é "Construir agora" e ele roda com os valores padrão (sem Turnstile e sem importar o dump). Pode deixar rodar ou abortar. Depois dela, aparece **"Construir com parâmetros"**.
+> Na **primeira** execução, o Jenkins ainda não conhece os parâmetros: o botão é "Construir agora" e ele roda com os valores padrão (sem Turnstile). Pode deixar rodar ou abortar. Depois dela, aparece **"Construir com parâmetros"**.
 
 ---
 
-## 7. Dump de um banco MariaDB de origem e primeira carga
+## 7. Dump de um banco de origem (removido, DEPLOY-15)
 
-Use esta seção só se for preciso levar dados de **outro MariaDB** para o servidor. A instalação inicial da produção (seção 11) **não** importa dump: o banco nasce com o seed do `deploy/seed-producao.sh`, e os dados do MariaDB do CasaOS são de desenvolvimento. Importar um dump **sobrescreve** as tabelas de produção (dados reais): faça backup antes (seção 9).
-
-1. **No Windows**, na raiz do projeto:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File deploy\dump-local.ps1
-   ```
-   O script lê `DB_*` e `DB_TLS_CA` do `.env` da raiz e roda **só o `mariadb-dump`** (SEC-41; sem fallback; procura `-DumpExe`, o `PATH` e `C:\Program Files\MariaDB *\bin`, e confere que o `--version` diz MariaDB). Com `DB_TLS_CA`, usa `--ssl-ca=<caminho a partir da raiz> --ssl-verify-server-cert`; sem `DB_TLS_CA`, só aceita `DB_HOST` loopback (`localhost`, `127.x`, `::1`), sem TLS e com aviso, e **aborta** para host remoto. A senha vai por `MYSQL_PWD`. Grava `deploy\dumps\rotaperfumes-AAAAMMDD-HHMMSS.sql.gz` (a pasta é ignorada pelo git) e apaga o `.sql` intermediário.
-2. **No servidor**, prepare a pasta. O Jenkins precisa conseguir **ler** o arquivo (com o Jenkins em container, o `setup-servidor.sh` cuida disso; ver seção 0, etapa 4):
-   ```bash
-   sudo mkdir -p /opt/rotaperfumes/dumps
-   sudo chown "$USER":jenkins /opt/rotaperfumes/dumps
-   sudo chmod 750 /opt/rotaperfumes/dumps
-   ```
-3. **No Windows**, copie o dump com scp:
-   ```powershell
-   scp deploy\dumps\rotaperfumes-AAAAMMDD-HHMMSS.sql.gz SEU_USUARIO@192.168.168.106:/opt/rotaperfumes/dumps/rotaperfumes.sql.gz
-   ```
-   Depois, no servidor:
-   ```bash
-   chmod 640 /opt/rotaperfumes/dumps/rotaperfumes.sql.gz
-   ```
-4. No Jenkins, **Construir com parâmetros**:
-   - `TURNSTILE_SITE_KEY` = site key do passo 4
-   - `IMPORTAR_DUMP` = **marcado**
-   - demais parâmetros no padrão
-5. O estágio **Importar dump**:
-   - valida o gzip;
-   - para o container da API;
-   - confere que o estágio `CA do banco` validou a CA;
-   - importa com o cliente `mariadb` de `DB_CLIENT_IMAGE`, pela rede `rotaperfumes-db` com IP `172.30.42.20`, em `rotaperfumes-mariadb:3306`, com `--local-infile=0 --ssl-ca=... --ssl-verify-server-cert` e o usuário da credencial `rotaperfumes-db-admin`;
-   - roda `TRUNCATE TABLE refresh_tokens`, porque as sessões do ambiente de origem não valem no servidor.
-
-   Em seguida vêm `Deploy` e `Smoke test`.
-6. Com o build verde, **apague o dump** do servidor e da máquina local:
-   ```bash
-   rm /opt/rotaperfumes/dumps/rotaperfumes.sql.gz
-   ```
-   ```powershell
-   Remove-Item deploy\dumps\*.sql.gz
-   ```
-7. Nos próximos deploys, deixe `IMPORTAR_DUMP` **desmarcado**. Se marcar de novo, o dump **sobrescreve** os dados do servidor.
+O estágio `Importar dump` do Jenkins, os parâmetros `IMPORTAR_DUMP`/`DUMP_PATH`, a opção `--dump` do `setup-servidor.sh` e o `deploy/dump-local.ps1` saíram: só serviam para a primeira carga do banco vazio, e a produção nasce pelo `deploy/seed-producao.sh` (seção 11). Colunas e tabelas novas chegam pelas migrações do estágio `Migracoes` (`sql/NN_alter_*.sql`, idempotentes). Restaurar um backup: `docs/manual-base-de-dados.md`, seção 24.5.
 
 ---
 
@@ -423,7 +380,7 @@ O Caddy usa `tls internal`, ou seja, uma CA própria guardada no volume `caddy_d
 3. **No Windows**: clique duas vezes no `.crt` → **Instalar Certificado** → **Máquina Local** (ou Usuário Atual) → **Colocar todos os certificados no repositório a seguir** → **Autoridades de Certificação Raiz Confiáveis** → Concluir.
    - O Firefox usa um repositório próprio. Importe em Configurações → Privacidade e Segurança → Certificados → Autoridades, ou ative `security.enterprise_roots.enabled`.
 4. Feche e reabra o navegador e acesse **https://ivo-inspiron-15-3530:8443**. O cadeado deve aparecer sem aviso.
-5. Faça login com um usuário do dump.
+5. Faça login com o admin do seed (seção 11, passo 10).
 
 > A CA vive no volume `caddy_data`. **Não** rode `docker compose down -v` nem `docker volume rm rotaperfumes_caddy_data`: isso gera uma CA nova e obriga a reinstalar o certificado em todos os clientes.
 
@@ -541,7 +498,7 @@ A vitrine mostra as imagens em até 5 min (TTL do cache). Cada `--confirmar` fic
 ### Atualizar
 
 1. Faça commit e push no `main`.
-2. Em até ~2 minutos o Jenkins detecta o commit novo (`pollSCM('H/2 * * * *')` no `Jenkinsfile`) e roda o job sozinho, com os valores padrão dos parâmetros (`IMPORTAR_DUMP` desmarcado, `TURNSTILE_SITE_KEY` já preenchida). Para rodar na hora, use **Construir com parâmetros**.
+2. Em até ~2 minutos o Jenkins detecta o commit novo (`pollSCM('H/2 * * * *')` no `Jenkinsfile`) e roda o job sozinho, com os valores padrão dos parâmetros (`TURNSTILE_SITE_KEY` já preenchida). Para rodar na hora, use **Construir com parâmetros**.
 3. O pipeline testa, reconstrói as imagens, valida a CA do banco, recria os containers e roda o smoke test.
 
 O gatilho só passa a valer depois que o job roda uma vez com o `Jenkinsfile` que contém o bloco `triggers`. Confira em `rotaperfumes-deploy` → **Configurar** que "Consultar periodicamente o SCM" aparece marcado.
@@ -554,7 +511,7 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 
 1. No repositório, `git revert <commit-problemático>` e push no `main`. Evite reescrever o histórico.
 2. Rode o job de novo.
-3. Se o problema for de dados, reimporte um dump bom (seção 7) com `IMPORTAR_DUMP=true`. O banco não é versionado pelo pipeline: faça backup (acima) antes de importar.
+3. Se o problema for de dados, restaure um backup (`docs/manual-base-de-dados.md`, seção 24.5). As migrações não são revertidas pelo pipeline: use o `sql/NN_revert_*.sql` correspondente (`make db-revert-*`).
 4. Banco (imagem, certificado ou CA): `docs/Instal_SSL.md`, passo 10.
 
 ---
@@ -594,7 +551,6 @@ As imagens da aplicação são sempre `:latest`, sem tag por versão. Para volta
 | Estágio **CA do banco**: "nao e certificado", "invalido", "VENCIDO" ou "NAO valida o certificado servido" | Arquivo com chave, CA vencida, CA que não assinou o certificado em uso ou banco fora do ar | `docs/Instal_SSL.md` passos 2, 4 e 9 |
 | API: `x509: certificate signed by unknown authority` | A API ainda monta a CA antiga depois de uma troca de CA (`--nova-ca`) | Rode o job (a label do sha256 recria a API) depois do commit do fingerprint (`docs/Instal_SSL.md` passo 9.2) |
 | API: `x509: certificate is valid for ..., not rotaperfumes-mariadb` | Certificado do servidor emitido fora do script ou com SAN antigo | `sudo bash deploy/mariadb-docker.sh --novo-cert --ca-key ...` |
-| Estágio **Importar dump** falha com "Dump nao encontrado/legivel" | Arquivo fora do `DUMP_PATH` ou sem permissão para o usuário do Jenkins | Seção 7.2/7.3 (`chown`/`chmod`), ou o `DUMP_PATH` informado pelo `setup-servidor.sh` (Jenkins em container) |
 | Import ou `Migracoes` falha com `Access denied` (1045) | Credencial `rotaperfumes-db-admin` com senha diferente de `rotaperfumes_admin.senha` | Atualize a credencial (seção 5.2) |
 | Máquina de dev na 3306: `Host ... is not allowed to connect` (erro 1130) ou timeout | Esperado desde o DEPLOY-10: nenhuma conta aceita a LAN | Por SSH no servidor: `sudo rotaperfumes-dba` |
 | `rotaperfumes-dba`: `ja ha uma sessao aberta` ou `mariadb-docker.sh`: `ha uma sessao do DBA aberta` | Container `rotaperfumes-dba-cliente` em uso ou abandonado | Feche a sessão; se abandonada, `sudo rotaperfumes-dba --encerrar-sessao` |
@@ -764,7 +720,7 @@ bash deploy/seed-producao.sh --pepper-file /root/pepper-producao.txt
 
 ### Passo 7. Conferências SQL
 
-Pela rede interna, com o mesmo cliente do `seed-producao.sh` e do estágio `Importar dump` (imagem fixada = `IMAGEM_BASE`/`DB_CLIENT_IMAGE`, conta `rotaperfumes_admin` em `172.30.42.20`, senha por `MYSQL_PWD`, nunca no argv):
+Pela rede interna, com o mesmo cliente do `seed-producao.sh` e do estágio `Migracoes` (imagem fixada = `IMAGEM_BASE`/`DB_CLIENT_IMAGE`, conta `rotaperfumes_admin` em `172.30.42.20`, senha por `MYSQL_PWD`, nunca no argv):
 
 ```bash
 IMG='mariadb:11.4.13@sha256:5e73baf8179b29f115101bb102763a47a017361f3e9792daccba6646c3ab1532'   # = IMAGEM_BASE
@@ -796,7 +752,7 @@ Esperado: `tabelas` = 14 (um por `CREATE TABLE` dos arquivos de `sql/ordem-ddl.t
 - [ ] a chave da CA saiu do servidor (`test ! -e /root/rotaperfumes-ca/ca-key.pem && echo OK`);
 - [ ] Secret file `rotaperfumes-api-env` cadastrado ou atualizado (passo 5), com o **mesmo** `PASSWORD_PEPPER` do seed, `JWT_SECRET` novo, `TURNSTILE_SECRET_KEY` real, `SMTP_*`, `COOKIE_SECURE=true` e sem `DB_TLS_REQUIRED=false`; credencial `rotaperfumes-db-admin` cadastrada;
 - [ ] seed conferido (passo 7);
-- [ ] job `rotaperfumes-deploy` criado (seção 6) e o parâmetro **`IMPORTAR_DUMP` desmarcado** (padrão `false`, que é o valor usado pelo `pollSCM`). Não há dump a importar: marcado, ele **sobrescreveria** o banco de produção;
+- [ ] job `rotaperfumes-deploy` criado (seção 6);
 - [ ] `make deps-audit` rodado (`CLAUDE.md`: antes de cada deploy);
 - [ ] tudo que os testes usam está commitado (SEC-62): arquivos novos, como `sql/27_*` e os testes, no mesmo commit do `Jenkinsfile`.
 
@@ -808,7 +764,7 @@ Na máquina de dev:
 git push origin main
 ```
 
-Em até ~2 minutos o `pollSCM` dispara o job `rotaperfumes-deploy` com os valores padrão. Estágios esperados: `Checkout` → `Testes Go` → `Testes Frontend` → `Build` → `CA do banco` (lista o fingerprint aceito, cada certificado com `na lista (deploy/db-ca.fingerprint)`, `s_client: Verify return code: 0 (ok)` e `CA do banco validada: /etc/mysql/ssl/ca.pem (sha256 ...)`) → `Importar dump` (pulado: `IMPORTAR_DUMP=false`) → `Migracoes` (`Migracoes concluidas.`) → `Deploy` (a API entra na rede `rotaperfumes-db` com `172.30.42.10`) → `Smoke test` verde. Depois, no servidor:
+Em até ~2 minutos o `pollSCM` dispara o job `rotaperfumes-deploy` com os valores padrão. Estágios esperados: `Checkout` → `Testes Go` → `Testes Frontend` → `Build` → `CA do banco` (lista o fingerprint aceito, cada certificado com `na lista (deploy/db-ca.fingerprint)`, `s_client: Verify return code: 0 (ok)` e `CA do banco validada: /etc/mysql/ssl/ca.pem (sha256 ...)`) → `Migracoes` (`Migracoes concluidas.`) → `Deploy` (a API entra na rede `rotaperfumes-db` com `172.30.42.10`) → `Smoke test` verde. Depois, no servidor:
 
 ```bash
 docker logs rotaperfumes-api-1 2>&1 | grep -E 'TLS do banco|conexão MariaDB estabelecida'

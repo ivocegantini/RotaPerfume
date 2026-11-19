@@ -12,6 +12,10 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-18: DEPLOY-15 fim do "Importar dump"; migrações 34/35 no pipeline
+- Saíram o estágio `Importar dump`, os parâmetros `IMPORTAR_DUMP`/`DUMP_PATH`, a `--dump` (e a etapa) do `setup-servidor.sh` (8 etapas) e o `deploy/dump-local.ps1`; docs ajustadas (seção 7 vira nota).
+- `Migracoes` passa a aplicar `sql/34` e `35`; continua depois dos testes/CA e antes do Deploy (os testes do CI não usam banco). Testes DEPLOY-04/10/15 ajustados.
+
 ## Avulso de 2026-11-18: BUG-32 baixa do faturamento a partir do último saldo
 - Decisão do usuário: o dia novo parte do último saldo − quantidade; o saldo nunca fica negativo; sem saldo, não fatura (`catalogo.ErrEstoqueInsuficienteFaturamento`, 409, rollback do pedido).
 - `AjustarSaldoPorFaturamento`: trava o produto (mutex da baixa e do checkout), lê o último snapshot até o dia, UPDATE no mesmo dia ou INSERT do dia novo; itens baixados em ordem de produto. Substitui o upsert do BUG-21 (testes antigos reescritos); integração com 2 faturamentos simultâneos (1 baixa, 1 recusa). `make test-integration` e `lint` rc=0.
