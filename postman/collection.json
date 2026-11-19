@@ -6,6 +6,10 @@
   },
   "variable": [
     {
+      "key": "compra_id",
+      "value": "1"
+    },
+    {
       "key": "checkout_chave",
       "value": "",
       "description": "ECOM-14: UUID do checkout (gerado no pre-request; apague para uma compra nova)"
@@ -6123,7 +6127,7 @@
           "response": []
         },
         {
-          "name": "Minhas Compras (AnyRole, ECOM-12)",
+          "name": "Minhas Compras (AnyRole, ECOM-12/16)",
           "event": [
             {
               "listen": "test",
@@ -6132,10 +6136,11 @@
                 "exec": [
                   "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
                   "var d = pm.response.json().data;",
-                  "pm.test('Lista sem custo', function() {",
+                  "pm.test('Um pedido por linha com os nomes dos produtos', function() {",
                   "    pm.expect(d).to.be.an('array');",
-                  "    d.forEach(function(p) { pm.expect(p).to.not.have.property('custo_unitario'); pm.expect(p).to.have.property('produto_id'); });",
-                  "});"
+                  "    d.forEach(function(c) { pm.expect(c).to.have.property('pedido_id'); pm.expect(c).to.have.property('data'); pm.expect(c.produtos).to.be.an('array'); pm.expect(c).to.not.have.property('vendedor_id'); });",
+                  "});",
+                  "if (d && d.length) { pm.collectionVariables.set('compra_id', d[0].pedido_id); }"
                 ]
               }
             }
@@ -6144,7 +6149,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/loja/minhas-compras?page=1&limit=20&order_by=ultima_compra&order_dir=desc",
+              "raw": "{{base_url}}/api/loja/minhas-compras?page=1&limit=20&order_by=data&order_dir=desc",
               "host": [
                 "{{base_url}}"
               ],
@@ -6164,8 +6169,8 @@
                 },
                 {
                   "key": "order_by",
-                  "value": "ultima_compra",
-                  "description": "ultima_compra (padrão), nome, quantidade, pedidos, total_gasto"
+                  "value": "data",
+                  "description": "data (padrão), pedido_id, valor_total"
                 },
                 {
                   "key": "order_dir",
@@ -6173,7 +6178,47 @@
                 }
               ]
             },
-            "description": "GET /api/loja/minhas-compras — **AnyRole** (sessão obrigatória). Produtos dos pedidos **não cancelados** do cliente da loja ligado ao usuário do token (`clientes.usuario_id`), somados por produto: `produto_id`, `sku`, `nome`, `imagem_url`, `ativo`, `quantidade`, `pedidos`, `total_gasto`, `ultima_compra` (AAAA-MM-DD).\n\nO usuário vem só do token (id na query é ignorado). Login sem cliente da loja (equipe) → `data: []`.\n\n**Erros:** 401 sem sessão."
+            "description": "GET /api/loja/minhas-compras — **AnyRole** (sessão obrigatória). Um pedido por linha do cliente da loja ligado ao usuário do token (`clientes.usuario_id`), todos os status: `pedido_id`, `data` (AAAA-MM-DD), `status`, `valor_total`, `produtos` (nomes, sem repetir). A linha abre o detalhe (`/minhas-compras/{id}`).\n\nO usuário vem só do token (id na query é ignorado). Login sem cliente da loja (equipe) → `data: []`.\n\n**Erros:** 401 sem sessão."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalhe da Compra (AnyRole, ECOM-16)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 ou 404', function() { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });",
+                  "if (pm.response.code === 200) {",
+                  "    var c = pm.response.json().data;",
+                  "    pm.test('Itens e pagamentos, sem taxa', function() {",
+                  "        pm.expect(c.itens).to.be.an('array');",
+                  "        pm.expect(c.pagamentos).to.be.an('array');",
+                  "        c.pagamentos.forEach(function(p) { pm.expect(p).to.not.have.property('taxa_pct'); pm.expect(p).to.not.have.property('valor_liquido'); });",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/loja/minhas-compras/{{compra_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "loja",
+                "minhas-compras",
+                "{{compra_id}}"
+              ]
+            },
+            "description": "GET /api/loja/minhas-compras/{id} — **AnyRole**. O pedido do usuário do token: `pedido_id`, `data`, `status`, `valor_total`, `itens` (`produto_id`, `sku`, `nome`, `imagem_url`, `ativo`, `quantidade`, `preco_praticado`, `desconto_pct`, `valor_bruto`) e `pagamentos` (`forma_pagamento`, `parcelas`, `valor`, `data_vencimento`, `data_pagamento`, `status_pagamento`; sem taxa nem líquido).\n\n**Erros:** 400 id inválido; 401 sem sessão; 404 pedido inexistente **ou de outra pessoa** (mesma resposta)."
           },
           "response": []
         },

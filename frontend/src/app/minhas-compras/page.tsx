@@ -1,6 +1,6 @@
 "use client";
 
-// ECOM-12: produtos comprados pelo usuario logado.
+// ECOM-12/16: compras (pedidos) do usuario logado.
 
 import { MinhasCompras } from "@/components/loja/MinhasCompras";
 

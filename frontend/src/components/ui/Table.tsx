@@ -43,6 +43,11 @@ interface TableProps<T> {
    * registro" seria uma afirmacao falsa.
    */
   erroCarga?: boolean;
+  /**
+   * ECOM-16: linha clicavel (cursor e hover). O clique num link/botao da
+   * propria celula nao dispara (evita navegar duas vezes).
+   */
+  onRowClick?: (row: T) => void;
 }
 
 export function Table<T>({
@@ -56,6 +61,7 @@ export function Table<T>({
   onSort,
   renderExpanded,
   erroCarga = false,
+  onRowClick,
 }: TableProps<T>) {
   vlog("Table.tsx", "Table", "verificando estado de carregamento:", loading);
   if (loading) {
@@ -121,7 +127,17 @@ export function Table<T>({
               expanded !== null && expanded !== undefined && expanded !== false;
             return (
               <Fragment key={keyExtractor(row)}>
-                <tr className="hover:bg-slate-50">
+                <tr
+                  className={onRowClick ? "cursor-pointer hover:bg-slate-50" : "hover:bg-slate-50"}
+                  onClick={
+                    onRowClick
+                      ? (e) => {
+                          if ((e.target as HTMLElement).closest("a, button")) return;
+                          onRowClick(row);
+                        }
+                      : undefined
+                  }
+                >
                   {columns.map((col) => (
                     <td
                       key={String(col.key)}

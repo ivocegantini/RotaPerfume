@@ -12,6 +12,10 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-19: ECOM-16 minhas compras por pedido, com detalhe
+- `GET /api/loja/minhas-compras` passa a um pedido por linha (ID, data, status, total, nomes dos produtos sem repetir; todos os status; `order_by` data/pedido_id/valor_total). Novo `GET /api/loja/minhas-compras/{id}` (AnyRole; rotas 75): itens e pagamentos sem taxa/líquido; pedido alheio = 404. Sem mudança de schema.
+- Tela: linha clicável (e link `#ID`) abre `/minhas-compras/[id]` com produtos e pagamento; `Table` ganhou `onRowClick`. Postman, matriz e docs atualizados; `make test`, `test-integration` e `test-frontend` (1923) rc=0.
+
 ## Avulso de 2026-11-18: DEPLOY-15 fim do "Importar dump"; migrações 34/35 no pipeline
 - Saíram o estágio `Importar dump`, os parâmetros `IMPORTAR_DUMP`/`DUMP_PATH`, a `--dump` (e a etapa) do `setup-servidor.sh` (8 etapas) e o `deploy/dump-local.ps1`; docs ajustadas (seção 7 vira nota).
 - `Migracoes` passa a aplicar `sql/34` e `35`; continua depois dos testes/CA e antes do Deploy (os testes do CI não usam banco). Testes DEPLOY-04/10/15 ajustados.
