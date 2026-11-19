@@ -20,7 +20,7 @@
 #
 # Uso rapido (no servidor):
 #   curl -fsSLO https://raw.githubusercontent.com/residentivo/RotaPerfume/main/deploy/setup-servidor.sh
-#   sudo bash setup-servidor.sh --env /tmp/.env --dump /tmp/rotaperfumes-AAAAMMDD-HHMMSS.sql.gz
+#   sudo bash setup-servidor.sh --env /tmp/.env
 #
 # Re-executavel: cada etapa confere o estado antes de mudar algo.
 # Regras: nunca "set -x"; segredos nunca vao para argv, log ou tela.
@@ -36,10 +36,6 @@ readonly DB_ADMIN="rotaperfumes_admin"
 # Banco: container e rede criados pelo deploy/mariadb-docker.sh (SEC-45).
 readonly DB_REDE="rotaperfumes-db"
 readonly DB_PORTA_INTERNA="3306"
-readonly DUMP_DIR="/opt/rotaperfumes/dumps"
-readonly DUMP_DESTINO="$DUMP_DIR/rotaperfumes.sql.gz"
-# Jenkins em container sem bind de $DUMP_DIR: o dump vai para o JENKINS_HOME.
-readonly DUMP_DIR_JENKINS_CONTAINER="/var/jenkins_home/rotaperfumes-dumps"
 readonly CRED_API_ENV="rotaperfumes-api-env"
 readonly CRED_DB_ADMIN="rotaperfumes-db-admin"
 readonly COMPOSE_MINIMO="2.17.0"
@@ -47,11 +43,10 @@ readonly PLUGINS_EXIGIDOS=(workflow-job workflow-cps git credentials plain-crede
 # Chaves do api.env que o script sempre define (as do --env sao descartadas).
 readonly CHAVES_SOBRESCRITAS=(DB_HOST DB_PORT DB_NAME DB_USUARIO DB_SENHA JWT_SECRET CORS_ALLOWED_ORIGINS TRUST_PROXY_HEADERS COOKIE_SECURE)
 # Etapas (numeracao continua, igual com Jenkins nativo ou em container).
-readonly TOTAL_ETAPAS=9
+readonly TOTAL_ETAPAS=8
 
 # Opcoes (preenchidas por ler_argumentos)
 ARQ_ENV=""
-ARQ_DUMP=""
 TURNSTILE_SITE_KEY=""
 SITE_HOST="ivo-inspiron-15-3530"
 SITE_IP="192.168.168.106"
@@ -69,7 +64,6 @@ USUARIO=""
 USUARIO_HOME=""
 USUARIO_GRUPO=""
 JENKINS_MODO=""   # nativo | container
-DUMP_PATH_JOB="$DUMP_DESTINO"
 SENHA_APP=""
 API_ENV_SAIDA=""
 TMP_DIR=""
@@ -115,8 +109,6 @@ Obrigatorio:
                               DB_*, JWT_SECRET, CORS, TRUST_PROXY_HEADERS e
                               COOKIE_SECURE (sempre true) sao substituidos; o resto (SMTP, Turnstile...) e mantido.
 Opcoes:
-  --dump ARQUIVO              Dump .sql.gz a importar no primeiro build
-                              (instalado em /opt/rotaperfumes/dumps).
   --turnstile-site-key KEY    Site key PUBLICA do Cloudflare Turnstile.
   --site-host HOST            Hostname de acesso   (padrao ivo-inspiron-15-3530)
   --site-ip IP                IP do servidor na LAN (padrao 192.168.168.106)
@@ -129,14 +121,14 @@ Opcoes:
   --db-segredos DIR           Senhas do mariadb-docker.sh
                               (padrao /root/rotaperfumes-mariadb)
   --skip-build                Nao dispara o build no final.
-  --remove-inputs             Apaga o --env e o --dump originais no final.
+  --remove-inputs             Apaga o --env original no final.
   -h, --help                  Mostra esta ajuda.
 
 Fluxo:
   Servidor: sudo bash deploy/mariadb-docker.sh ...   (banco, uma vez)
-  Windows:  scp deploy/dumps/<arquivo>.sql.gz backend/.env USUARIO@ivo-inspiron-15-3530:/tmp/
+  Windows:  scp backend/.env USUARIO@ivo-inspiron-15-3530:/tmp/
   Servidor: curl -fsSLO https://raw.githubusercontent.com/residentivo/RotaPerfume/main/deploy/setup-servidor.sh
-            sudo bash setup-servidor.sh --env /tmp/.env --dump /tmp/<arquivo>.sql.gz
+            sudo bash setup-servidor.sh --env /tmp/.env
 
 O script pausa para voce cadastrar MANUALMENTE as credenciais
 "rotaperfumes-api-env" e "rotaperfumes-db-admin" na UI do Jenkins.
@@ -340,8 +332,6 @@ EOF
   xml_param_string SITE_IP 'IP do servidor na LAN (tambem aceito pelo Caddy)' "$SITE_IP"
   xml_param_string HTTPS_PORT 'Porta HTTPS publicada pelo Caddy' "$HTTPS_PORT"
   xml_param_string TURNSTILE_SITE_KEY 'Site key PUBLICA do Cloudflare Turnstile (embutida no bundle do frontend)' "$TURNSTILE_SITE_KEY"
-  xml_param_bool IMPORTAR_DUMP 'Importa o dump (.sql.gz) no MariaDB do servidor - SOBRESCREVE as tabelas' false
-  xml_param_string DUMP_PATH 'Caminho do dump no servidor (visivel para o agente Jenkins)' "$DUMP_DESTINO"
   cat <<EOF
       </parameterDefinitions>
     </hudson.model.ParametersDefinitionProperty>
@@ -380,21 +370,6 @@ eh_imagem_jenkins() {
   [[ "$1" =~ (^|/)jenkins(/[^:[:space:]]+)?(:|@|$) ]]
 }
 
-# caminho_no_container MOUNTS CAMINHO_HOST -> caminho visto dentro do
-# container, se algum bind (linhas "origem|destino") cobrir o caminho.
-caminho_no_container() {
-  local mounts=$1 alvo=$2 origem destino
-  while IFS='|' read -r origem destino; do
-    [[ -n "$origem" && -n "$destino" ]] || continue
-    origem=${origem%/}
-    if [[ "$alvo" == "$origem" || "$alvo" == "$origem/"* ]]; then
-      printf '%s%s' "${destino%/}" "${alvo#"$origem"}"
-      return 0
-    fi
-  done <<<"$mounts"
-  return 1
-}
-
 # -----------------------------------------------------------------------------
 # Argumentos
 # -----------------------------------------------------------------------------
@@ -406,7 +381,6 @@ ler_argumentos() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --env) exigir_valor "$@"; ARQ_ENV=$2; shift 2 ;;
-      --dump) exigir_valor "$@"; ARQ_DUMP=$2; shift 2 ;;
       --turnstile-site-key) exigir_valor "$@"; TURNSTILE_SITE_KEY=$2; shift 2 ;;
       --site-host) exigir_valor "$@"; SITE_HOST=$2; shift 2 ;;
       --site-ip) exigir_valor "$@"; SITE_IP=$2; shift 2 ;;
@@ -460,11 +434,11 @@ checar_root_e_usuario() {
 
 checar_comandos() {
   local cmd faltando=()
-  for cmd in docker curl openssl gzip install getent; do
+  for cmd in docker curl openssl install getent; do
     command -v "$cmd" >/dev/null 2>&1 || faltando+=("$cmd")
   done
   ((${#faltando[@]} == 0)) || falhar "Comandos ausentes: ${faltando[*]}"
-  ok "comandos: docker curl openssl gzip"
+  ok "comandos: docker curl openssl"
 }
 
 checar_compose() {
@@ -478,13 +452,6 @@ checar_compose() {
 
 checar_entradas() {
   [[ -f "$ARQ_ENV" && -r "$ARQ_ENV" ]] || falhar "--env nao encontrado/legivel: $ARQ_ENV"
-  if [[ -n "$ARQ_DUMP" ]]; then
-    [[ -f "$ARQ_DUMP" ]] || falhar "--dump nao encontrado: $ARQ_DUMP"
-    gzip -t "$ARQ_DUMP" 2>/dev/null || falhar "--dump nao e um gzip valido: $ARQ_DUMP"
-    ok "dump integro (gzip -t)"
-  else
-    info "Sem --dump: o build NAO importara dados."
-  fi
 }
 
 # DEPLOY-04: Jenkins nativo (systemd) ou em container. Resultado em
@@ -620,51 +587,6 @@ etapa_firewall() {
     "  sudo ufw allow $HTTPS_PORT/tcp" \
     "  sudo ufw allow 8888/tcp      # Jenkins, se acessado de outra maquina" \
     "  sudo ufw enable"
-}
-
-# -----------------------------------------------------------------------------
-# Dump
-# -----------------------------------------------------------------------------
-instalar_dump_nativo() {
-  install -d -m 750 -o root -g jenkins "$DUMP_DIR"
-  install -m 640 -o root -g jenkins "$ARQ_DUMP" "$DUMP_DESTINO"
-  runuser -u jenkins -- test -r "$DUMP_DESTINO" || falhar "jenkins nao consegue ler $DUMP_DESTINO."
-  DUMP_PATH_JOB=$DUMP_DESTINO
-  ok "dump em $DUMP_DESTINO (root:jenkins 640)"
-}
-
-# Container: se $DUMP_DIR estiver num bind do Jenkins, usa o caminho visto
-# por ele; senao copia para o JENKINS_HOME (docker cp) com dono do Jenkins.
-instalar_dump_container() {
-  local mounts destino uid gid
-  mounts=$(docker inspect -f '{{range .Mounts}}{{.Source}}|{{.Destination}}{{println}}{{end}}' "$JENKINS_CONTAINER")
-  uid=$(docker exec "$JENKINS_CONTAINER" id -u)
-  gid=$(docker exec "$JENKINS_CONTAINER" id -g)
-  [[ "$uid" =~ ^[0-9]+$ && "$gid" =~ ^[0-9]+$ ]] || falhar "uid/gid do Jenkins no container inesperado."
-  if destino=$(caminho_no_container "$mounts" "$DUMP_DESTINO"); then
-    install -d -m 750 -o root -g "$gid" "$DUMP_DIR"
-    install -m 640 -o root -g "$gid" "$ARQ_DUMP" "$DUMP_DESTINO"
-    info "dump em $DUMP_DESTINO (bind do Jenkins: $destino)"
-  else
-    destino="$DUMP_DIR_JENKINS_CONTAINER/rotaperfumes.sql.gz"
-    docker exec -u 0 "$JENKINS_CONTAINER" install -d -m 700 -o "$uid" -g "$gid" "$DUMP_DIR_JENKINS_CONTAINER"
-    docker cp "$ARQ_DUMP" "$JENKINS_CONTAINER:$destino" >/dev/null
-    docker exec -u 0 "$JENKINS_CONTAINER" chown "$uid:$gid" "$destino"
-    docker exec -u 0 "$JENKINS_CONTAINER" chmod 600 "$destino"
-    info "dump copiado para $JENKINS_CONTAINER:$destino (sem bind de $DUMP_DIR no container)"
-  fi
-  docker exec "$JENKINS_CONTAINER" test -r "$destino" || falhar "o Jenkins ($JENKINS_CONTAINER) nao consegue ler $destino."
-  DUMP_PATH_JOB=$destino
-  ok "DUMP_PATH do job: $DUMP_PATH_JOB"
-}
-
-etapa_dump() {
-  etapa "Dump do banco"
-  if [[ -z "$ARQ_DUMP" ]]; then
-    info "Sem --dump: nada a instalar."
-    return 0
-  fi
-  if [[ "$JENKINS_MODO" == container ]]; then instalar_dump_container; else instalar_dump_nativo; fi
 }
 
 # -----------------------------------------------------------------------------
@@ -873,11 +795,8 @@ etapa_credenciais() {
 # -----------------------------------------------------------------------------
 
 disparar_build() {
-  local importar=false local_fila
-  [[ -n "$ARQ_DUMP" ]] && importar=true
+  local local_fila
   jenkins_req POST "/job/$JOB_NOME/buildWithParameters" \
-    --data-urlencode "IMPORTAR_DUMP=$importar" \
-    --data-urlencode "DUMP_PATH=$DUMP_PATH_JOB" \
     --data-urlencode "SITE_HOST=$SITE_HOST" \
     --data-urlencode "SITE_IP=$SITE_IP" \
     --data-urlencode "HTTPS_PORT=$HTTPS_PORT" \
@@ -885,7 +804,7 @@ disparar_build() {
   [[ "$HTTP_CODE" == 201 ]] || falhar "Falha ao disparar o build (HTTP $HTTP_CODE)."
   local_fila=$(cabecalho Location "$RESP_HEADERS")
   local_fila=$(grep -o '/queue/item/[0-9]*/' <<<"$local_fila") || falhar "Location da fila ausente."
-  info "Build enfileirado (IMPORTAR_DUMP=$importar); aguardando executor..." >&2
+  info "Build enfileirado; aguardando executor..." >&2
   printf '%s' "$local_fila"
 }
 
@@ -982,12 +901,11 @@ instrucoes_ca() {
 tratar_entradas() {
   if $REMOVER_ENTRADAS; then
     apagar_seguro "$ARQ_ENV"
-    [[ -n "$ARQ_DUMP" ]] && apagar_seguro "$ARQ_DUMP"
-    ok "--env e --dump originais apagados"
+    ok "--env original apagado"
     return 0
   fi
-  aviso_destacado "Apague os arquivos de entrada (contem segredos/dados):" \
-    "  shred -u $ARQ_ENV${ARQ_DUMP:+ $ARQ_DUMP}"
+  aviso_destacado "Apague o arquivo de entrada (contem segredos):" \
+    "  shred -u $ARQ_ENV"
 }
 
 etapa_resumo() {
@@ -997,14 +915,7 @@ etapa_resumo() {
   instrucoes_ca
   info "Turnstile: cadastre o hostname '$SITE_HOST' no site do Turnstile (Cloudflare)."
   [[ -z "$TURNSTILE_SITE_KEY" ]] && aviso "Sem --turnstile-site-key: o widget nao aparece; rode o job com TURNSTILE_SITE_KEY."
-  if [[ -n "$ARQ_DUMP" ]]; then
-    if [[ "$JENKINS_MODO" == container && "$DUMP_PATH_JOB" != "$DUMP_DESTINO" ]]; then
-      info "Depois de conferir os dados, apague o dump: sudo docker exec $JENKINS_CONTAINER rm $DUMP_PATH_JOB"
-    else
-      info "Depois de conferir os dados, apague o dump: sudo rm $DUMP_DESTINO"
-    fi
-  fi
-  info "Proximos deploys: Jenkins > $JOB_NOME > Construir com parametros (IMPORTAR_DUMP desmarcado)."
+  info "Proximos deploys: push na main (pollSCM) ou Jenkins > $JOB_NOME > Construir com parametros."
   tratar_entradas
 }
 
@@ -1017,7 +928,6 @@ main() {
   etapa_prechecagens
   etapa_jenkins_docker
   etapa_firewall
-  etapa_dump
   etapa_api_env
   etapa_jenkins_job
   etapa_credenciais

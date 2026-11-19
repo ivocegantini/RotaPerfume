@@ -3,13 +3,13 @@
 // Pre-requisitos no agente (o proprio servidor):
 //   - docker + plugin "docker compose" v2;
 //     usuario do Jenkins no grupo "docker".
-//   - curl, gzip (zcat), install (coreutils), bash, openssl, git (SEC-62: o
+//   - curl, install (coreutils), bash, openssl, git (SEC-62: o
 //     codigo dos estagios de teste sai do git archive HEAD).
 //   - DEPLOY-06: banco = container MariaDB 11.4 "rotaperfumes-mariadb" criado
 //     por deploy/mariadb-docker.sh, so na rede Docker EXTERNA "rotaperfumes-db"
 //     (172.30.42.0/24; MariaDB em 172.30.42.2). A API entra nela com IP fixo
-//     172.30.42.10 (docker-compose.yml) e os clientes do pipeline (Importar
-//     dump) com 172.30.42.20 (conta rotaperfumes_admin@'172.30.42.20').
+//     172.30.42.10 (docker-compose.yml) e os clientes do pipeline (CA do
+//     banco e Migracoes) com 172.30.42.20 (conta rotaperfumes_admin@'172.30.42.20').
 //   - SEC-29/SEC-40: o certificado PUBLICO da CA do banco no HOST em
 //     /etc/mysql/ssl/ca.pem (constante DB_TLS_CA_HOST_PATH abaixo), modo 644,
 //     com o fingerprint SHA-256 listado em deploy/db-ca.fingerprint. O Jenkins
@@ -17,7 +17,7 @@
 //     pelo daemon direto do host, nunca passa pelo workspace.
 // Credenciais Jenkins:
 //   - rotaperfumes-api-env   (Secret file)              -> deploy/api.env (ver deploy/api.env.example)
-//   - rotaperfumes-db-admin  (Username with password)   -> IMPORTAR_DUMP e Migracoes (DEPLOY-10)
+//   - rotaperfumes-db-admin  (Username with password)   -> Migracoes (DEPLOY-10)
 //
 // Regras: nunca "set -x", nunca cat de segredo, nunca "-e SEGREDO=valor".
 // Todo "sh" comeca com #!/bin/bash: com shebang o Jenkins NAO aplica o
@@ -44,8 +44,6 @@ pipeline {
         string(name: 'SITE_IP', defaultValue: '192.168.168.106', description: 'IP do servidor na LAN (tambem aceito pelo Caddy)')
         string(name: 'HTTPS_PORT', defaultValue: '8443', description: 'Porta HTTPS publicada pelo Caddy')
         string(name: 'TURNSTILE_SITE_KEY', defaultValue: '0x4AAAAAAFACjc-LtM9NWlvP', description: 'Site key PUBLICA do Cloudflare Turnstile (embutida no bundle do frontend)')
-        booleanParam(name: 'IMPORTAR_DUMP', defaultValue: false, description: 'Importa o dump (.sql.gz) no MariaDB 11.4 do container rotaperfumes-mariadb (rede rotaperfumes-db) - SOBRESCREVE as tabelas')
-        string(name: 'DUMP_PATH', defaultValue: '/opt/rotaperfumes/dumps/rotaperfumes.sql.gz', description: 'Caminho do dump no servidor (visivel para o agente Jenkins)')
     }
 
     environment {
@@ -195,7 +193,7 @@ pipeline {
                 // fingerprint listado em deploy/db-ca.fingerprint, e s_client
                 // -starttls mysql pela rede rotaperfumes-db em
                 // rotaperfumes-mariadb:3306 com -verify_hostname rotaperfumes-mariadb.
-                // Roda ANTES de parar a API ou importar. O sha256 sai em
+                // Roda ANTES das Migracoes. O sha256 sai em
                 // deploy/db-ca.sha256 (label do compose, rotacao).
                 sh '''#!/bin/bash
                     set -euo pipefail
@@ -233,62 +231,10 @@ pipeline {
             }
         }
 
-        stage('Importar dump') {
-            when { expression { params.IMPORTAR_DUMP } }
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'rotaperfumes-db-admin',
-                                                  usernameVariable: 'DB_ADMIN_USER',
-                                                  passwordVariable: 'MYSQL_PWD')]) {
-                    dir('deploy') {
-                        sh '''#!/bin/bash
-                            set -euo pipefail
-                            if [ ! -r "$DUMP_PATH" ]; then
-                              echo "Dump nao encontrado/legivel: $DUMP_PATH" >&2
-                              exit 1
-                            fi
-                            gzip -t "$DUMP_PATH"
-
-                            # Para a API durante o import (o dump faz DROP/CREATE TABLE).
-                            API_ENV_FILE=/dev/null docker compose -p "$COMPOSE_PROJECT_NAME" stop api || true
-
-                            [ -r db-ca.sha256 ] || { echo "Estagio CA do banco nao validou a CA" >&2; exit 1; }
-
-                            mariadb_cli() {
-                              # DEPLOY-06: pela rede rotaperfumes-db com o IP fixo
-                              # do cliente (172.30.42.20, o da conta admin), no
-                              # nome do container (no SAN): TLS verificado.
-                              # -e MYSQL_PWD (sem valor) repassa a variavel do
-                              # ambiente, sem expor a senha na linha de comando
-                              # (o cliente mariadb le MYSQL_PWD). --local-infile=0:
-                              # o dump nao usa LOAD DATA LOCAL. A CA (publica) e a
-                              # do HOST, validada no estagio "CA do banco" e
-                              # montada read-only pelo daemon.
-                              docker run --rm -i \
-                                --network "$DB_REDE" --ip "$DB_CLIENTE_IP" \
-                                --mount "type=bind,source=$DB_TLS_CA_HOST_PATH,target=/etc/rotaperfumes/db-ca.pem,readonly" \
-                                -e MYSQL_PWD \
-                                "$DB_CLIENT_IMAGE" \
-                                mariadb --local-infile=0 -h "$DB_HOST_INTERNO" -P "$DB_HOST_PORT" -u "$DB_ADMIN_USER" \
-                                      --ssl-ca=/etc/rotaperfumes/db-ca.pem --ssl-verify-server-cert \
-                                      --default-character-set=utf8mb4 "$@"
-                            }
-
-                            echo "Importando dump em $DB_NAME..."
-                            zcat "$DUMP_PATH" | mariadb_cli "$DB_NAME"
-
-                            # Sessoes do ambiente de origem nao valem aqui.
-                            mariadb_cli "$DB_NAME" -e 'TRUNCATE TABLE refresh_tokens'
-                            echo "Import concluido."
-                        '''
-                    }
-                }
-            }
-        }
-
         stage('Migracoes') {
-            // DEPLOY-10: migracoes da loja (ECOM-01/03/05/06/09), idempotentes,
-            // antes de subir a API nova (sem elas o cadastro falha no INSERT).
-            // Depois do "Importar dump": um dump antigo volta o schema.
+            // DEPLOY-10: migracoes da loja (ECOM-01/03/05/06/09/11/14), idempotentes,
+            // antes de subir a API nova (sem elas a API nova falha nas colunas novas).
+            // Depois dos testes: build vermelho nao altera o banco da API em uso.
             steps {
                 withCredentials([usernamePassword(credentialsId: 'rotaperfumes-db-admin',
                                                   usernameVariable: 'DB_ADMIN_USER',
@@ -296,13 +242,13 @@ pipeline {
                     sh '''#!/bin/bash
                         set -euo pipefail
                         [ -r deploy/db-ca.sha256 ] || { echo "Estagio CA do banco nao validou a CA" >&2; exit 1; }
-                        MIGRACOES="27_alter_usuarios_role_usuario.sql 28_ddl_confirmacoes_email.sql 29_alter_usuarios_email_confirmacao.sql 30_alter_clientes_loja.sql 31_alter_clientes_numero_complemento.sql 33_alter_pedidos_canal_loja.sql"
+                        MIGRACOES="27_alter_usuarios_role_usuario.sql 28_ddl_confirmacoes_email.sql 29_alter_usuarios_email_confirmacao.sql 30_alter_clientes_loja.sql 31_alter_clientes_numero_complemento.sql 33_alter_pedidos_canal_loja.sql 34_alter_produtos_nome_descricao.sql 35_alter_pedidos_chave_checkout.sql"
                         for f in $MIGRACOES; do
                           [ -r "sql/$f" ] || { echo "Migracao ausente: sql/$f" >&2; exit 1; }
                         done
                         for f in $MIGRACOES; do
                           echo "Migracao sql/$f em $DB_NAME..."
-                          # Mesmo cliente do "Importar dump" (DEPLOY-06): rede
+                          # Cliente admin (DEPLOY-06): rede
                           # rotaperfumes-db, IP da conta admin, TLS verificado,
                           # senha so por MYSQL_PWD no ambiente.
                           docker run --rm -i \

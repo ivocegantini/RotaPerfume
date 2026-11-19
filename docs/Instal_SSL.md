@@ -25,7 +25,7 @@
 Quem confia na CA:
 
 - **API** (container, uid 65532): `DB_TLS_CA=/etc/rotaperfumes/db-ca.pem`, montado do host a partir de `/etc/mysql/ssl/ca.pem`; `DB_HOST=rotaperfumes-mariadb`, `DB_TLS_SERVER_NAME=rotaperfumes-mariadb` (fixados no `docker-compose.yml`).
-- **Jenkins**: estágio `CA do banco` (valida o arquivo do host contra `deploy/db-ca.fingerprint`, SEC-40, e contra o certificado servido) e `Importar dump` (cliente `mariadb --ssl-ca --ssl-verify-server-cert`).
+- **Jenkins**: estágio `CA do banco` (valida o arquivo do host contra `deploy/db-ca.fingerprint`, SEC-40, e contra o certificado servido) e `Migracoes` (cliente `mariadb --ssl-ca --ssl-verify-server-cert`).
 - **DBA**: `sudo rotaperfumes-dba`, no servidor, com `--ssl-ca` de `/etc/mysql/ssl/ca.pem` e `--ssl-verify-server-cert`. O `deploy/ca-cert.pem` é a CA de dev (CasaOS) e não confia neste servidor.
 
 ## 1. Opções do script usadas neste roteiro

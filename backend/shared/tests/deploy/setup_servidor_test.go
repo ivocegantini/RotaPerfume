@@ -9,7 +9,7 @@ package deploy_test
 //   - --apenas-banco e --skip-mysql saíram e dão erro apontando para o
 //     mariadb-docker.sh;
 //   - Jenkins nativo (systemd) ou em container (checar_jenkins);
-//   - numeração das etapas contínua [1/9]..[9/9] nos dois modos.
+//   - numeração das etapas contínua [1/8]..[8/8] nos dois modos (DEPLOY-15: sem a etapa do dump).
 // O script é carregado com "source" (o main só roda quando executado
 // diretamente) e docker/systemctl/id/... viram funções stub.
 
@@ -69,7 +69,7 @@ func TestDEPLOY06_SetupServidor_ValidarArgumentos(t *testing.T) {
 		nome, args, erro string
 	}{
 		{"minimo", "--env /tmp/x.env", ""},
-		{"todas as opcoes", "--env /tmp/x.env --dump /tmp/d.sql.gz --turnstile-site-key 0x4AAA_b-c --site-host srv.lan --site-ip 10.0.0.5 --https-port 443 --jenkins-url http://localhost:8080/ --jenkins-container jenkins --db-container rotaperfumes-mariadb --db-segredos /root/x/ --skip-build --remove-inputs", ""},
+		{"todas as opcoes", "--env /tmp/x.env --turnstile-site-key 0x4AAA_b-c --site-host srv.lan --site-ip 10.0.0.5 --https-port 443 --jenkins-url http://localhost:8080/ --jenkins-container jenkins --db-container rotaperfumes-mariadb --db-segredos /root/x/ --skip-build --remove-inputs", ""},
 		{"sem --env", "--skip-build", "Informe --env ARQUIVO"},
 		{"opcao desconhecida", "--env /tmp/x.env --sabor mysql", "Opcao desconhecida: --sabor"},
 		{"valor ausente", "--env", "A opcao --env exige um valor"},
@@ -286,68 +286,13 @@ func TestDEPLOY04_EhImagemJenkins(t *testing.T) {
 	}
 }
 
-func TestDEPLOY04_CaminhoNoContainer(t *testing.T) {
-	mounts := "/var/lib/docker/volumes/jh/_data|/var/jenkins_home\n/opt/rotaperfumes/|/opt/rotaperfumes\n/srv|/dados/\n"
-	casos := []struct{ alvo, esperado string }{
-		{"/opt/rotaperfumes/dumps/rotaperfumes.sql.gz", "/opt/rotaperfumes/dumps/rotaperfumes.sql.gz"},
-		{"/srv/a/b", "/dados/a/b"},
-		{"/srv", "/dados"},
-		{"/srvx/a", ""},
-		{"/opt/outro", ""},
-	}
-	for _, c := range casos {
-		t.Run(c.alvo, func(t *testing.T) {
-			out, err := bashSetup(t, "", `caminho_no_container "$M" '`+c.alvo+`' || echo NENHUM`, "M="+mounts)
-			require.NoError(t, err, out)
-			if c.esperado == "" {
-				assert.Equal(t, "NENHUM\n", out)
-			} else {
-				assert.Equal(t, c.esperado, out)
-			}
-		})
-	}
-}
-
-// Jenkins em container sem bind do /opt/rotaperfumes: dump vai por docker cp
-// para o JENKINS_HOME, com dono do Jenkins e 600.
-func TestDEPLOY04_InstalarDumpContainer(t *testing.T) {
-	casos := []struct {
-		nome, mounts, destino string
-		cp                    bool
-	}{
-		{"sem bind: docker cp", "/var/lib/docker/volumes/jh/_data|/var/jenkins_home", "/var/jenkins_home/rotaperfumes-dumps/rotaperfumes.sql.gz", true},
-		{"com bind do /opt/rotaperfumes", "/opt/rotaperfumes|/opt/rotaperfumes", "/opt/rotaperfumes/dumps/rotaperfumes.sql.gz", false},
-	}
-	for _, c := range casos {
-		t.Run(c.nome, func(t *testing.T) {
-			dir := t.TempDir()
-			out, err := bashSetup(t, dir, `
-reg() { printf '%s\n' "$*" >>"$FAKE/log"; }
-docker() {
-  case "$1 $2" in
-    "inspect -f") printf '%s\n' "$FAKE_MOUNTS" ;;
-    "exec jk") case "$3" in id) [[ "$4" == -u ]] && echo 1000 || echo 1000 ;; test) reg "docker $*" ;; esac ;;
-    *) reg "docker $*" ;;
-  esac
-}
-install() { reg "install $*"; }
-JENKINS_CONTAINER=jk; JENKINS_MODO=container; ARQ_DUMP=/tmp/d.sql.gz
-etapa_dump; echo "JOB=$DUMP_PATH_JOB"`, "FAKE_MOUNTS="+c.mounts)
-			require.NoError(t, err, out)
-			assert.Contains(t, out, "JOB="+c.destino+"\n")
-			log, _ := os.ReadFile(filepath.Join(dir, "log"))
-			if c.cp {
-				assert.Contains(t, string(log), "docker cp /tmp/d.sql.gz jk:"+c.destino)
-				assert.Contains(t, string(log), "docker exec -u 0 jk chmod 600 "+c.destino)
-				assert.Contains(t, string(log), "docker exec -u 0 jk chown 1000:1000 "+c.destino)
-				assert.NotContains(t, string(log), "\ninstall ")
-			} else {
-				assert.Contains(t, string(log), "install -m 640 -o root -g 1000 /tmp/d.sql.gz /opt/rotaperfumes/dumps/rotaperfumes.sql.gz")
-				assert.NotContains(t, string(log), "docker cp")
-			}
-			assert.Contains(t, string(log), "docker exec jk test -r "+c.destino)
-		})
-	}
+// DEPLOY-15: o dump saiu do setup (sem --dump, etapa nem parâmetros do job).
+func TestDEPLOY15_SetupServidor_SemDump(t *testing.T) {
+	texto := lerRaiz(t, "deploy", "setup-servidor.sh")
+	assert.NotRegexp(t, `(?i)dump`, texto)
+	out, err := exec.Command("bash", caminhoRaiz(t, "deploy", "setup-servidor.sh"), "--env", "/tmp/x.env", "--dump", "/tmp/d.sql.gz").CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "Opcao desconhecida: --dump")
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +304,7 @@ func TestDEPLOY04_EtapasDeclaradasIguaisAoTotal(t *testing.T) {
 	m := regexp.MustCompile(`(?m)^readonly TOTAL_ETAPAS=(\d+)$`).FindStringSubmatch(texto)
 	require.NotNil(t, m)
 	total, _ := strconv.Atoi(m[1])
-	assert.Equal(t, 9, total)
+	assert.Equal(t, 8, total)
 	chamadas := regexp.MustCompile(`(?m)^\s+etapa "`).FindAllString(texto, -1)
 	assert.Len(t, chamadas, total, "cada etapa_* chama etapa uma vez; o total bate com TOTAL_ETAPAS")
 }
@@ -388,10 +333,10 @@ main --env "$FAKE/origem.env" --skip-build --db-segredos "$FAKE/seg"`, "FAKE_MOD
 			require.NoError(t, err, out)
 			re := regexp.MustCompile(`(?m)^==> \[(\d+)/(\d+)\] (.*)$`)
 			achadas := re.FindAllStringSubmatch(out, -1)
-			require.Len(t, achadas, 9, out)
+			require.Len(t, achadas, 8, out)
 			for i, a := range achadas {
 				assert.Equal(t, strconv.Itoa(i+1), a[1], "numeração contínua: %v", a[0])
-				assert.Equal(t, "9", a[2])
+				assert.Equal(t, "8", a[2])
 			}
 			assert.Equal(t, "Jenkins com acesso ao Docker ("+modo+")", achadas[1][3])
 			assert.Contains(t, out, "SUB "+modo)

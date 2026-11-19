@@ -33,8 +33,8 @@
 -- (mesmo padrão da 08/13/18 a 24/26): é correção avulsa para bancos criados
 -- antes do DB-09. Num banco criado pelo 07 novo, não muda nada.
 --
--- Risco residual: o IMPORTAR_DUMP do Jenkinsfile recria as tabelas pelo DDL do
--- dump, então um dump antigo volta a coluna para anulável. Por isso o scan com
+-- Risco residual: restaurar um dump antigo (backup) recria as tabelas pelo DDL
+-- dele, então ele volta a coluna para anulável. Por isso o scan com
 -- sql.NullTime em identidademysql/historico.go fica como defesa; rode esta
 -- migração de novo depois de importar um dump assim.
 --

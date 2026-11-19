@@ -505,7 +505,7 @@ Auditoria das trocas de senha. Cada linha guarda o hash **anterior** e quem fez 
   - Essas linhas **não** devem ser apagadas, porque alimentam o bloqueio de reuso de senha. O remédio é manual, e a data real não é recuperável: `SET time_zone = '-03:00'; UPDATE senha_historico SET created_at = '1970-01-01 00:00:01' WHERE created_at IS NULL;` (sem o `SET`, numa sessão UTC, a API lê `1969-12-31 21:00:01`). Depois disso, rode a migração de novo. Com a sentinela, a tela passa a mostrar essa data em vez de `-`.
   - O `ALTER` fica dentro do bloco, depois do `SIGNAL`: no MariaDB 11.4, o `MODIFY` para `NOT NULL` não recusa os NULL, mesmo em modo estrito, e os preenche em silêncio com a hora da migração (conferido no descartável).
   - Com a coluna `NOT NULL`, um `INSERT` com `created_at` NULL explícito não dá erro: grava o valor padrão (conferido no descartável, modo estrito).
-  - Risco residual: o `IMPORTAR_DUMP` do Jenkinsfile recria as tabelas pelo DDL do dump, então um dump antigo volta a coluna para anulável. Rode a migração de novo depois de importar um dump assim.
+  - Risco residual: restaurar um dump antigo (backup) recria as tabelas pelo DDL dele e volta a coluna para anulável. Rode a migração de novo depois de uma restauração assim.
 - **ENUM corrigido (migração 13):** o DDL original tinha `ENUM('proprio','admin','primeiro_login')`, mas o código grava `usuario`/`admin`/`primeiro_acesso`/`esquecimento`. Isso causava o erro 1265 e travava a troca de senha obrigatória. O `07_ddl_senha_historico.sql` já foi corrigido; bancos antigos recebem a correção por `make db-fix-tipo-reset`. Não há script de reversão.
 
 **Migrações:** 13, 27.
@@ -1208,7 +1208,7 @@ As contas não estão no dump, então o banco precisa nascer antes da importaç�
 4. **Use o mesmo `PASSWORD_PEPPER`** no Secret file (seção 24.4). **Não** gere um novo, como faz o passo 5 da seção 11 numa instalação limpa.
 5. **Não rode o `seed-producao.sh`:** ele criaria as tabelas, e a importação falharia com o erro 1050.
 6. **Restaure o banco:** rode os passos 3, 5, 6, 7 e 8 da seção 24.5, sem o `docker compose start` e os comandos do timer, que ainda não existem aqui. O banco já está vazio, então o passo 4 não se aplica.
-7. **Suba a aplicação** pelo Jenkins, com `IMPORTAR_DUMP` desmarcado (seção 11, passo 9). É esse deploy que cria o volume `rotaperfumes_produto_imagens`; não o crie à mão, porque o backup confere as labels do compose.
+7. **Suba a aplicação** pelo Jenkins (seção 11, passo 9). É esse deploy que cria o volume `rotaperfumes_produto_imagens`; não o crie à mão, porque o backup confere as labels do compose.
 8. **Devolva as imagens:** pare a API (`API_ENV_FILE=/dev/null docker compose -p rotaperfumes stop api`), rode o passo 6a da seção 24.5, sem a cópia `PRE_IMG`, pois o volume está vazio, e religue-a (`start api`).
 9. **Reinstale a rotina:** `sudo bash deploy/backup-banco.sh --instalar`. Ela recusa enquanto o volume não existir.
 
