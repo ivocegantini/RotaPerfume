@@ -1,4 +1,4 @@
-.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-role-usuario db-revert-role-usuario db-fix-confirmacao-email db-revert-confirmacao-email db-fix-clientes-loja db-revert-clientes-loja db-fix-clientes-numero db-revert-clientes-numero db-fix-historico-created-at db-revert-historico-created-at db-fix-pedidos-canal-loja db-revert-pedidos-canal-loja db-fix-produtos-nome-descricao db-revert-produtos-nome-descricao db-fix-pedidos-chave-checkout db-revert-pedidos-chave-checkout db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test lint shellcheck \
+.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-role-usuario db-revert-role-usuario db-fix-confirmacao-email db-revert-confirmacao-email db-fix-clientes-loja db-revert-clientes-loja db-fix-clientes-numero db-revert-clientes-numero db-fix-historico-created-at db-revert-historico-created-at db-fix-pedidos-canal-loja db-revert-pedidos-canal-loja db-fix-produtos-nome-descricao db-revert-produtos-nome-descricao db-fix-pedidos-chave-checkout db-revert-pedidos-chave-checkout db-fix-pedidos-entrega db-revert-pedidos-entrega db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test lint shellcheck \
 	build build-api run-api dev-api stop-api \
 	test-api cover-api test-shared cover-shared arch-check cover-combinada gen-hash fix-hash \
 	frontend-deps \
@@ -571,6 +571,12 @@ db-fix-pedidos-chave-checkout: db-guard-producao db-check-env ## ECOM-14: pedido
 
 db-revert-pedidos-chave-checkout: db-guard-producao db-check-env ## Reverte db-fix-pedidos-chave-checkout (remove a protecao contra compra repetida)
 	$(DB_CLI) $(DB_NAME) < sql/35_revert_pedidos_chave_checkout.sql
+
+db-fix-pedidos-entrega: db-guard-producao db-check-env ## ECOM-17: pedidos.entrega_* obrigatorio (antigos recebem endereco ficticio; idempotente)
+	$(DB_CLI) $(DB_NAME) < sql/36_alter_pedidos_endereco_entrega.sql
+
+db-revert-pedidos-entrega: db-guard-producao db-check-env ## Reverte db-fix-pedidos-entrega (perde os enderecos de entrega)
+	$(DB_CLI) $(DB_NAME) < sql/36_revert_pedidos_endereco_entrega.sql
 
 # IMG-01: gera um PNG por produto (nome na diagonal) pelo mesmo caso de uso do
 # upload, no PRODUTO_IMAGENS_DIR (padrão backend/rotaperfumes-api/data/produtos-imagens).

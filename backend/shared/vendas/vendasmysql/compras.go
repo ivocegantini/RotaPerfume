@@ -105,9 +105,11 @@ func (r *Pedidos) nomesDosProdutos(ctx context.Context, compras []vendas.Compra)
 // pagamentos. Pedido de outra pessoa ou inexistente: ErrPedidoNaoEncontrado
 // (o mesmo 404, sem revelar se o id existe).
 func (r *Pedidos) CompraDoUsuario(ctx context.Context, usuarioID, pedidoID int64) (*vendas.CompraDetalhe, error) {
-	const cab = `SELECT p.pedido_id_origem, p.data_pedido, p.status, p.valor_total` + comprasFrom + ` AND p.pedido_id_origem = ? LIMIT 1`
+	const cab = `SELECT p.pedido_id_origem, p.data_pedido, p.status, p.valor_total, p.entrega_cep, p.entrega_endereco, ` +
+		`p.entrega_numero, p.entrega_complemento, p.entrega_bairro, p.entrega_cidade, p.entrega_uf` + comprasFrom + ` AND p.pedido_id_origem = ? LIMIT 1`
 	var d vendas.CompraDetalhe
-	err := r.q.QueryRowContext(ctx, cab, usuarioID, pedidoID).Scan(&d.PedidoID, &d.Data, &d.Status, &d.ValorTotal)
+	err := r.q.QueryRowContext(ctx, cab, usuarioID, pedidoID).Scan(&d.PedidoID, &d.Data, &d.Status, &d.ValorTotal,
+		&d.Entrega.CEP, &d.Entrega.Endereco, &d.Entrega.Numero, &d.Entrega.Complemento, &d.Entrega.Bairro, &d.Entrega.Cidade, &d.Entrega.UF)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, vendas.ErrPedidoNaoEncontrado
 	}

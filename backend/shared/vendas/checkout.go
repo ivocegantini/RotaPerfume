@@ -48,21 +48,24 @@ type ItemCheckout struct {
 
 // DadosCheckout é o comando do POST /api/loja/checkout.
 type DadosCheckout struct {
-	Itens []ItemCheckout
-	Forma string
-	Chave string // UUID do navegador (idempotência)
+	Itens   []ItemCheckout
+	Forma   string
+	Chave   string // UUID do navegador (idempotência)
+	Entrega DadosEntrega
 }
 
 // CheckoutValido é o comando já validado (produtos sem repetição).
 type CheckoutValido struct {
-	Itens []ItemCheckout
-	Forma FormaCheckout
-	Chave string
+	Itens   []ItemCheckout
+	Forma   FormaCheckout
+	Chave   string
+	Entrega DadosEntrega // validado (NovaEntrega aceitou)
 }
 
 var reChave = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-// Validar confere chave, forma e itens (1..50, quantidade 1..99, sem repetir).
+// Validar confere chave, forma, itens (1..50, quantidade 1..99, sem repetir)
+// e, por último, o endereço de entrega (ECOM-17: sem ele não há compra).
 func (d DadosCheckout) Validar() (CheckoutValido, error) {
 	chave := strings.ToLower(strings.TrimSpace(d.Chave))
 	if !reChave.MatchString(chave) {
@@ -92,7 +95,10 @@ func (d DadosCheckout) Validar() (CheckoutValido, error) {
 		}
 		vistos[it.ProdutoID] = true
 	}
-	return CheckoutValido{Itens: d.Itens, Forma: forma, Chave: chave}, nil
+	if _, err := NovaEntrega(d.Entrega); err != nil {
+		return CheckoutValido{}, err
+	}
+	return CheckoutValido{Itens: d.Itens, Forma: forma, Chave: chave, Entrega: d.Entrega}, nil
 }
 
 // ProdutoIDs devolve os produtos do carrinho, na ordem.
@@ -138,7 +144,7 @@ func MontarCompraLoja(c CheckoutValido, clienteID, vendedorID int64, ofertas map
 	}
 	dia := hoje.In(time.Local).Format(kernel.LayoutData)
 	ped, err := NovoPedido(DadosPedido{ClienteID: clienteID, VendedorID: vendedorID, DataPedido: dia,
-		Canal: string(CanalLoja), Status: string(StatusEmSeparacao), Itens: itens})
+		Canal: string(CanalLoja), Status: string(StatusEmSeparacao), Itens: itens, Entrega: c.Entrega})
 	if err != nil {
 		return nil, nil, err
 	}

@@ -26,7 +26,7 @@ const (
 	ecom14Produto     = `SELECT preco_tabela, sku FROM produtos WHERE id = \? AND ativo = 1 FOR UPDATE`
 	ecom14Saldo       = `SELECT saldo FROM estoque WHERE sku = \? ORDER BY data_snapshot DESC, id DESC LIMIT 1 LOCK IN SHARE MODE`
 	ecom14Reservado   = `SELECT COALESCE\(SUM\(i.quantidade\), 0\) FROM itens_pedido i JOIN pedidos p .* p.canal = 'Loja' AND p.status = 'Em separação' LOCK IN SHARE MODE`
-	ecom14InsPedido   = `INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`
+	ecom14InsPedido   = `INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total,\s+entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf\)`
 	ecom14InsItem     = `INSERT INTO itens_pedido`
 	ecom14Chavear     = `UPDATE pedidos SET chave_checkout = \? WHERE pedido_id_origem = \?`
 	ecom14InsPag      = `INSERT INTO pagamentos`
@@ -54,6 +54,7 @@ func corpoCheckout(forma string) map[string]any {
 		// preco/valor_total do cliente são ignorados (não existem no contrato).
 		"itens":       []map[string]any{{"produto_id": 7, "quantidade": 2, "preco": 0.01}, {"produto_id": 8, "quantidade": 1}},
 		"valor_total": 0.01,
+		"entrega":     entregaPayloadH(), // ECOM-17
 	}
 }
 
@@ -71,7 +72,8 @@ func esperarDetalhe(mock sqlmock.Sqlmock, id int64) {
 	now := time.Now()
 	mock.ExpectQuery(`SELECT ` + pedidoColunasRegexH + pedidoFromRegexH + ` WHERE p\.pedido_id_origem = \? LIMIT 1`).WithArgs(id).
 		WillReturnRows(sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-			AddRow(id, int64(55), int64(168), time.Date(2026, 11, 18, 0, 0, 0, 0, time.Local), "Loja", "Em separação", "250.50", now, now, "Ana", "Loja Online"))
+			AddRow(id, int64(55), int64(168), time.Date(2026, 11, 18, 0, 0, 0, 0, time.Local), "Loja", "Em separação", "250.50",
+				"01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "Ana", "Loja Online"))
 	mock.ExpectQuery(`SELECT ` + itemPedidoColunasRegexH + itemPedidoFromRegexH).WithArgs(id).
 		WillReturnRows(sqlmock.NewRows([]string{"item_id_origem", "pedido_id", "produto_id", "quantidade", "preco_praticado", "desconto_pct", "valor_bruto", "created_at", "updated_at", "sku", "nome"}).
 			AddRow(int64(1), id, int64(7), 2, "100.25", 0.0, "200.50", now, now, "SKU-7", "Perfume Oud").
@@ -90,7 +92,7 @@ func TestECOM14_Checkout_CriaPedidoComPrecosDoBanco(t *testing.T) {
 	mock.ExpectQuery(ecom14Vendedor).WithArgs("Loja Online").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(168)))
 	esperarOferta(mock, 7, "100.25", 10, 3) // 7 disponíveis, pede 2
 	esperarOferta(mock, 8, "50.00", 1, 0)   // 1 disponível, pede 1
-	mock.ExpectExec(ecom14InsPedido).WithArgs(int64(55), int64(168), sqlmock.AnyArg(), "Loja", "Em separação", "250.50").
+	mock.ExpectExec(ecom14InsPedido).WithArgs(int64(55), int64(168), sqlmock.AnyArg(), "Loja", "Em separação", "250.50", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewResult(1000, 1))
 	mock.ExpectExec(ecom14InsItem).WithArgs(int64(1000), int64(7), 2, "100.25", 0.0, "200.50").WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(ecom14InsItem).WithArgs(int64(1000), int64(8), 1, "50.00", 0.0, "50.00").WillReturnResult(sqlmock.NewResult(2, 1))
@@ -113,6 +115,8 @@ func TestECOM14_Checkout_CriaPedidoComPrecosDoBanco(t *testing.T) {
 	assert.Equal(t, "Boleto 14 dias", c["forma_pagamento"])
 	assert.Equal(t, "Em aberto", c["status_pagamento"])
 	assert.Equal(t, false, c["repetida"])
+	assert.Equal(t, map[string]any{"cep": "01310100", "endereco": "Avenida Paulista", "numero": "1000", "complemento": "",
+		"bairro": "Bela Vista", "cidade": "São Paulo", "uf": "SP"}, c["entrega"], "ECOM-17")
 	itens := como[[]any](t, c["itens"])
 	require.Len(t, itens, 2)
 	assert.Equal(t, 100.25, como[map[string]any](t, itens[0])["preco"])
@@ -210,6 +214,12 @@ func TestECOM14_Checkout_CorpoInvalidoDa400SemSQL(t *testing.T) {
 		"quantidade 100":   {"chave": ecom14Chave, "forma_pagamento": "pix", "itens": []any{item(7, 100)}},
 		"produto 0":        {"chave": ecom14Chave, "forma_pagamento": "pix", "itens": []any{item(0, 1)}},
 		"produto repetido": {"chave": ecom14Chave, "forma_pagamento": "pix", "itens": []any{item(7, 1), item(7, 2)}},
+		// ECOM-17: sem endereço completo a compra não é finalizada (400, sem SQL).
+		"sem entrega": {"chave": ecom14Chave, "forma_pagamento": "pix", "itens": []any{item(7, 1)}},
+		"sem numero": {"chave": ecom14Chave, "forma_pagamento": "pix", "itens": []any{item(7, 1)},
+			"entrega": map[string]any{"cep": "01310100", "endereco": "Av. Paulista", "bairro": "Bela Vista", "cidade": "São Paulo", "uf": "SP"}},
+		"uf invalida": {"chave": ecom14Chave, "forma_pagamento": "pix", "itens": []any{item(7, 1)},
+			"entrega": map[string]any{"cep": "01310100", "endereco": "Av. Paulista", "numero": "1", "bairro": "Bela Vista", "cidade": "São Paulo", "uf": "XX"}},
 	}
 	for nome, corpo := range casos {
 		resp := postCheckout(t, server.URL, tok, corpo)

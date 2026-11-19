@@ -53,6 +53,8 @@ const api = vi.hoisted(() => ({
   apiMe: vi.fn(),
 }));
 vi.mock("@/lib/api", () => api);
+import { ENTREGA, preencherEntrega, viaCepMock } from "../helpers/entrega";
+vi.mock("@/lib/viaCep", () => viaCepMock);
 
 import PedidosPage from "@/app/admin/pedidos/page";
 import PagamentosPage from "@/app/pagamentos/page";
@@ -73,6 +75,7 @@ const pedido = (id: number, extra: Record<string, unknown> = {}) => ({
   // um pedido ainda editavel.
   status: "Em separação",
   valor_total: 10,
+  entrega: ENTREGA,
   ...extra,
 });
 
@@ -178,6 +181,7 @@ const TELAS: Tela[] = [
       await w.findByRole("option", { name: "#100 - Cliente 100" });
       await userEvent.selectOptions(w.getByLabelText("Cliente"), "100");
       await userEvent.selectOptions(w.getByLabelText("Produto"), "50");
+      await preencherEntrega(d);
     },
     botaoCriar: "Criar pedido",
     msgCriado: "Pedido #9 criado com sucesso.",

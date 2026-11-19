@@ -60,6 +60,7 @@ type compraDetalheJSON struct {
 	Data       string                  `json:"data"`
 	Status     string                  `json:"status"`
 	ValorTotal kernel.Dinheiro         `json:"valor_total"`
+	Entrega    entregaJSON             `json:"entrega"`
 	Itens      []itemCompradoJSON      `json:"itens"`
 	Pagamentos []pagamentoCompradoJSON `json:"pagamentos"`
 }
@@ -89,6 +90,7 @@ func novoPagamentoCompradoJSON(p vendas.PagamentoComprado) pagamentoCompradoJSON
 func novoCompraDetalheJSON(d vendas.CompraDetalhe) compraDetalheJSON {
 	return compraDetalheJSON{
 		PedidoID: d.PedidoID, Data: d.Data.Format(formatoData), Status: d.Status, ValorTotal: d.ValorTotal,
+		Entrega:    novoEntregaJSON(d.Entrega),
 		Itens:      httpx.Lista(d.Itens, novoItemCompradoJSON),
 		Pagamentos: httpx.Lista(d.Pagamentos, novoPagamentoCompradoJSON),
 	}

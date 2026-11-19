@@ -22,8 +22,8 @@ const (
 	pedidoByIDRegexH    = `SELECT ` + pedidoColunasRegexH + pedidoFromRegexH + ` WHERE p\.pedido_id_origem = \? LIMIT 1`
 	itensByPedidoRegexH = `SELECT ` + itemPedidoColunasRegexH + itemPedidoFromRegexH + ` WHERE i\.pedido_id = \? ORDER BY i\.item_id_origem ASC`
 	pagamentoByIDRegexH = `SELECT ` + pagamentoColunasRegexH + pagamentoFromRegexH + ` WHERE pagamento_id = \? LIMIT 1`
-	updatePedidoRegexH  = `UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`
-	insertPedidoRegexH  = `INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`
+	updatePedidoRegexH  = `UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?,\s+entrega_cep = \?, entrega_endereco = \?, entrega_numero = \?, entrega_complemento = \?,\s+entrega_bairro = \?, entrega_cidade = \?, entrega_uf = \?\s+WHERE pedido_id_origem = \?`
+	insertPedidoRegexH  = `INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total,\s+entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf\)`
 	insertItemRegexH    = `INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`
 	updatePagamentoRegH = `UPDATE pagamentos\s+SET forma_pagamento = \?, parcelas = \?, valor = \?, taxa_pct = \?, valor_liquido = \?, data_vencimento = \?, data_pagamento = \?, status_pagamento = \?\s+WHERE pagamento_id = \?`
 	insertPagamentoRegH = `INSERT INTO pagamentos \(pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento\)`
@@ -50,7 +50,7 @@ func expectCarteiraInexistenteH(mock sqlmock.Sqlmock, vendedorID, clienteID int6
 func pedidoRowsVendedorH(idOrigem, vendedorID int64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-		AddRow(idOrigem, int64(1), vendedorID, now, "App", "Faturado", "230.0", now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), vendedorID, now, "App", "Faturado", "230.0", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 // expectPedidoAtualH registra a leitura do pedido atual (GetPedidoDetalhe:
@@ -93,7 +93,7 @@ func TestCreatePedido_Normal_ForcaVendedorDoUsuario(t *testing.T) {
 	expectEscopoCarteiraPedidoH(mock, 2, 7, 1)
 	mock.ExpectBegin()
 	mock.ExpectExec(insertPedidoRegexH).
-		WithArgs(int64(1), int64(7), sqlmock.AnyArg(), "App", "Faturado", "230.00").
+		WithArgs(int64(1), int64(7), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewResult(100, 1))
 	mock.ExpectExec(insertItemRegexH).WithArgs(int64(100), int64(10), 2, "100.00", 10.0, "180.00").
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -332,7 +332,7 @@ func TestUpdatePedido_Normal_NaoTrocaVendedor(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"status", "vendedor_id"}).AddRow("Pendente", int64(2)))
 	mock.ExpectQuery(selectItensAtuaisTxRegexH).WithArgs(int64(1)).WillReturnRows(itensAtuaisRowsVazioH())
 	mock.ExpectExec(updatePedidoRegexH).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 2))

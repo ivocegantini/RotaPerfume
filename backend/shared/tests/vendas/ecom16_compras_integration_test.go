@@ -53,7 +53,7 @@ func dadosECOM12(t *testing.T, db *sql.DB) idsECOM12 {
 	}
 	ids.prodA, ids.prodB, ids.prodC = produto("A", true), produto("B", false), produto("C", true)
 	pedido := func(dia, status, total string) int64 {
-		return inserirECOM12(t, db, `INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total) VALUES (?, ?, ?, 'Loja', ?, ?)`, ids.cliente, ids.vendedor, dia, status, total)
+		return inserirECOM12(t, db, `INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total, entrega_cep, entrega_endereco, entrega_numero, entrega_bairro, entrega_cidade, entrega_uf) VALUES (?, ?, ?, 'Loja', ?, ?, '01310100', 'Avenida Paulista', '1000', 'Bela Vista', 'São Paulo', 'SP')`, ids.cliente, ids.vendedor, dia, status, total)
 	}
 	item := func(pedidoID, produtoID int64, qtd int, bruto string) {
 		inserirECOM12(t, db, `INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto) VALUES (?, ?, ?, '10.00', 0, ?)`, pedidoID, produtoID, qtd, bruto)

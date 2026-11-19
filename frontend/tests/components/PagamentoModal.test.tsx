@@ -39,6 +39,7 @@ function pedido(id: number, nome = `Cliente ${id}`): Pedido {
     canal: "App",
     status: "Faturado",
     valor_total: 100,
+    entrega: { cep: "01310100", endereco: "Rua A", numero: "1", complemento: "", bairro: "B", cidade: "C", uf: "SP" },
     created_at: "",
     updated_at: "",
     cliente_nome: nome,

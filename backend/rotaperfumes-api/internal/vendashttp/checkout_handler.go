@@ -18,12 +18,14 @@ type checkoutReq struct {
 		ProdutoID  int64 `json:"produto_id"`
 		Quantidade int   `json:"quantidade"`
 	} `json:"itens"`
-	FormaPagamento string `json:"forma_pagamento"`
-	Chave          string `json:"chave"`
+	FormaPagamento string      `json:"forma_pagamento"`
+	Chave          string      `json:"chave"`
+	Entrega        entregaJSON `json:"entrega"` // ECOM-17: obrigatório
 }
 
 func dadosCheckout(r checkoutReq) vendas.DadosCheckout {
-	d := vendas.DadosCheckout{Forma: r.FormaPagamento, Chave: r.Chave, Itens: make([]vendas.ItemCheckout, len(r.Itens))}
+	d := vendas.DadosCheckout{Forma: r.FormaPagamento, Chave: r.Chave, Entrega: dadosEntrega(r.Entrega),
+		Itens: make([]vendas.ItemCheckout, len(r.Itens))}
 	for i, it := range r.Itens {
 		d.Itens[i] = vendas.ItemCheckout{ProdutoID: it.ProdutoID, Quantidade: it.Quantidade}
 	}
@@ -48,6 +50,7 @@ type compraJSON struct {
 	StatusPagamento string           `json:"status_pagamento"`
 	DataVencimento  string           `json:"data_vencimento"`
 	Repetida        bool             `json:"repetida"`
+	Entrega         *entregaJSON     `json:"entrega"`
 	Itens           []itemCompraJSON `json:"itens"`
 }
 
@@ -55,6 +58,10 @@ func novoCompraJSON(c vendas.CompraLoja) compraJSON {
 	p := c.Pedido
 	j := compraJSON{PedidoID: p.PedidoIDOrigem, DataPedido: p.DataPedido.Format("2006-01-02"), Status: p.Status,
 		ValorTotal: p.ValorTotal, Repetida: c.Repetida, Itens: make([]itemCompraJSON, 0, len(p.Itens))}
+	if p.Entrega.CEP != "" {
+		e := novoEntregaJSON(p.Entrega)
+		j.Entrega = &e
+	}
 	if c.Pagamento != nil {
 		j.FormaPagamento, j.StatusPagamento = c.Pagamento.FormaPagamento, c.Pagamento.StatusPagamento
 		j.DataVencimento = c.Pagamento.DataVencimento.Format("2006-01-02")

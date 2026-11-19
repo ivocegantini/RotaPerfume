@@ -1,4 +1,4 @@
-/** ECOM-13/14: botao Comprar (vitrine e produto), carrinho lateral e /checkout. */
+/** ECOM-13/14/17: botao Comprar (vitrine e produto), carrinho lateral e /checkout (endereco obrigatorio). */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProdutoLojaDetalhe } from "@/lib/types";
@@ -18,6 +18,9 @@ vi.mock("@/lib/api", () => ({
   apiOpcoesFiltroLoja: () => Promise.resolve({ categorias: [], marcas: [], notas_olfativas: [] }),
 }));
 
+const cepMock = vi.fn();
+vi.mock("@/lib/viaCep", () => ({ buscarCEP: (...a: unknown[]) => cepMock(...a) }));
+
 import LojaPage from "@/app/loja/page";
 import ProdutoPage from "@/app/produtos/[id]/page";
 import CheckoutPage from "@/app/checkout/page";
@@ -29,7 +32,16 @@ const lateral = () => within(screen.getAllByRole("complementary", { name: "Carri
 beforeEach(() => {
   localStorage.clear();
   finalizarMock.mockReset();
+  cepMock.mockReset();
+  cepMock.mockResolvedValue({ logradouro: "Avenida Paulista", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP" });
 });
+
+// ECOM-17: digita o CEP, espera a pesquisa liberar os campos e informa o numero.
+const preencherEndereco = async () => {
+  fireEvent.change(screen.getByLabelText("CEP"), { target: { value: "01310100" } });
+  await waitFor(() => expect(screen.getByLabelText("Rua")).toBeEnabled());
+  fireEvent.change(screen.getByLabelText("Numero"), { target: { value: "1000" } });
+};
 
 const umItem = () =>
   localStorage.setItem("carrinho_loja", JSON.stringify([{ id: 7, nome: "Perfume Oud", marca: "S", preco: 10, imagem_url: null, quantidade: 2 }]));
@@ -96,9 +108,12 @@ describe("CheckoutPage", () => {
     });
     render(<CheckoutPage />);
     fireEvent.click(screen.getByRole("radio", { name: "Boleto" }));
+    await preencherEndereco();
     fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
     const titulo = await screen.findByRole("heading", { name: "Pedido #1000 recebido!" });
-    const [corpo] = finalizarMock.mock.calls[0] as [{ chave: string; forma_pagamento: string; itens: unknown[] }];
+    const [corpo] = finalizarMock.mock.calls[0] as [{ chave: string; forma_pagamento: string; itens: unknown[]; entrega: unknown }];
+    expect(corpo.entrega).toEqual({ cep: "01310100", endereco: "Avenida Paulista", numero: "1000", complemento: "",
+      bairro: "Bela Vista", cidade: "São Paulo", uf: "SP" });
     expect(corpo.forma_pagamento).toBe("boleto");
     expect(corpo.itens).toEqual([{ produto_id: 7, quantidade: 2 }]); // sem preco
     expect(corpo.chave).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -112,6 +127,7 @@ describe("CheckoutPage", () => {
     logar();
     finalizarMock.mockRejectedValueOnce(new Error("um ou mais produtos não estão mais disponíveis na loja"));
     render(<CheckoutPage />);
+    await preencherEndereco();
     fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("não estão mais disponíveis");
     expect(obterItens()).toHaveLength(1);
@@ -120,6 +136,42 @@ describe("CheckoutPage", () => {
     await waitFor(() => expect(finalizarMock).toHaveBeenCalledTimes(2));
     const chaves = finalizarMock.mock.calls.map((c) => (c[0] as { chave: string }).chave);
     expect(chaves[0]).toBe(chaves[1]);
+  });
+
+  it("ECOM-17: sem endereco nao finaliza; campos so liberam depois da pesquisa do CEP", async () => {
+    umItem();
+    logar();
+    render(<CheckoutPage />);
+    expect(screen.getByLabelText("Cidade")).toBeDisabled();
+    expect(screen.getByLabelText("Estado")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
+    expect(screen.getAllByRole("alert").map((a) => a.textContent).join(" ")).toMatch(/Preencha o endereco de entrega/);
+    expect(finalizarMock).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("CEP"), { target: { value: "01310100" } });
+    await waitFor(() => expect(screen.getByLabelText("Cidade")).toHaveValue("São Paulo"));
+    expect(cepMock).toHaveBeenCalledWith("01310100");
+    expect(screen.getByLabelText("CEP")).toHaveValue("01310-100");
+    expect(screen.getByLabelText("Estado")).toHaveValue("SP");
+    expect(screen.getByLabelText("Bairro")).toHaveValue("Bela Vista");
+    // cidade e estado continuam abertos (editaveis)
+    fireEvent.change(screen.getByLabelText("Cidade"), { target: { value: "Osasco" } });
+    expect(screen.getByLabelText("Cidade")).toHaveValue("Osasco");
+    // sem numero ainda: continua bloqueado
+    fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
+    expect(screen.getByText(/Numero e obrigatorio/)).toBeInTheDocument();
+    expect(finalizarMock).not.toHaveBeenCalled();
+  });
+
+  it("ECOM-17: CEP nao encontrado libera os campos vazios para digitar", async () => {
+    umItem();
+    logar();
+    cepMock.mockResolvedValue(null);
+    render(<CheckoutPage />);
+    fireEvent.change(screen.getByLabelText("CEP"), { target: { value: "99999-999" } });
+    await waitFor(() => expect(screen.getByLabelText("Cidade")).toBeEnabled());
+    expect(screen.getByText(/CEP nao encontrado/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Cidade")).toHaveValue("");
   });
 
   it("novaChave gera UUID v4 tambem sem randomUUID (HTTP fora do localhost)", () => {

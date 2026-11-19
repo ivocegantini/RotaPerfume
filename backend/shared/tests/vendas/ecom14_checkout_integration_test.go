@@ -83,7 +83,7 @@ func TestIntegracaoECOM14_Checkout(t *testing.T) {
 		return vendasapp.TxPedido{Pedidos: vendasmysql.NovoPedidos(q), Pagamentos: vendasmysql.NovoPagamentos(q), Loja: vendasmysql.NovaLoja(q)}
 	})
 	finalizar := func(usuarioID int64, chave string, itens ...vendas.ItemCheckout) (*vendas.CompraLoja, error) {
-		v, err := vendas.DadosCheckout{Chave: chave, Forma: "boleto", Itens: itens}.Validar()
+		v, err := vendas.DadosCheckout{Chave: chave, Forma: "boleto", Itens: itens, Entrega: entregaTeste}.Validar()
 		require.NoError(t, err)
 		var res *vendas.CompraLoja
 		err = tx.WithTx(ctx, func(r vendasapp.TxPedido) error {
@@ -101,6 +101,10 @@ func TestIntegracaoECOM14_Checkout(t *testing.T) {
 	id := res.Pedido.PedidoIDOrigem
 	var canal, status, total, chaveGravada, forma, statusPag, valorPag string
 	require.NoError(t, conn.QueryRow(`SELECT canal, status, valor_total, chave_checkout FROM pedidos WHERE pedido_id_origem = ?`, id).Scan(&canal, &status, &total, &chaveGravada))
+	var cep, uf string // ECOM-17: o endereço de entrega foi gravado
+	require.NoError(t, conn.QueryRow(`SELECT entrega_cep, entrega_uf FROM pedidos WHERE pedido_id_origem = ?`, id).Scan(&cep, &uf))
+	assert.Equal(t, "01310100", cep)
+	assert.Equal(t, "SP", uf)
 	assert.Equal(t, []string{"Loja", "Em separação", "300.85", chave}, []string{canal, status, total, chaveGravada})
 	var nItens int
 	require.NoError(t, conn.QueryRow(`SELECT COUNT(*) FROM itens_pedido WHERE pedido_id = ?`, id).Scan(&nItens))
@@ -150,7 +154,7 @@ func TestIntegracaoECOM14_Checkout(t *testing.T) {
 		go func(i int, u int64) {
 			defer wg.Done()
 			ch := fmt.Sprintf("%08x-0000-4000-8000-%012x", (n+10+int64(i))%0xffffffff, (n+10+int64(i))%0xffffffffffff)
-			v, err := vendas.DadosCheckout{Chave: ch, Forma: "pix", Itens: []vendas.ItemCheckout{{ProdutoID: prodC, Quantidade: 1}}}.Validar()
+			v, err := vendas.DadosCheckout{Chave: ch, Forma: "pix", Itens: []vendas.ItemCheckout{{ProdutoID: prodC, Quantidade: 1}}, Entrega: entregaTeste}.Validar()
 			if err != nil {
 				erros[i] = err
 				return

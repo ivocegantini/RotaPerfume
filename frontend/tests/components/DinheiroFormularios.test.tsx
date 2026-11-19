@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
   apiDesvincularCliente: vi.fn(),
 }));
 vi.mock("@/lib/api", () => api);
+import { ENTREGA } from "../helpers/entrega";
 
 import { PagamentoModal } from "@/components/PagamentoModal";
 import { OportunidadeModal } from "@/components/admin/OportunidadeModal";
@@ -70,7 +71,7 @@ const oportunidade: Oportunidade = {
 };
 const pedido = {
   pedido_id_origem: 5, cliente_id: 701, cliente_nome: "Cliente 701", vendedor_id: 7,
-  data_pedido: "2026-09-01T00:00:00Z", canal: "App", status: "Em separação", valor_total: 20,
+  data_pedido: "2026-09-01T00:00:00Z", canal: "App", status: "Em separação", valor_total: 20, entrega: ENTREGA,
   itens: [{ item_id_origem: 1, produto_id: 50, quantidade: 2, preco_praticado: 10, desconto_pct: 0 }],
 } as unknown as PedidoDetalhe;
 

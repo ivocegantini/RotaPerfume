@@ -19,6 +19,7 @@ var migracoesDEPLOY10 = []string{
 	"29_alter_usuarios_email_confirmacao.sql", "30_alter_clientes_loja.sql",
 	"31_alter_clientes_numero_complemento.sql", "33_alter_pedidos_canal_loja.sql",
 	"34_alter_produtos_nome_descricao.sql", "35_alter_pedidos_chave_checkout.sql",
+	"36_alter_pedidos_endereco_entrega.sql",
 }
 
 func TestDEPLOY10_Jenkinsfile_MigracoesAntesDoDeploy(t *testing.T) {

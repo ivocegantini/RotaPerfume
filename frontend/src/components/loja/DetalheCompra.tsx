@@ -10,6 +10,7 @@ import { TopoLoja, useSessaoLocal } from "@/components/loja/TopoLoja";
 import { StatusPedido, dataCompra, moeda } from "@/components/loja/MinhasCompras";
 import { apiMinhaCompra } from "@/lib/api";
 import { ApiError } from "@/lib/apiError";
+import { formatarEntrega } from "@/lib/entrega";
 import { urlImagemProduto } from "@/lib/imagemProduto";
 import type { CompraDetalhe, ItemComprado, PagamentoComprado } from "@/lib/types";
 import { vlog } from "@/lib/vlog";
@@ -111,6 +112,12 @@ function Detalhe({ c }: { c: CompraDetalhe }) {
           Total {real(c.valor_total)}
         </p>
       </section>
+      {c.entrega && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="mb-1 text-lg font-semibold text-slate-900">Endereco de entrega</h2>
+          <p className="text-sm text-slate-700">{formatarEntrega(c.entrega)}</p>
+        </section>
+      )}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Pagamento</h2>
         {c.pagamentos.length === 0 ? (

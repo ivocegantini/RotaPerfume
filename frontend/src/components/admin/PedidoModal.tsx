@@ -23,6 +23,10 @@ import {
 import { refreshSessionUser, useSessionUser } from "@/lib/session";
 import { vlog } from "@/lib/vlog";
 import { validarDinheiro } from "@/lib/dinheiro";
+import { FormEnderecoEntrega } from "@/components/loja/FormEnderecoEntrega";
+import { mascararCEP } from "@/lib/clienteLoja";
+import { entregaVazia, normalizarEntrega, validarEntrega, type ErrosEntrega } from "@/lib/entrega";
+import type { EnderecoEntrega } from "@/lib/types";
 
 const F = "PedidoModal.tsx";
 
@@ -175,6 +179,10 @@ export function PedidoModal({
   const [status, setStatus] = useState("Em separação");
   vlog(F, "PedidoModal", "criando estado itens");
   const [itens, setItens] = useState<ItemFormRow[]>([emptyItemRow()]);
+  // ECOM-17: endereco de entrega obrigatorio (criacao e edicao).
+  const [entrega, setEntrega] = useState<EnderecoEntrega>(entregaVazia);
+  const [errosEntrega, setErrosEntrega] = useState<ErrosEntrega>({});
+  const [versaoEntrega, setVersaoEntrega] = useState(0);
   vlog(F, "PedidoModal", "criando estado submitting");
   const [submitting, setSubmitting] = useState(false);
   vlog(F, "PedidoModal", "criando estado error");
@@ -257,6 +265,13 @@ export function PedidoModal({
     vlog(F, "PedidoModal.reset", "calculando vendedor travado, id:", ownId);
     const lockedVendedor = !admin ? (ownId ? String(ownId) : "") : null;
     vlog(F, "PedidoModal.reset", "verificando se é edição com pedido, id:", pedido?.pedido_id_origem);
+    setErrosEntrega({});
+    setVersaoEntrega((v) => v + 1);
+    if (mode === "edit" && pedido?.entrega) {
+      setEntrega({ ...pedido.entrega, cep: mascararCEP(pedido.entrega.cep) });
+    } else {
+      setEntrega(entregaVazia());
+    }
     if (mode === "edit" && pedido) {
       vlog(F, "PedidoModal.reset", "preenchendo cliente, id:", pedido.cliente_id);
       setClienteId(String(pedido.cliente_id));
@@ -650,6 +665,13 @@ export function PedidoModal({
       });
     }
     vlog(F, "PedidoModal.handleSubmit", "itens validados, qtd:", itensPayload.length);
+    const errsEntrega = validarEntrega(entrega);
+    setErrosEntrega(errsEntrega);
+    if (Object.keys(errsEntrega).length > 0) {
+      vlog(F, "PedidoModal.handleSubmit", "endereco de entrega incompleto, campos:", Object.keys(errsEntrega).length);
+      setError("Endereco de entrega e obrigatorio: preencha CEP, rua, numero, bairro, cidade e estado.");
+      return;
+    }
 
     vlog(F, "PedidoModal.handleSubmit", "marcando envio em andamento");
     setSubmitting(true);
@@ -662,6 +684,7 @@ export function PedidoModal({
         canal,
         status,
         itens: itensPayload,
+        entrega: normalizarEntrega(entrega),
       });
     } catch (err) {
       vlog(F, "PedidoModal.handleSubmit", "falha ao salvar pedido: montando mensagem de erro");
@@ -751,6 +774,16 @@ export function PedidoModal({
                 : undefined
             }
             required
+          />
+        </div>
+
+        <div className="rounded-md border border-slate-200 p-3">
+          <FormEnderecoEntrega
+            key={versaoEntrega}
+            valor={entrega}
+            onChange={setEntrega}
+            erros={errosEntrega}
+            pesquisadoInicial={mode === "edit" && !!pedido?.entrega}
           />
         </div>
 

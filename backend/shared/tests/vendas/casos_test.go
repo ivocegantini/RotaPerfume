@@ -96,8 +96,9 @@ func TestVendasapp_EscopoZeroValue_FalhaFechado(t *testing.T) {
 
 	mock.ExpectQuery(`FROM pedidos p .+ WHERE p\.pedido_id_origem = \? LIMIT 1`).WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido", "canal", "status",
-			"valor_total", "created_at", "updated_at", "c", "v"}).
-			AddRow(int64(1), int64(1), int64(2), time.Now(), "App", "Faturado", "1.0", time.Now(), time.Now(), "C", "V"))
+			"valor_total", "entrega_cep", "entrega_endereco", "entrega_numero", "entrega_complemento", "entrega_bairro",
+		"entrega_cidade", "entrega_uf", "created_at", "updated_at", "c", "v"}).
+			AddRow(linhaComEntrega(int64(1), int64(1), int64(2), time.Now(), "App", "Faturado", "1.0", time.Now(), time.Now(), "C", "V")...))
 	mock.ExpectQuery(`FROM itens_pedido i`).WithArgs(int64(1)).WillReturnRows(sqlmock.NewRows(nil))
 	_, err = c.ObterPedido(ctx, admin(t), 1)
 	assert.ErrorIs(t, err, vendas.ErrPedidoNaoEncontrado)

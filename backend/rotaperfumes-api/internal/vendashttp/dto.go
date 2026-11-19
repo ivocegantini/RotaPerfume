@@ -33,6 +33,7 @@ type pedidoJSON struct {
 	Canal          string          `json:"canal"`
 	Status         string          `json:"status"`
 	ValorTotal     kernel.Dinheiro `json:"valor_total"`
+	Entrega        entregaJSON     `json:"entrega"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 	ClienteNome    string          `json:"cliente_nome"`
@@ -41,7 +42,7 @@ type pedidoJSON struct {
 
 func novoPedidoJSON(p vendas.Pedido) pedidoJSON {
 	return pedidoJSON{PedidoIDOrigem: p.PedidoIDOrigem, ClienteID: p.ClienteID, VendedorID: p.VendedorID,
-		DataPedido: p.DataPedido, Canal: p.Canal, Status: p.Status, ValorTotal: p.ValorTotal,
+		DataPedido: p.DataPedido, Canal: p.Canal, Status: p.Status, ValorTotal: p.ValorTotal, Entrega: novoEntregaJSON(p.Entrega),
 		CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt, ClienteNome: p.ClienteNome, VendedorNome: p.VendedorNome}
 }
 
@@ -110,6 +111,7 @@ type pedidoRequest struct {
 	Canal      string              `json:"canal"`
 	Status     string              `json:"status"`
 	Itens      []itemPedidoRequest `json:"itens"`
+	Entrega    entregaJSON         `json:"entrega"` // ECOM-17: obrigatório
 }
 
 func dadosPedido(q pedidoRequest) vendas.DadosPedido {
@@ -118,7 +120,7 @@ func dadosPedido(q pedidoRequest) vendas.DadosPedido {
 		itens = append(itens, vendas.DadosItem(it))
 	}
 	return vendas.DadosPedido{ClienteID: q.ClienteID, VendedorID: q.VendedorID, DataPedido: q.DataPedido,
-		Canal: q.Canal, Status: q.Status, Itens: itens}
+		Canal: q.Canal, Status: q.Status, Itens: itens, Entrega: dadosEntrega(q.Entrega)}
 }
 
 // pagamentoRequest é o body do PUT /api/pagamentos/{id}: SEM pedido_id (um

@@ -26,7 +26,8 @@ func postJSONArq09(t *testing.T, url, token, body string) (int, string) {
 }
 
 const pedidoArq09 = `{"cliente_id":1,"vendedor_id":2,"data_pedido":"2024-01-15","canal":"App","status":"Em separação",
-	"itens":[{"produto_id":10,"quantidade":3,"preco_praticado":%s,"desconto_pct":10}]}`
+	"itens":[{"produto_id":10,"quantidade":3,"preco_praticado":%s,"desconto_pct":10}],
+	"entrega":{"cep":"01310100","endereco":"Avenida Paulista","numero":"1000","bairro":"Bela Vista","cidade":"São Paulo","uf":"SP"}}`
 
 // 3 × 33.33 com 10% = 89.991: grava "89.99" (texto exato) e responde 89.99.
 func TestARQ09_HTTP_CriarPedido_CentavosExatos(t *testing.T) {
@@ -36,7 +37,7 @@ func TestARQ09_HTTP_CriarPedido_CentavosExatos(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`INSERT INTO pedidos`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Em separação", "89.99").
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Em separação", "89.99", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewResult(100, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido`).
 		WithArgs(int64(100), int64(10), 3, "33.33", 10.0, "89.99").
@@ -46,7 +47,7 @@ func TestARQ09_HTTP_CriarPedido_CentavosExatos(t *testing.T) {
 	mock.ExpectQuery(`SELECT ` + pedidoColunasRegexH + pedidoFromRegexH + ` WHERE p\.pedido_id_origem = \? LIMIT 1`).
 		WithArgs(int64(100)).
 		WillReturnRows(sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-			AddRow(int64(100), int64(1), int64(2), now, "App", "Em separação", []byte("89.99"), now, now, "C", "V"))
+			AddRow(int64(100), int64(1), int64(2), now, "App", "Em separação", []byte("89.99"), "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "C", "V"))
 	mock.ExpectQuery(`SELECT ` + itemPedidoColunasRegexH + itemPedidoFromRegexH + ` WHERE i\.pedido_id = \? ORDER BY i\.item_id_origem ASC`).
 		WithArgs(int64(100)).
 		WillReturnRows(sqlmock.NewRows(itemPedidoColunasHeaderForHandler()).

@@ -4,15 +4,18 @@
 // de pagamento; visitante e convidado a entrar. "Finalizar pedido" chama
 // POST /api/loja/checkout (preco recalculado no servidor; a chave evita pedido
 // em dobro) e, no sucesso, limpa o carrinho e mostra o numero do pedido.
+// ECOM-17: sem o endereco de entrega completo a compra nao e finalizada.
 
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CarrinhoLateral } from "@/components/loja/CarrinhoLateral";
+import { FormEnderecoEntrega } from "@/components/loja/FormEnderecoEntrega";
 import { TopoLoja, useSessaoLocal } from "@/components/loja/TopoLoja";
 import { apiFinalizarCompra } from "@/lib/api";
 import { limparCarrinho, useCarrinho } from "@/lib/carrinho";
-import type { CompraFinalizada, FormaCheckout } from "@/lib/types";
+import { entregaVazia, formatarEntrega, normalizarEntrega, validarEntrega, type ErrosEntrega } from "@/lib/entrega";
+import type { CompraFinalizada, EnderecoEntrega, FormaCheckout } from "@/lib/types";
 import { vlog } from "@/lib/vlog";
 
 const FILE = "Checkout.tsx";
@@ -40,6 +43,7 @@ function Confirmacao({ c }: { c: CompraFinalizada }) {
         Total de <strong>{moeda.format(c.valor_total)}</strong> em {c.forma_pagamento}, vencimento em {dataBR(c.data_vencimento)}.
       </p>
       <p className="mt-1 text-sm text-slate-600">Pagamento: {c.status_pagamento}. Status do pedido: {c.status}.</p>
+      {c.entrega && <p className="mt-1 text-sm text-slate-600">Entrega em: {formatarEntrega(c.entrega)}</p>}
       <div className="mt-5 flex justify-center gap-4 text-sm font-medium">
         <Link href="/minhas-compras" className="text-primary-600 hover:underline">
           Minhas compras
@@ -66,8 +70,17 @@ export function Checkout() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [compra, setCompra] = useState<CompraFinalizada | null>(null);
+  const [entrega, setEntrega] = useState<EnderecoEntrega>(entregaVazia);
+  const [errosEntrega, setErrosEntrega] = useState<ErrosEntrega>({});
 
   const finalizar = async () => {
+    const errs = validarEntrega(entrega);
+    setErrosEntrega(errs);
+    if (Object.keys(errs).length > 0) {
+      vlog(FILE, "Checkout.finalizar", "endereco de entrega incompleto, campos:", Object.keys(errs).length);
+      setErro("Preencha o endereco de entrega para finalizar a compra.");
+      return;
+    }
     setEnviando(true);
     setErro(null);
     try {
@@ -75,6 +88,7 @@ export function Checkout() {
         chave,
         forma_pagamento: forma,
         itens: itens.map((i) => ({ produto_id: i.id, quantidade: i.quantidade })),
+        entrega: normalizarEntrega(entrega),
       });
       vlog(FILE, "Checkout.finalizar", "pedido criado, repetida:", c.repetida);
       limparCarrinho();
@@ -109,12 +123,15 @@ export function Checkout() {
             <CarrinhoLateral semBotaoPagamento />
             <section aria-labelledby="titulo-forma" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 id="titulo-forma" className="mb-3 text-base font-semibold text-slate-900">
-                Forma de pagamento
+                Entrega e pagamento
               </h2>
               {sessao ? (
                 <>
+                  <div className="mb-4 border-b border-slate-200 pb-4">
+                    <FormEnderecoEntrega valor={entrega} onChange={setEntrega} erros={errosEntrega} />
+                  </div>
                   <fieldset className="flex flex-col gap-2">
-                    <legend className="sr-only">Forma de pagamento</legend>
+                    <legend className="mb-1 text-sm font-semibold text-slate-900">Forma de pagamento</legend>
                     {FORMAS.map((f) => (
                       <label key={f.valor} className="flex items-center gap-2 text-sm text-slate-700">
                         <input

@@ -216,12 +216,14 @@ func dlParsers() []dlParserCaso {
 			var got time.Time
 			mock.ExpectBegin()
 			mock.ExpectExec(`INSERT INTO pedidos`).
-				WithArgs(int64(1), int64(2), dlCapturaTempo{&got}, "App", "Faturado", sqlmock.AnyArg()).
+				WithArgs(int64(1), int64(2), dlCapturaTempo{&got}, "App", "Faturado", sqlmock.AnyArg(), "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 				WillReturnError(errDLParar)
 			mock.ExpectRollback()
 			_, err := casosVendas(db, 0).CriarPedido(ctx, principalAdmin(), lerFixo(vendas.DadosPedido{
 				ClienteID: 1, VendedorID: 2, DataPedido: data, Canal: "App", Status: "Faturado",
 				Itens: []vendas.DadosItem{{ProdutoID: 3, Quantidade: 1, PrecoPraticado: "10"}},
+				Entrega: vendas.DadosEntrega{CEP: "01310100", Endereco: "Avenida Paulista", Numero: "1000", Bairro: "Bela Vista",
+					Cidade: "São Paulo", UF: "SP"},
 			}))
 			require.ErrorIs(t, err, errDLParar)
 			require.NoError(t, mock.ExpectationsWereMet())

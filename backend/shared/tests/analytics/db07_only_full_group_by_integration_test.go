@@ -81,7 +81,7 @@ func dadosDB07(t *testing.T, db *sql.DB, hoje string) (vendedorID int64) {
 	})
 	_, err = db.Exec(`INSERT INTO carteiras (cliente_id, vendedor_id, data_inicio) VALUES (?, ?, ?)`, clienteID, vendedorID, hoje)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total) VALUES (?, ?, ?, 'App', 'Faturado', ?)`,
+	_, err = db.Exec(`INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total, entrega_cep, entrega_endereco, entrega_numero, entrega_bairro, entrega_cidade, entrega_uf) VALUES (?, ?, ?, 'App', 'Faturado', ?, '01310100', 'Avenida Paulista', '1000', 'Bela Vista', 'São Paulo', 'SP')`,
 		clienteID, vendedorID, hoje, valorPedidoDB07)
 	require.NoError(t, err)
 	return vendedorID

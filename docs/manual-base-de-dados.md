@@ -114,7 +114,7 @@ A ordem é a do `make db-up`, que cria o schema vazio. O `make db-seed` roda o `
 | `senha_historico` | `sql/07_ddl_senha_historico.sql` | 13 (ENUM `tipo_reset`), 27 (`created_at` NOT NULL) | 8 |
 | `clientes` | `sql/09_ddl_clientes.sql` | 19 (`uq_clientes_cnpj`), 20 (COMMENT de `cnpj`) | 9 |
 | `produtos` | `sql/10_ddl_produtos.sql` (já com `imagem` desde o IMG-01) | 26 (`imagem`, `uk_produtos_imagem`, `chk_produtos_imagem`) | 13 |
-| `pedidos` | `sql/04_ddl_pedidos.sql` | 19 (transferência de `cliente_id`, só dados) | 14 |
+| `pedidos` | `sql/04_ddl_pedidos.sql` | 19 (transferência de `cliente_id`, só dados), 33 (canal Loja), 35 (`chave_checkout`), 36 (`entrega_*`) | 14 |
 | `itens_pedido` | `sql/11_ddl_itens_pedido.sql` | - | 15 |
 | `pagamentos` | `sql/12_ddl_pagamentos.sql` | - | 16 |
 | `carteiras` | `sql/14_ddl_carteiras.sql` | 19 (transferência/descarte, só dados) | 10 |
@@ -628,7 +628,7 @@ Oportunidades de venda (funil do CRM), importadas de `dados/crm/oportunidades.cs
 
 **Regras de negócio:** `origem` e `etapa` são VARCHAR (e não ENUM) para não travar a importação se surgirem valores novos; o banco não valida a lista. Exclusão física pela API.
 
-**Migrações:** nenhuma alteração de schema (a 19 só transfere dados).
+**Migrações:** a 19 só transfere dados. **36 (ECOM-17, `make db-fix-pedidos-entrega`):** cria `entrega_*`, dá aos pedidos antigos um endereço fictício (10 capitais, escolhidas por `MOD(id*31, 10)`; o importador CSV e o seed 25 usam o mesmo) e aplica NOT NULL + CHECK. Reversão: `make db-revert-pedidos-entrega` (perde os endereços).
 
 ---
 
@@ -718,7 +718,13 @@ Pedidos do ERP, importados de `dados/erp/pedidos.csv` (`make db-import-pedidos`,
 | `canal` | ENUM('App','Telefone','Visita','WhatsApp') | não | - | Canal de venda. |
 | `status` | ENUM('Cancelado','Em separação','Entregue','Faturado') | não | - | Status. |
 | `valor_total` | DECIMAL(15,2) | não | 0.00 | Valor total em R$. |
+| `entrega_cep` | CHAR(8) | não | - | ECOM-17: CEP de entrega, só dígitos. |
+| `entrega_endereco`, `entrega_numero` | VARCHAR(255), VARCHAR(20) | não | - | Rua e número ("s/n" aceito). |
+| `entrega_complemento` | VARCHAR(120) | não | `''` | Complemento (vazio = sem). |
+| `entrega_bairro`, `entrega_cidade`, `entrega_uf` | VARCHAR(120), VARCHAR(120), CHAR(2) | não | - | Bairro, cidade e UF de entrega. |
 | `created_at`, `updated_at` | TIMESTAMP | não | CURRENT_TIMESTAMP | Controle. |
+
+**CHECK `chk_pedidos_entrega` (ECOM-17):** CEP com 8 dígitos; rua, número, bairro e cidade não vazios; UF com 2 letras.
 
 **Índices:** `PRIMARY` (`pedido_id_origem`), `idx_pedidos_status`, `idx_pedidos_canal`, `idx_pedidos_data_pedido`, `idx_pedidos_cliente_id`, `idx_pedidos_vendedor_id`.
 

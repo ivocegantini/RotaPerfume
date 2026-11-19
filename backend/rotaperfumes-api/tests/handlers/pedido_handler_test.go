@@ -13,7 +13,7 @@ import (
 )
 
 // Regexes/colunas que espelham as constantes de backend/shared/vendas/vendasmysql (SQL do legado pedido_repository.go).
-const pedidoColunasRegexH = `p\.pedido_id_origem, p\.cliente_id, p\.vendedor_id, p\.data_pedido, p\.canal, p\.status, p\.valor_total, p\.created_at, p\.updated_at, c\.razao_social, v\.nome`
+const pedidoColunasRegexH = `p\.pedido_id_origem, p\.cliente_id, p\.vendedor_id, p\.data_pedido, p\.canal, p\.status, p\.valor_total, p\.entrega_cep, p\.entrega_endereco, p\.entrega_numero, p\.entrega_complemento, p\.entrega_bairro, p\.entrega_cidade, p\.entrega_uf, p\.created_at, p\.updated_at, c\.razao_social, v\.nome`
 const pedidoFromRegexH = ` FROM pedidos p JOIN clientes c ON c\.cliente_id_origem = p\.cliente_id JOIN vendedores v ON v\.id = p\.vendedor_id`
 const itemPedidoColunasRegexH = `i\.item_id_origem, i\.pedido_id, i\.produto_id, i\.quantidade, i\.preco_praticado, i\.desconto_pct, i\.valor_bruto, i\.created_at, i\.updated_at, pr\.sku, pr\.nome`
 const itemPedidoFromRegexH = ` FROM itens_pedido i JOIN produtos pr ON pr\.id = i\.produto_id`
@@ -21,14 +21,14 @@ const itemPedidoFromRegexH = ` FROM itens_pedido i JOIN produtos pr ON pr\.id = 
 func pedidoColunasHeaderForHandler() []string {
 	return []string{
 		"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido",
-		"canal", "status", "valor_total", "created_at", "updated_at", "cliente_nome", "vendedor_nome",
+		"canal", "status", "valor_total", "entrega_cep", "entrega_endereco", "entrega_numero", "entrega_complemento", "entrega_bairro", "entrega_cidade", "entrega_uf", "created_at", "updated_at", "cliente_nome", "vendedor_nome",
 	}
 }
 
 func pedidoRowsForHandler(idOrigem int64, valorTotal float64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-		AddRow(idOrigem, int64(1), int64(2), now, "App", "Faturado", decT(valorTotal), now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), int64(2), now, "App", "Faturado", decT(valorTotal), "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 func emptyPedidoRowsForHandler() *sqlmock.Rows {
@@ -64,7 +64,14 @@ func validPedidoPayload() map[string]any {
 			{"produto_id": 10, "quantidade": 2, "preco_praticado": 100.0, "desconto_pct": 10.0},
 			{"produto_id": 11, "quantidade": 1, "preco_praticado": 50.0, "desconto_pct": 0.0},
 		},
+		"entrega": entregaPayloadH(),
 	}
+}
+
+// entregaPayloadH é o endereço de entrega obrigatório (ECOM-17) do payload.
+func entregaPayloadH() map[string]any {
+	return map[string]any{"cep": "01310-100", "endereco": "Avenida Paulista", "numero": "1000", "complemento": "",
+		"bairro": "Bela Vista", "cidade": "São Paulo", "uf": "SP"}
 }
 
 // expectCreatePedidoSuccessH registra os mocks para uma criação bem-sucedida
@@ -74,8 +81,8 @@ func validPedidoPayload() map[string]any {
 // criação baixa o estoque dos dois itens na mesma tx (BUG-20).
 func expectCreatePedidoSuccessH(mock sqlmock.Sqlmock) {
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").
+	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total,\s+entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf\)`).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewResult(100, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
 		WithArgs(int64(100), int64(10), 2, "100.00", 10.0, "180.00").
@@ -684,8 +691,8 @@ func TestUpdatePedido_Success(t *testing.T) {
 	mock.ExpectQuery(selectItensAtuaisTxRegexH).
 		WithArgs(int64(1)).
 		WillReturnRows(itensAtuaisRowsVazioH())
-	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
+	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?,\s+entrega_cep = \?, entrega_endereco = \?, entrega_numero = \?, entrega_complemento = \?,\s+entrega_bairro = \?, entrega_cidade = \?, entrega_uf = \?\s+WHERE pedido_id_origem = \?`).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
@@ -750,8 +757,8 @@ func TestUpdatePedido_PermitidoParaNaoAdmin(t *testing.T) {
 	mock.ExpectQuery(selectItensAtuaisTxRegexH).
 		WithArgs(int64(1)).
 		WillReturnRows(itensAtuaisRowsVazioH())
-	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
+	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?,\s+entrega_cep = \?, entrega_endereco = \?, entrega_numero = \?, entrega_complemento = \?,\s+entrega_bairro = \?, entrega_cidade = \?, entrega_uf = \?\s+WHERE pedido_id_origem = \?`).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
@@ -920,7 +927,7 @@ func TestUpdatePedido_JaFaturadoTentaAlterarItens_409(t *testing.T) {
 func pedidoRowsForHandlerStatus(idOrigem int64, valorTotal float64, status string) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-		AddRow(idOrigem, int64(1), int64(2), now, "App", status, decT(valorTotal), now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), int64(2), now, "App", status, decT(valorTotal), "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 const deleteItensPedidoRegexH = `DELETE FROM itens_pedido WHERE pedido_id = \?`
