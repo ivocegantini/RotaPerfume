@@ -55,6 +55,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "Inadimplente", label: "Inadimplente" },
   { value: "Pago", label: "Pago" },
   { value: "Pago com atraso", label: "Pago com atraso" },
+  { value: "Recusado", label: "Recusado" }, // ECOM-18
 ];
 
 const FORMA_FILTER_OPTIONS = [
@@ -92,6 +93,7 @@ function statusBadgeColor(status: string): "green" | "yellow" | "red" | "gray" {
       return "yellow";
     case "Inadimplente":
     case "Pago com atraso":
+    case "Recusado":
       return "red";
     default:
       return "gray";

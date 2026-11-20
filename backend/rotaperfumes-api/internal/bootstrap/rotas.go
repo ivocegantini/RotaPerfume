@@ -23,7 +23,7 @@ func HandlerHTTP(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) h
 	)
 }
 
-// NovoRouter registra as 73 rotas da API com método e política obrigatórios.
+// NovoRouter registra as 75 rotas da API com método e política obrigatórios.
 // Rotas() do router devolvido é a fonte da matriz ARQ-00.
 func NovoRouter(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) *httpx.Router {
 	r := httpx.NovoRouter(httpx.NovoAutenticador(identidadecrypto.NovoJWT(cfg), checker).ComCookieSeguro(cfg.CookieSecure))
@@ -134,6 +134,8 @@ func rotas(h Handlers) []httpx.Rota {
 		{Metodo: get, Padrao: "/api/loja/minhas-compras/{id}", Policy: todos, Arquivo: "compras_handler.go", Funcao: "PedidoHandler.MinhaCompra", Handler: h.Pedido.MinhaCompra},
 		// Checkout (ECOM-14): fecha o carrinho do usuário do token (preços do banco).
 		{Metodo: post, Padrao: "/api/loja/checkout", Policy: todos, Arquivo: "checkout_handler.go", Funcao: "PedidoHandler.FinalizarCompra", Handler: h.Pedido.FinalizarCompra},
+		// ECOM-18: simulador de aprovação/recusa do pagamento (só APP_ENV dev/qa; senão 404).
+		{Metodo: post, Padrao: "/api/loja/pagamentos/{id}/simular", Policy: todos, Arquivo: "pagamento_loja_handler.go", Funcao: "PedidoHandler.SimularPagamento", Handler: h.Pedido.SimularPagamento},
 
 		// Imagem do produto (IMG-01): upload/remoção admin; leitura pública
 		// (aprovada pelo SecBrain), por handler próprio sem FileServer.
@@ -178,6 +180,8 @@ func rotas(h Handlers) []httpx.Rota {
 
 		// Healthcheck (Caddy e smoke do Jenkins, GET; HEAD também casa).
 		{Metodo: get, Padrao: "/health", Policy: publica, Arquivo: "server.go", Funcao: "Health", Handler: health},
+		// ECOM-18: ambiente da API (dev/qa/producao) para o selo do rodapé.
+		{Metodo: get, Padrao: "/api/ambiente", Policy: publica, Arquivo: "rotas.go", Funcao: "Ambiente", Handler: ambienteHandler(h.Ambiente)},
 	}
 }
 
@@ -186,4 +190,17 @@ func health(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"success":true,"data":{"status":"ok"}}`))
+}
+
+// ambienteHandler responde o APP_ENV (vazio = producao), sem nada sensível.
+func ambienteHandler(a config.Ambiente) http.HandlerFunc {
+	if a == "" {
+		a = config.AmbienteProducao
+	}
+	corpo := []byte(`{"success":true,"data":{"ambiente":"` + string(a) + `"}}`)
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(corpo)
+	}
 }

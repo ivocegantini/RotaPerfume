@@ -10,7 +10,7 @@ import (
 
 // ECOM-14: checkout da loja. O carrinho chega só com produto e quantidade;
 // preço, ativo, total e pagamento saem do servidor. O pedido nasce com canal
-// Loja e status "Em separação"; o pagamento, "Em aberto" (sem gateway ainda).
+// Loja e status "Aguardando pagamento" (ECOM-18); o pagamento, "Em aberto".
 
 // Limites do carrinho (os mesmos do frontend, lib/carrinho.ts).
 const (
@@ -48,21 +48,24 @@ type ItemCheckout struct {
 
 // DadosCheckout é o comando do POST /api/loja/checkout.
 type DadosCheckout struct {
-	Itens []ItemCheckout
-	Forma string
-	Chave string // UUID do navegador (idempotência)
+	Itens   []ItemCheckout
+	Forma   string
+	Chave   string // UUID do navegador (idempotência)
+	Entrega DadosEntrega
 }
 
 // CheckoutValido é o comando já validado (produtos sem repetição).
 type CheckoutValido struct {
-	Itens []ItemCheckout
-	Forma FormaCheckout
-	Chave string
+	Itens   []ItemCheckout
+	Forma   FormaCheckout
+	Chave   string
+	Entrega DadosEntrega // validado (NovaEntrega aceitou)
 }
 
 var reChave = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-// Validar confere chave, forma e itens (1..50, quantidade 1..99, sem repetir).
+// Validar confere chave, forma, itens (1..50, quantidade 1..99, sem repetir)
+// e, por último, o endereço de entrega (ECOM-17: sem ele não há compra).
 func (d DadosCheckout) Validar() (CheckoutValido, error) {
 	chave := strings.ToLower(strings.TrimSpace(d.Chave))
 	if !reChave.MatchString(chave) {
@@ -92,7 +95,10 @@ func (d DadosCheckout) Validar() (CheckoutValido, error) {
 		}
 		vistos[it.ProdutoID] = true
 	}
-	return CheckoutValido{Itens: d.Itens, Forma: forma, Chave: chave}, nil
+	if _, err := NovaEntrega(d.Entrega); err != nil {
+		return CheckoutValido{}, err
+	}
+	return CheckoutValido{Itens: d.Itens, Forma: forma, Chave: chave, Entrega: d.Entrega}, nil
 }
 
 // ProdutoIDs devolve os produtos do carrinho, na ordem.
@@ -114,7 +120,8 @@ type CompraLoja struct {
 
 // OfertaLoja é o que o servidor sabe de um produto ativo no checkout
 // (SEC-79): o preço de tabela e as unidades disponíveis (saldo do último
-// snapshot menos o já reservado em pedidos da Loja Em separação).
+// snapshot menos o já reservado em pedidos da Loja Aguardando pagamento ou
+// Em separação).
 type OfertaLoja struct {
 	Preco      kernel.Dinheiro
 	Disponivel int
@@ -123,7 +130,8 @@ type OfertaLoja struct {
 // MontarCompraLoja monta pedido e pagamento com os preços do servidor
 // (ofertas: só produtos ativos). Produto fora do mapa → indisponível (409);
 // quantidade acima do disponível → sem estoque (409, SEC-79).
-// hoje é o dia do pedido (meia-noite local); o pagamento fica Em aberto.
+// hoje é o dia do pedido (meia-noite local); o pedido fica Aguardando
+// pagamento e o pagamento, Em aberto, até a confirmação (ECOM-18).
 func MontarCompraLoja(c CheckoutValido, clienteID, vendedorID int64, ofertas map[int64]OfertaLoja, hoje time.Time) (*Pedido, *Pagamento, error) {
 	itens := make([]DadosItem, 0, len(c.Itens))
 	for _, it := range c.Itens {
@@ -138,7 +146,7 @@ func MontarCompraLoja(c CheckoutValido, clienteID, vendedorID int64, ofertas map
 	}
 	dia := hoje.In(time.Local).Format(kernel.LayoutData)
 	ped, err := NovoPedido(DadosPedido{ClienteID: clienteID, VendedorID: vendedorID, DataPedido: dia,
-		Canal: string(CanalLoja), Status: string(StatusEmSeparacao), Itens: itens})
+		Canal: string(CanalLoja), Status: string(StatusAguardandoPagamento), Itens: itens, Entrega: c.Entrega})
 	if err != nil {
 		return nil, nil, err
 	}

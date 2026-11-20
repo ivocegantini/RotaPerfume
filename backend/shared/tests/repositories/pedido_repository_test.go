@@ -18,11 +18,17 @@ import (
 
 var pedidoColumns = []string{
 	"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido", "canal", "status",
-	"valor_total", "created_at", "updated_at", "cliente_nome", "vendedor_nome",
+	"valor_total", "entrega_cep", "entrega_endereco", "entrega_numero", "entrega_complemento", "entrega_bairro",
+	"entrega_cidade", "entrega_uf", "created_at", "updated_at", "cliente_nome", "vendedor_nome",
 }
 
+// entregaRepo é o endereço de entrega das linhas e dos pedidos gravados (ECOM-17).
+var entregaRepo = vendas.Entrega{CEP: "01310100", Endereco: "Avenida Paulista", Numero: "1000", Bairro: "Bela Vista", Cidade: "São Paulo", UF: "SP"}
+
 func pedidoRow(idOrigem, clienteID, vendedorID int64, dataPedido time.Time, canal, status string, valorTotal float64, created, updated time.Time, clienteNome, vendedorNome string) []driver.Value {
-	return []driver.Value{idOrigem, clienteID, vendedorID, dataPedido, canal, status, decT(valorTotal), created, updated, clienteNome, vendedorNome}
+	e := entregaRepo
+	return []driver.Value{idOrigem, clienteID, vendedorID, dataPedido, canal, status, decT(valorTotal),
+		e.CEP, e.Endereco, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.UF, created, updated, clienteNome, vendedorNome}
 }
 
 var itemPedidoColumns = []string{
@@ -394,7 +400,8 @@ func TestPedidoCreateComItens_Success(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String()).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+			p.Entrega.CEP, p.Entrega.Endereco, p.Entrega.Numero, p.Entrega.Complemento, p.Entrega.Bairro, p.Entrega.Cidade, p.Entrega.UF).
 		WillReturnResult(sqlmock.NewResult(10, 1))
 	mock.ExpectExec("INSERT INTO itens_pedido").
 		WithArgs(int64(10), int64(1), 3, "50.00", 0.0, "150.00").
@@ -420,7 +427,8 @@ func TestPedidoCreateComItens_SemItens(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String()).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+			p.Entrega.CEP, p.Entrega.Endereco, p.Entrega.Numero, p.Entrega.Complemento, p.Entrega.Bairro, p.Entrega.Cidade, p.Entrega.UF).
 		WillReturnResult(sqlmock.NewResult(11, 1))
 	mock.ExpectCommit()
 
@@ -496,7 +504,8 @@ func TestPedidoUpdateComItens_Success(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+			p.Entrega.CEP, p.Entrega.Endereco, p.Entrega.Numero, p.Entrega.Complemento, p.Entrega.Bairro, p.Entrega.Cidade, p.Entrega.UF, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
@@ -601,7 +610,8 @@ func TestPedidoUpdateComItens_TransicaoParaFaturado_BaixaEstoque(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+			p.Entrega.CEP, p.Entrega.Endereco, p.Entrega.Numero, p.Entrega.Complemento, p.Entrega.Bairro, p.Entrega.Cidade, p.Entrega.UF, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
@@ -647,7 +657,8 @@ func TestPedidoUpdateComItens_ReenvioFaturadoIdempotente_NaoBaixaEstoqueDeNovo(t
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns).
 			AddRow(int64(2), 4, "50.0", "0.0"))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+			p.Entrega.CEP, p.Entrega.Endereco, p.Entrega.Numero, p.Entrega.Complemento, p.Entrega.Bairro, p.Entrega.Cidade, p.Entrega.UF, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// pedido já estava Faturado: não reescreve itens_pedido (sem DELETE/INSERT)
 	// nem dispara baixa de estoque novamente (statusAtual já era Faturado).
@@ -706,7 +717,8 @@ func TestPedidoUpdateComItens_ErroBaixaEstoque_RollbackTudo(t *testing.T) {
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows(itensAtuaisColumns))
 	mock.ExpectExec("UPDATE pedidos").
-		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), int64(1)).
+		WithArgs(p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+			p.Entrega.CEP, p.Entrega.Endereco, p.Entrega.Numero, p.Entrega.Complemento, p.Entrega.Bairro, p.Entrega.Cidade, p.Entrega.UF, int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).

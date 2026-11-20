@@ -17,12 +17,12 @@ import (
 const chaveECOM14 = "0b7f3c1e-5d2a-4c8e-9f10-123456789abc"
 
 func checkoutValido(forma string, itens ...vendas.ItemCheckout) vendas.DadosCheckout {
-	return vendas.DadosCheckout{Chave: chaveECOM14, Forma: forma, Itens: itens}
+	return vendas.DadosCheckout{Chave: chaveECOM14, Forma: forma, Itens: itens, Entrega: entregaTeste}
 }
 
 func TestECOM14_Validar(t *testing.T) {
 	it := func(id int64, q int) vendas.ItemCheckout { return vendas.ItemCheckout{ProdutoID: id, Quantidade: q} }
-	v, err := vendas.DadosCheckout{Chave: " 0B7F3C1E-5D2A-4C8E-9F10-123456789ABC ", Forma: " cartao ", Itens: []vendas.ItemCheckout{it(7, 99)}}.Validar()
+	v, err := vendas.DadosCheckout{Chave: " 0B7F3C1E-5D2A-4C8E-9F10-123456789ABC ", Forma: " cartao ", Itens: []vendas.ItemCheckout{it(7, 99)}, Entrega: entregaTeste}.Validar()
 	require.NoError(t, err)
 	assert.Equal(t, chaveECOM14, v.Chave, "chave normalizada")
 	assert.Equal(t, vendas.CheckoutCartao, v.Forma)
@@ -36,6 +36,8 @@ func TestECOM14_Validar(t *testing.T) {
 		err error
 	}{
 		{vendas.DadosCheckout{Chave: "nao-uuid", Forma: "pix", Itens: []vendas.ItemCheckout{it(1, 1)}}, vendas.ErrCheckoutChaveInvalida},
+		// ECOM-17: sem endereço de entrega a compra não é finalizada.
+		{vendas.DadosCheckout{Chave: chaveECOM14, Forma: "pix", Itens: []vendas.ItemCheckout{it(1, 1)}}, vendas.ErrEntregaCEPInvalido},
 		{checkoutValido("dinheiro", it(1, 1)), vendas.ErrCheckoutFormaInvalida},
 		{checkoutValido("pix"), vendas.ErrCheckoutCarrinhoVazio},
 		{checkoutValido("pix", muitos...), vendas.ErrCheckoutItensDemais},
@@ -71,7 +73,9 @@ func TestECOM14_MontarCompraLoja(t *testing.T) {
 		ped, pag, err := vendas.MontarCompraLoja(v, 55, 168, ofertas, hoje)
 		require.NoError(t, err)
 		assert.Equal(t, "Loja", ped.Canal)
-		assert.Equal(t, "Em separação", ped.Status)
+		assert.Equal(t, "Aguardando pagamento", ped.Status, "ECOM-18")
+		assert.Equal(t, vendas.Entrega{CEP: "01310100", Endereco: "Avenida Paulista", Numero: "1000", Bairro: "Bela Vista",
+			Cidade: "São Paulo", UF: "SP"}, ped.Entrega, "ECOM-17: o pedido nasce com o endereço normalizado")
 		assert.Equal(t, int64(55), ped.ClienteID)
 		assert.Equal(t, int64(168), ped.VendedorID)
 		assert.Equal(t, "2026-11-18", ped.DataPedido.Format("2006-01-02"))

@@ -15,7 +15,9 @@ import (
 const arqPedidos = "pedidos.go"
 
 // pedidoColunas traz o cabeçalho do pedido + nomes de cliente/vendedor via JOIN.
-const pedidoColunas = `p.pedido_id_origem, p.cliente_id, p.vendedor_id, p.data_pedido, p.canal, p.status, p.valor_total, p.created_at, p.updated_at, c.razao_social, v.nome`
+const pedidoColunas = `p.pedido_id_origem, p.cliente_id, p.vendedor_id, p.data_pedido, p.canal, p.status, p.valor_total, ` +
+	`p.entrega_cep, p.entrega_endereco, p.entrega_numero, p.entrega_complemento, p.entrega_bairro, p.entrega_cidade, p.entrega_uf, ` +
+	`p.created_at, p.updated_at, c.razao_social, v.nome`
 
 // pedidoFrom é o FROM + JOINs comuns às queries de listagem/detalhe de pedidos.
 const pedidoFrom = ` FROM pedidos p JOIN clientes c ON c.cliente_id_origem = p.cliente_id JOIN vendedores v ON v.id = p.vendedor_id`
@@ -126,8 +128,10 @@ func (r *Pedidos) PorID(ctx context.Context, id int64) (*vendas.Pedido, error) {
 
 func scanPedido(s db.Linha) (*vendas.Pedido, error) {
 	return db.LerUma(s, vendas.ErrPedidoNaoEncontrado, "vendasmysql: scan pedido", func(p *vendas.Pedido) []any {
+		e := &p.Entrega
 		return []any{&p.PedidoIDOrigem, &p.ClienteID, &p.VendedorID, &p.DataPedido, &p.Canal, &p.Status,
-			&p.ValorTotal, &p.CreatedAt, &p.UpdatedAt, &p.ClienteNome, &p.VendedorNome}
+			&p.ValorTotal, &e.CEP, &e.Endereco, &e.Numero, &e.Complemento, &e.Bairro, &e.Cidade, &e.UF,
+			&p.CreatedAt, &p.UpdatedAt, &p.ClienteNome, &p.VendedorNome}
 	})
 }
 
@@ -157,10 +161,13 @@ func scanItem(s db.Linha) (*vendas.ItemPedido, error) {
 // dos itens. pedido_id_origem e item_id_origem são AUTO_INCREMENT.
 func (r *Pedidos) Inserir(ctx context.Context, p *vendas.Pedido) error {
 	const insertPedido = `
-		INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total)
-		VALUES (?, ?, ?, ?, ?, ?)`
+		INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total,
+			entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	e := p.Entrega
 	id, err := db.Inserir(ctx, r.q, "vendasmysql: create pedido", insertPedido,
-		p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String())
+		p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+		e.CEP, e.Endereco, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.UF)
 	if err != nil {
 		return err
 	}
@@ -240,10 +247,14 @@ func (r *Pedidos) ItensAtuais(ctx context.Context, id int64) ([]vendas.ItemPedid
 func (r *Pedidos) AtualizarCabecalho(ctx context.Context, id int64, p *vendas.Pedido) error {
 	const updatePedido = `
 		UPDATE pedidos
-		SET cliente_id = ?, vendedor_id = ?, data_pedido = ?, canal = ?, status = ?, valor_total = ?
+		SET cliente_id = ?, vendedor_id = ?, data_pedido = ?, canal = ?, status = ?, valor_total = ?,
+			entrega_cep = ?, entrega_endereco = ?, entrega_numero = ?, entrega_complemento = ?,
+			entrega_bairro = ?, entrega_cidade = ?, entrega_uf = ?
 		WHERE pedido_id_origem = ?`
+	e := p.Entrega
 	return db.ExecPorID(ctx, r.q, arqPedidos, "Pedidos.AtualizarCabecalho", "vendasmysql: update pedido", vendas.ErrPedidoNaoEncontrado,
-		updatePedido, p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(), id)
+		updatePedido, p.ClienteID, p.VendedorID, p.DataPedido, p.Canal, p.Status, p.ValorTotal.String(),
+		e.CEP, e.Endereco, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.UF, id)
 }
 
 // SubstituirItens troca integralmente os itens (DELETE + INSERT).

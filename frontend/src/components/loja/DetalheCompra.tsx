@@ -8,8 +8,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { TopoLoja, useSessaoLocal } from "@/components/loja/TopoLoja";
 import { StatusPedido, dataCompra, moeda } from "@/components/loja/MinhasCompras";
+import { SimuladorPagamento } from "@/components/loja/SimuladorPagamento";
 import { apiMinhaCompra } from "@/lib/api";
 import { ApiError } from "@/lib/apiError";
+import { formatarEntrega } from "@/lib/entrega";
 import { urlImagemProduto } from "@/lib/imagemProduto";
 import type { CompraDetalhe, ItemComprado, PagamentoComprado } from "@/lib/types";
 import { vlog } from "@/lib/vlog";
@@ -92,7 +94,7 @@ function Pagamento({ p }: { p: PagamentoComprado }) {
   );
 }
 
-function Detalhe({ c }: { c: CompraDetalhe }) {
+function Detalhe({ c, onRecarregar }: { c: CompraDetalhe; onRecarregar: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -111,8 +113,17 @@ function Detalhe({ c }: { c: CompraDetalhe }) {
           Total {real(c.valor_total)}
         </p>
       </section>
+      {c.entrega && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="mb-1 text-lg font-semibold text-slate-900">Endereco de entrega</h2>
+          <p className="text-sm text-slate-700">{formatarEntrega(c.entrega)}</p>
+        </section>
+      )}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Pagamento</h2>
+        {c.status === "Aguardando pagamento" && (
+          <p className="mb-3 text-sm text-slate-600">O pedido vai para separação assim que o pagamento for confirmado.</p>
+        )}
         {c.pagamentos.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhum pagamento registrado para esta compra.</p>
         ) : (
@@ -124,6 +135,7 @@ function Detalhe({ c }: { c: CompraDetalhe }) {
             ))}
           </div>
         )}
+        <SimuladorPagamento pedidoId={c.pedido_id} status={c.status} onConcluido={onRecarregar} />
       </section>
     </div>
   );
@@ -134,6 +146,7 @@ export function DetalheCompra({ idBruto }: { idBruto: string | undefined }) {
   const logado = sessao !== null;
   const id = idDaCompra(idBruto);
   const [carregado, setCarregado] = useState<{ id: number; estado: Estado } | null>(null);
+  const [versao, setVersao] = useState(0); // ECOM-18: relê depois do simulador
 
   useEffect(() => {
     if (!logado || id === null) return;
@@ -156,7 +169,7 @@ export function DetalheCompra({ idBruto }: { idBruto: string | undefined }) {
     return () => {
       vivo = false;
     };
-  }, [logado, id]);
+  }, [logado, id, versao]);
 
   const estado: Estado =
     id === null ? { tipo: "nao-encontrado" } : carregado && carregado.id === id ? carregado.estado : { tipo: "carregando" };
@@ -186,7 +199,7 @@ export function DetalheCompra({ idBruto }: { idBruto: string | undefined }) {
                 {estado.mensagem}
               </p>
             )}
-            {estado.tipo === "ok" && <Detalhe c={estado.compra} />}
+            {estado.tipo === "ok" && <Detalhe c={estado.compra} onRecarregar={() => setVersao((v) => v + 1)} />}
           </>
         )}
       </main>

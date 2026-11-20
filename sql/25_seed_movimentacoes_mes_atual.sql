@@ -223,8 +223,23 @@ UPDATE tmp_ped p JOIN (SELECT pedido_id, SUM(bruto) AS t FROM tmp_item GROUP BY 
     ON s.pedido_id = p.pedido_id
    SET p.total = s.t;
 
-INSERT INTO pedidos (pedido_id_origem, cliente_id, vendedor_id, data_pedido, canal, status, valor_total, created_at, updated_at)
-SELECT pedido_id, cliente_id, vendedor_id, data_pedido, canal, status, total, TIMESTAMP(data_pedido), TIMESTAMP(data_pedido)
+-- ECOM-17: endereço de entrega fictício (mesmas 10 capitais da sql/36).
+INSERT INTO pedidos (pedido_id_origem, cliente_id, vendedor_id, data_pedido, canal, status, valor_total,
+                     entrega_cep, entrega_endereco, entrega_numero, entrega_bairro, entrega_cidade, entrega_uf,
+                     created_at, updated_at)
+SELECT pedido_id, cliente_id, vendedor_id, data_pedido, canal, status, total,
+       ELT(1 + MOD(pedido_id * 31, 10), '01310100', '22070011', '30130010', '80020310', '90020004',
+           '40060001', '50050000', '60025100', '70070120', '74015010'),
+       ELT(1 + MOD(pedido_id * 31, 10), 'Avenida Paulista', 'Avenida Atlântica', 'Avenida Afonso Pena',
+           'Rua XV de Novembro', 'Rua dos Andradas', 'Avenida Sete de Setembro', 'Rua da Aurora',
+           'Rua Major Facundo', 'SBS Quadra 2', 'Avenida Goiás'),
+       CAST(1 + MOD(pedido_id * 7919, 1999) AS CHAR),
+       ELT(1 + MOD(pedido_id * 31, 10), 'Bela Vista', 'Copacabana', 'Centro', 'Centro', 'Centro Histórico',
+           'Vitória', 'Boa Vista', 'Centro', 'Asa Sul', 'Setor Central'),
+       ELT(1 + MOD(pedido_id * 31, 10), 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba',
+           'Porto Alegre', 'Salvador', 'Recife', 'Fortaleza', 'Brasília', 'Goiânia'),
+       ELT(1 + MOD(pedido_id * 31, 10), 'SP', 'RJ', 'MG', 'PR', 'RS', 'BA', 'PE', 'CE', 'DF', 'GO'),
+       TIMESTAMP(data_pedido), TIMESTAMP(data_pedido)
   FROM tmp_ped ORDER BY i;
 
 INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto, created_at, updated_at)

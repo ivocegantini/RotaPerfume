@@ -43,6 +43,8 @@ type Handlers struct {
 	Visita         *comercialhttp.VisitaHandler
 	Estoque        *catalogohttp.EstoqueHandler
 	ImagemPublica  *catalogohttp.ImagemPublicaHandler
+	// Ambiente (APP_ENV, ECOM-18): exposto no GET /api/ambiente (rodapé).
+	Ambiente config.Ambiente
 }
 
 // NovosHandlers cria os handlers sobre o pool, com a Identidade padrão
@@ -81,6 +83,11 @@ func NovosHandlersCom(pool *sql.DB, cfg *config.Config, identidade *identidadeap
 	// SEC-79: checkouts por usuário e por IP (tentativas, com sucesso ou não).
 	vendas.Pedido.ComLimiteCheckout(ratelimit.Nova(checkoutMaxUsuario, checkoutJanela, checkoutBloqueio),
 		ratelimit.Nova(checkoutMaxIP, checkoutJanela, checkoutBloqueio), cfg.TrustProxyHeaders)
+	// ECOM-18: simulador de pagamento só em dev/qa.
+	vendas.Pedido.ComSimuladorPagamento(cfg.Ambiente.PermiteSimuladorPagamento())
+	if cfg.Ambiente.PermiteSimuladorPagamento() {
+		log.Printf("[loja] AVISO: APP_ENV=%s: simulador de pagamento ligado (POST /api/loja/pagamentos/{id}/simular)", cfg.Ambiente)
+	}
 	ident := NovoIdentidadeHTTP(identidade, cfg)
 	return Handlers{
 		Auth:           ident.Auth,
@@ -96,6 +103,7 @@ func NovosHandlersCom(pool *sql.DB, cfg *config.Config, identidade *identidadeap
 		Visita:         com.Visita,
 		Estoque:        cat.Estoque,
 		ImagemPublica:  cat.ImagemPublica,
+		Ambiente:       cfg.Ambiente,
 	}
 }
 

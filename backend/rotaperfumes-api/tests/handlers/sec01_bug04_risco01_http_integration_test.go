@@ -520,6 +520,7 @@ func TestIntegracaoHTTP_BUG04_PutSemAlteracao(t *testing.T) {
 	pedBody := map[string]any{
 		"cliente_id": cliID, "vendedor_id": vendID, "data_pedido": "2024-03-10", "canal": "App", "status": "Em separação",
 		"itens": []map[string]any{{"produto_id": prodID, "quantidade": 2, "preco_praticado": 10.5, "desconto_pct": 0}},
+		"entrega": entregaPayloadH(), // ECOM-17
 	}
 	pedID := criar(t, "/api/pedidos", "pedido_id_origem", pedBody)
 

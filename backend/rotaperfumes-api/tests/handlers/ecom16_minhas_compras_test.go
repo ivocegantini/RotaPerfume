@@ -21,14 +21,16 @@ const (
 	ecom16Count    = `SELECT COUNT\(\*\) FROM pedidos p\s+JOIN clientes c ON c.cliente_id_origem = p.cliente_id\s+WHERE c.usuario_id = \?`
 	ecom16Lista    = `SELECT p.pedido_id_origem, p.data_pedido, p.status, p.valor_total FROM pedidos p .*WHERE c.usuario_id = \? ORDER BY p.data_pedido DESC, p.pedido_id_origem DESC LIMIT \? OFFSET \?`
 	ecom16Nomes    = `SELECT i.pedido_id, i.produto_id, pr.nome FROM itens_pedido i JOIN produtos pr .*WHERE i.pedido_id IN \(\?, \?\) ORDER BY i.pedido_id, i.item_id_origem`
-	ecom16Cab      = `SELECT p.pedido_id_origem, p.data_pedido, p.status, p.valor_total FROM pedidos p .*WHERE c.usuario_id = \? AND p.pedido_id_origem = \? LIMIT 1`
+	ecom16Cab      = `SELECT p.pedido_id_origem, p.data_pedido, p.status, p.valor_total, p.entrega_cep, .*p.entrega_uf FROM pedidos p .*WHERE c.usuario_id = \? AND p.pedido_id_origem = \? LIMIT 1`
 	ecom16Itens    = `SELECT pr.id, pr.sku, pr.nome, .* FROM itens_pedido i JOIN produtos pr ON pr.id = i.produto_id WHERE i.pedido_id = \?`
 	ecom16Pagament = `SELECT forma_pagamento, parcelas, valor, data_vencimento, data_pagamento, status_pagamento\s+FROM pagamentos WHERE pedido_id = \?`
 )
 
 var (
-	ecom16Colunas = []string{"pedido_id_origem", "data_pedido", "status", "valor_total"}
-	ecom16Dia     = time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+	ecom16Colunas    = []string{"pedido_id_origem", "data_pedido", "status", "valor_total"}
+	ecom16ColunasCab = append(append([]string{}, ecom16Colunas...), "entrega_cep", "entrega_endereco", "entrega_numero",
+		"entrega_complemento", "entrega_bairro", "entrega_cidade", "entrega_uf") // ECOM-17
+	ecom16Dia = time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
 )
 
 func TestECOM16_MinhasCompras_PorPedidoDoUsuarioDoToken(t *testing.T) {
@@ -125,8 +127,8 @@ func TestECOM16_MinhaCompra_ItensEPagamento(t *testing.T) {
 	defer db.Close()
 	tok := generateToken(t, testCfg(), idUsuarioLoja, "usuario")
 
-	mock.ExpectQuery(ecom16Cab).WithArgs(idUsuarioLoja, int64(31)).WillReturnRows(sqlmock.NewRows(ecom16Colunas).
-		AddRow(int64(31), ecom16Dia, "Faturado", "299.70"))
+	mock.ExpectQuery(ecom16Cab).WithArgs(idUsuarioLoja, int64(31)).WillReturnRows(sqlmock.NewRows(ecom16ColunasCab).
+		AddRow(int64(31), ecom16Dia, "Faturado", "299.70", "01310100", "Avenida Paulista", "1000", "ap 5", "Bela Vista", "São Paulo", "SP"))
 	mock.ExpectQuery(ecom16Itens).WithArgs(int64(31)).WillReturnRows(sqlmock.NewRows(
 		[]string{"id", "sku", "nome", "imagem", "ativo", "quantidade", "preco_praticado", "desconto_pct", "valor_bruto"}).
 		AddRow(int64(7), "SKU-007", "Perfume A", "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.webp", true, 3, "99.90", 0.0, "299.70"))
@@ -142,6 +144,8 @@ func TestECOM16_MinhaCompra_ItensEPagamento(t *testing.T) {
 	assert.NotContains(t, string(raw), "liquido")
 	corpo := como[map[string]any](t, decodeResponse(t, raw)["data"])
 	assert.Equal(t, float64(31), corpo["pedido_id"])
+	assert.Equal(t, map[string]any{"cep": "01310100", "endereco": "Avenida Paulista", "numero": "1000", "complemento": "ap 5",
+		"bairro": "Bela Vista", "cidade": "São Paulo", "uf": "SP"}, corpo["entrega"], "ECOM-17: endereço no detalhe")
 	itens := como[[]any](t, corpo["itens"])
 	require.Len(t, itens, 1)
 	it := como[map[string]any](t, itens[0])
@@ -163,7 +167,7 @@ func TestECOM16_MinhaCompra_PedidoAlheioDa404(t *testing.T) {
 	defer server.Close()
 	defer db.Close()
 	tok := generateToken(t, testCfg(), idUsuarioLoja, "usuario")
-	mock.ExpectQuery(ecom16Cab).WithArgs(idUsuarioLoja, int64(5)).WillReturnRows(sqlmock.NewRows(ecom16Colunas))
+	mock.ExpectQuery(ecom16Cab).WithArgs(idUsuarioLoja, int64(5)).WillReturnRows(sqlmock.NewRows(ecom16ColunasCab))
 
 	resp := getLoja(t, server.URL+"/api/loja/minhas-compras/5", tok)
 	defer resp.Body.Close()

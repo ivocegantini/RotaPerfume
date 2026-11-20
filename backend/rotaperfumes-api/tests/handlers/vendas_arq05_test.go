@@ -19,15 +19,25 @@ import (
 
 type (
 	legadoPedido struct {
-		PedidoIDOrigem int64     `json:"pedido_id_origem"`
-		ClienteID      int64     `json:"cliente_id"`
-		VendedorID     int64     `json:"vendedor_id"`
-		DataPedido     time.Time `json:"data_pedido"`
-		Canal          string    `json:"canal"`
-		Status         string    `json:"status"`
-		ValorTotal     float64   `json:"valor_total"`
-		CreatedAt      time.Time `json:"created_at"`
-		UpdatedAt      time.Time `json:"updated_at"`
+		PedidoIDOrigem int64           `json:"pedido_id_origem"`
+		ClienteID      int64           `json:"cliente_id"`
+		VendedorID     int64           `json:"vendedor_id"`
+		DataPedido     time.Time       `json:"data_pedido"`
+		Canal          string          `json:"canal"`
+		Status         string          `json:"status"`
+		ValorTotal     float64         `json:"valor_total"`
+		Entrega        entregaContrato `json:"entrega"` // ECOM-17: contrato ganhou o endereço
+		CreatedAt      time.Time       `json:"created_at"`
+		UpdatedAt      time.Time       `json:"updated_at"`
+	}
+	entregaContrato struct {
+		CEP         string `json:"cep"`
+		Endereco    string `json:"endereco"`
+		Numero      string `json:"numero"`
+		Complemento string `json:"complemento"`
+		Bairro      string `json:"bairro"`
+		Cidade      string `json:"cidade"`
+		UF          string `json:"uf"`
 	}
 	legadoPedidoListagem struct {
 		legadoPedido
@@ -74,10 +84,13 @@ func TestARQ05_ContratoJSON_ByteAByte(t *testing.T) {
 	quando := time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)
 	rowsPedido := func() *sqlmock.Rows {
 		return sqlmock.NewRows(pedidoColunasHeaderForHandler()).
-			AddRow(int64(7), int64(1), int64(2), quando, "App", "Entregue", "230.5", quando, quando, "ACME", "Ana")
+			AddRow(int64(7), int64(1), int64(2), quando, "App", "Entregue", "230.5",
+				"01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", quando, quando, "ACME", "Ana")
 	}
 	cabecalho := legadoPedidoListagem{legadoPedido: legadoPedido{PedidoIDOrigem: 7, ClienteID: 1, VendedorID: 2, DataPedido: quando,
-		Canal: "App", Status: "Entregue", ValorTotal: 230.5, CreatedAt: quando, UpdatedAt: quando}, ClienteNome: "ACME", VendedorNome: "Ana"}
+		Canal: "App", Status: "Entregue", ValorTotal: 230.5, Entrega: entregaContrato{CEP: "01310100", Endereco: "Avenida Paulista",
+			Numero: "1000", Bairro: "Bela Vista", Cidade: "São Paulo", UF: "SP"}, CreatedAt: quando, UpdatedAt: quando},
+		ClienteNome: "ACME", VendedorNome: "Ana"}
 	paginacao := func(total, pages int) map[string]any {
 		return map[string]any{"page": 1, "limit": 20, "total": total, "pages": pages}
 	}

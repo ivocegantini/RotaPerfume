@@ -46,6 +46,7 @@ type CompraDetalhe struct {
 	Data       time.Time
 	Status     string
 	ValorTotal kernel.Dinheiro
+	Entrega    Entrega // ECOM-17
 	Itens      []ItemComprado
 	Pagamentos []PagamentoComprado
 }

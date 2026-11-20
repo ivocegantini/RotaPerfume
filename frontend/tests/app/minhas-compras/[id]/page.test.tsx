@@ -16,6 +16,7 @@ import { idDaCompra } from "@/components/loja/DetalheCompra";
 
 const compra: CompraDetalhe = {
   pedido_id: 31, data: "2026-11-10", status: "Faturado", valor_total: 349.7,
+  entrega: { cep: "01310100", endereco: "Avenida Paulista", numero: "1000", complemento: "ap 5", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP" },
   itens: [
     { produto_id: 7, sku: "SKU-7", nome: "Perfume Oud", imagem_url: null, ativo: true, quantidade: 3, preco_praticado: 99.9, desconto_pct: 0, valor_bruto: 299.7 },
     { produto_id: 8, sku: "SKU-8", nome: "Perfume Antigo", imagem_url: null, ativo: false, quantidade: 1, preco_praticado: 50, desconto_pct: 0, valor_bruto: 50 },
@@ -45,6 +46,7 @@ describe("MinhaCompraPage", () => {
     expect(screen.getByText("Cartão de crédito em 3x")).toBeInTheDocument();
     expect(screen.getByText("Em aberto")).toBeInTheDocument();
     expect(screen.getByText("10/12/2026")).toBeInTheDocument();
+    expect(screen.getByText("Avenida Paulista, 1000 - ap 5, Bela Vista, São Paulo/SP, CEP 01310-100")).toBeInTheDocument(); // ECOM-17
     expect(screen.getByRole("link", { name: /Voltar para minhas compras/ })).toHaveAttribute("href", "/minhas-compras");
   });
 

@@ -147,6 +147,14 @@ type Config struct {
 	// REDIS_PASSWORD; CACHE_APPNAME (padrão "rotaperfumes") abre a chave.
 	Redis        RedisConfig
 	CacheAppName string
+
+	// Ambiente (APP_ENV, ECOM-18): dev, qa ou producao (padrão). dev e qa
+	// ligam o simulador de pagamento e o selo do rodapé.
+	Ambiente Ambiente
+
+	// LojaExpiracaoInterval (LOJA_EXPIRACAO_INTERVAL, ECOM-19): intervalo do
+	// job que cancela pedidos da loja com pagamento vencido. Padrão 1h; 0 desliga.
+	LojaExpiracaoInterval time.Duration
 }
 
 // RedisConfig é o destino do cache já validado (sem a URL crua nos logs).
@@ -342,6 +350,15 @@ func load(exigirDB bool) (*Config, error) {
 	}
 
 	cfg.GoogleClientID = strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+
+	vlog.Printf("config.go", "load", "lendo APP_ENV (ECOM-18) e verificando erro")
+	if cfg.Ambiente, err = LoadAmbiente(); err != nil {
+		return nil, err
+	}
+	vlog.Printf("config.go", "load", "lendo LOJA_EXPIRACAO_INTERVAL (ECOM-19) e verificando erro")
+	if cfg.LojaExpiracaoInterval, err = LoadExpiracaoLoja(); err != nil {
+		return nil, err
+	}
 
 	vlog.Printf("config.go", "load", "lendo REDIS_URL/CACHE_APPNAME (CACHE-01) e verificando erro")
 	if cfg.Redis, cfg.CacheAppName, err = LoadCache(); err != nil {

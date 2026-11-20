@@ -5,6 +5,7 @@ package vendas_test
 // regras do PUT de pedido faturado e N-9 (limite de DECIMAL(15,2), ARQ-09).
 
 import (
+	"database/sql/driver"
 	"math"
 	"testing"
 	"time"
@@ -16,12 +17,33 @@ import (
 	"github.com/rotaperfumes/shared/vendas"
 )
 
+// entregaTeste é um endereço de entrega válido (ECOM-17), com máscara no
+// CEP e UF minúscula; entregaArgs é como ele chega ao SQL.
+var entregaTeste = vendas.DadosEntrega{CEP: "01310-100", Endereco: " Avenida Paulista ", Numero: "1000",
+	Bairro: "Bela Vista", Cidade: "São Paulo", UF: "sp"}
+
+var entregaArgs = []driver.Value{"01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP"}
+
+// comEntrega: args do INSERT (… valor_total, entrega_*).
+func comEntrega(antes ...driver.Value) []driver.Value { return append(antes, entregaArgs...) }
+
+// comEntregaEID: args do UPDATE (… valor_total, entrega_*, id).
+func comEntregaEID(v ...driver.Value) []driver.Value {
+	return append(comEntrega(v[:len(v)-1]...), v[len(v)-1])
+}
+
+// linhaComEntrega: linha do SELECT de pedido (entrega_* depois de valor_total).
+func linhaComEntrega(v ...driver.Value) []driver.Value {
+	out := append(append([]driver.Value{}, v[:7]...), entregaArgs...)
+	return append(out, v[7:]...)
+}
+
 func pedidoValido() vendas.DadosPedido {
 	return vendas.DadosPedido{ClienteID: 1, VendedorID: 2, DataPedido: " 2024-01-15 ", Canal: " App ", Status: " Faturado ",
 		Itens: []vendas.DadosItem{
 			{ProdutoID: 10, Quantidade: 2, PrecoPraticado: "100", DescontoPct: 10},
 			{ProdutoID: 11, Quantidade: 1, PrecoPraticado: "50"},
-		}}
+		}, Entrega: entregaTeste}
 }
 
 func TestVendas_NovoPedido_CalculaValoresNoBackend(t *testing.T) {

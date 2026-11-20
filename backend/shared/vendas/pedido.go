@@ -22,12 +22,15 @@ const (
 	StatusEmSeparacao StatusPedido = "Em separação"
 	StatusEntregue    StatusPedido = "Entregue"
 	StatusFaturado    StatusPedido = "Faturado"
+	// StatusAguardandoPagamento: pedido da loja antes da confirmação do
+	// pagamento (ECOM-18); aprovado vai para Em separação, recusado é Cancelado.
+	StatusAguardandoPagamento StatusPedido = "Aguardando pagamento"
 )
 
 // NovoStatusPedido valida o status (espaços nas pontas ignorados).
 func NovoStatusPedido(s string) (StatusPedido, error) {
 	switch v := StatusPedido(strings.TrimSpace(s)); v {
-	case StatusCancelado, StatusEmSeparacao, StatusEntregue, StatusFaturado:
+	case StatusCancelado, StatusEmSeparacao, StatusEntregue, StatusFaturado, StatusAguardandoPagamento:
 		return v, nil
 	}
 	return "", ErrStatusInvalido
@@ -88,6 +91,7 @@ type Pedido struct {
 	Canal          string
 	Status         string
 	ValorTotal     kernel.Dinheiro
+	Entrega        Entrega // ECOM-17: obrigatório
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	ClienteNome    string
@@ -129,6 +133,7 @@ type DadosPedido struct {
 	Canal      string
 	Status     string
 	Itens      []DadosItem
+	Entrega    DadosEntrega // ECOM-17
 }
 
 // NovoPedido valida o comando na ordem do legado (cliente, vendedor, data,
@@ -136,6 +141,7 @@ type DadosPedido struct {
 // desconto) e calcula o valor_bruto de cada item e o valor_total (V-03):
 // bruto = quantidade * preco_praticado * (1 - desconto/100), exato e
 // arredondado ao centavo (metade para longe do zero); total = soma dos brutos.
+// ECOM-17: por último, o endereço de entrega (obrigatório).
 func NovoPedido(d DadosPedido) (*Pedido, error) {
 	switch {
 	case d.ClienteID <= 0:
@@ -159,8 +165,12 @@ func NovoPedido(d DadosPedido) (*Pedido, error) {
 	if err != nil {
 		return nil, err
 	}
+	entrega, err := NovaEntrega(d.Entrega)
+	if err != nil {
+		return nil, err
+	}
 	return &Pedido{ClienteID: d.ClienteID, VendedorID: d.VendedorID, DataPedido: data,
-		Canal: string(canal), Status: string(status), ValorTotal: total, Itens: itens}, nil
+		Canal: string(canal), Status: string(status), ValorTotal: total, Itens: itens, Entrega: entrega}, nil
 }
 
 // MaxItensPedido é o teto de itens de um pedido, na criação e no PUT

@@ -50,6 +50,7 @@ type SortDir = "asc" | "desc";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todos os status" },
+  { value: "Aguardando pagamento", label: "Aguardando pagamento" }, // ECOM-18
   { value: "Em separação", label: "Em separação" },
   { value: "Faturado", label: "Faturado" },
   { value: "Entregue", label: "Entregue" },
@@ -100,6 +101,7 @@ const statusColor: Record<string, string> = {
   Faturado: "bg-green-100 text-green-700",
   Entregue: "bg-blue-100 text-blue-700",
   "Em separação": "bg-yellow-100 text-yellow-700",
+  "Aguardando pagamento": "bg-purple-100 text-purple-700",
   Cancelado: "bg-red-100 text-red-700",
 };
 

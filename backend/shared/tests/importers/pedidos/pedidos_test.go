@@ -17,6 +17,7 @@ import (
 	"github.com/rotaperfumes/shared/cmdutil"
 	"github.com/rotaperfumes/shared/importers/clientesdedup"
 	"github.com/rotaperfumes/shared/importers/pedidos"
+	"github.com/rotaperfumes/shared/vendas"
 )
 
 const (
@@ -344,11 +345,11 @@ func TestUpsertPedidos(t *testing.T) {
 		{PedidoIDOrigem: 5, ClienteIDOrigem: 1, VendedorID: 7, DataPedido: data(2024, 1, 5), Canal: "App", Status: "Faturado", ValorTotal: reaisT("5")},
 	}
 	mock.ExpectPrepare("INSERT INTO pedidos")
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(1), int64(1), int64(7), "2024-01-02", "App", "Faturado", "10.00").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(comEntregaFicticia(int64(1), int64(1), int64(7), "2024-01-02", "App", "Faturado", "10.00")...).WillReturnResult(sqlmock.NewResult(0, 1))
 	// pedido 2: cliente 999 não está no lookup -> nenhum Exec.
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(3), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", "20.00").WillReturnResult(sqlmock.NewResult(0, 2))
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(4), int64(1), int64(99), "2024-01-04", "App", "Cancelado", "0.00").WillReturnError(errBanco) // FK de vendedor
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(5), int64(1), int64(7), "2024-01-05", "App", "Faturado", "5.00").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(comEntregaFicticia(int64(3), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", "20.00")...).WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(comEntregaFicticia(int64(4), int64(1), int64(99), "2024-01-04", "App", "Cancelado", "0.00")...).WillReturnError(errBanco) // FK de vendedor
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(comEntregaFicticia(int64(5), int64(1), int64(7), "2024-01-05", "App", "Faturado", "5.00")...).WillReturnResult(sqlmock.NewResult(0, 0))
 
 	ins, upd, fail, err := pedidos.UpsertPedidos(db, rows, map[int64]int64{1: 1})
 	require.NoError(t, err)
@@ -443,9 +444,9 @@ func TestRun_ImportaAsDuasFasesComUnificacao(t *testing.T) {
 	mock.ExpectQuery("SELECT cliente_id_origem FROM clientes").
 		WillReturnRows(sqlmock.NewRows([]string{"cliente_id_origem"}).AddRow(1))
 	mock.ExpectPrepare("INSERT INTO pedidos")
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(10), int64(1), int64(7), "2024-01-02", "App", "Faturado", "100.00").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(comEntregaFicticia(int64(10), int64(1), int64(7), "2024-01-02", "App", "Faturado", "100.00")...).WillReturnResult(sqlmock.NewResult(0, 1))
 	// NEG-01: pedido do cliente 3001 (cópia) é gravado no sobrevivente 1.
-	mock.ExpectExec("INSERT INTO pedidos").WithArgs(int64(11), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", "50.00").WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec("INSERT INTO pedidos").WithArgs(comEntregaFicticia(int64(11), int64(1), int64(7), "2024-01-03", "Visita", "Entregue", "50.00")...).WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectQuery("SELECT pedido_id_origem FROM pedidos").
 		WillReturnRows(sqlmock.NewRows([]string{"pedido_id_origem"}).AddRow(10).AddRow(11))
 	mock.ExpectQuery("SELECT id, sku FROM produtos").
@@ -601,4 +602,26 @@ func TestRun_ResolveCSVPathFalha(t *testing.T) {
 	err = pedidos.Run(pedidos.Options{PedidosCSVFlag: "p.csv", DryRun: true}, openerProibido(t))
 	require.Error(t, err, "itens sem flag nem env também exige a raiz")
 	assert.Contains(t, err.Error(), "raiz do projeto")
+}
+
+// comEntregaFicticia acrescenta o endereço fictício do pedido (ECOM-17) aos
+// args do upsert: o primeiro arg é o pedido_id_origem.
+func comEntregaFicticia(v ...driver.Value) []driver.Value {
+	e := pedidos.EntregaFicticia(v[0].(int64))
+	return append(v, e.CEP, e.Endereco, e.Numero, e.Bairro, e.Cidade, e.UF)
+}
+
+// ECOM-17: o fictício é determinístico, válido e varia entre as capitais.
+func TestECOM17_EntregaFicticia(t *testing.T) {
+	vistos := map[string]bool{}
+	for id := int64(1); id <= 20; id++ {
+		e := pedidos.EntregaFicticia(id)
+		assert.Equal(t, e, pedidos.EntregaFicticia(id))
+		_, err := vendas.NovaEntrega(vendas.DadosEntrega(e))
+		assert.NoError(t, err, "id=%d", id)
+		vistos[e.Cidade] = true
+	}
+	assert.Len(t, vistos, 10)
+	assert.Equal(t, "Recife", pedidos.EntregaFicticia(6).Cidade, "MOD(6*31, 10) = 6, como na sql/36")
+	assert.Equal(t, "1", pedidos.EntregaFicticia(0).Numero)
 }

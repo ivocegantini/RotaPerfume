@@ -67,7 +67,7 @@ func dadosBUG30(t *testing.T, db *sql.DB) (vendedorID int64) {
 		dia   string
 		valor float64
 	}{{diaBUG30Integracao, valorPedidoDiaBUG30}, {diaSeguinteBUG30, valorPedidoSeguinteBUG30}} {
-		_, err = db.Exec(`INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total) VALUES (?, ?, ?, 'App', 'Faturado', ?)`,
+		_, err = db.Exec(`INSERT INTO pedidos (cliente_id, vendedor_id, data_pedido, canal, status, valor_total, entrega_cep, entrega_endereco, entrega_numero, entrega_bairro, entrega_cidade, entrega_uf) VALUES (?, ?, ?, 'App', 'Faturado', ?, '01310100', 'Avenida Paulista', '1000', 'Bela Vista', 'São Paulo', 'SP')`,
 			clienteID, vendedorID, p.dia, p.valor)
 		require.NoError(t, err)
 	}

@@ -168,12 +168,24 @@ export interface ProdutoLojaDetalhe extends ProdutoLoja {
   descricao: string;
 }
 
+// ECOM-17: endereco de entrega obrigatorio do pedido (so o complemento e opcional).
+export interface EnderecoEntrega {
+  cep: string; // na resposta, so digitos
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+}
+
 // ECOM-14: POST /api/loja/checkout — so produto e quantidade (preco vem do servidor).
 export type FormaCheckout = "pix" | "cartao" | "boleto";
 export interface CheckoutRequest {
   chave: string; // UUID (idempotencia)
   forma_pagamento: FormaCheckout;
   itens: { produto_id: number; quantidade: number }[];
+  entrega: EnderecoEntrega;
 }
 export interface CompraFinalizada {
   pedido_id: number;
@@ -184,6 +196,7 @@ export interface CompraFinalizada {
   status_pagamento: string;
   data_vencimento: string;
   repetida: boolean;
+  entrega: EnderecoEntrega | null;
   itens: { produto_id: number; nome: string; quantidade: number; preco: number; valor: number }[];
 }
 
@@ -225,6 +238,7 @@ export interface CompraDetalhe {
   data: string;
   status: string;
   valor_total: number;
+  entrega: EnderecoEntrega;
   itens: ItemComprado[];
   pagamentos: PagamentoComprado[];
 }
@@ -458,7 +472,8 @@ export type PedidoStatus =
   | "Cancelado"
   | "Em separação"
   | "Entregue"
-  | "Faturado";
+  | "Faturado"
+  | "Aguardando pagamento"; // ECOM-18: pedido da loja antes da confirmação
 
 // Pedido (cabecalho), como retornado por GET /api/pedidos e no cabecalho de
 // GET /api/pedidos/{id}. cliente_nome/vendedor_nome vem via JOIN no backend.
@@ -470,6 +485,7 @@ export interface Pedido {
   canal: string;
   status: string;
   valor_total: number;
+  entrega: EnderecoEntrega;
   created_at: string;
   updated_at: string;
   cliente_nome: string;
@@ -514,6 +530,7 @@ export interface PedidoInput {
   canal: string;
   status: string;
   itens: ItemPedidoInput[];
+  entrega: EnderecoEntrega; // ECOM-17: obrigatorio
 }
 
 // === Pagamentos ===
@@ -538,7 +555,8 @@ export type StatusPagamento =
   | "Em aberto"
   | "Inadimplente"
   | "Pago"
-  | "Pago com atraso";
+  | "Pago com atraso"
+  | "Recusado"; // ECOM-18: pagamento da loja recusado
 
 // Pagamento, como retornado por GET /api/pagamentos e GET /api/pagamentos/{id}.
 // Diferente das demais tabelas, a PK e literalmente pagamento_id (nao ha
@@ -772,3 +790,7 @@ export interface ListEstoqueResponse {
   total: number;
   pages: number;
 }
+
+// ECOM-18: APP_ENV da API (GET /api/ambiente) e o resultado do simulador.
+export type Ambiente = "dev" | "qa" | "producao";
+export type ResultadoPagamento = "aprovado" | "recusado";

@@ -37,6 +37,7 @@
 --       Cheque a prazo, Dinheiro, PIX
 --   - `status_pagamento` vira ENUM com os valores reais observados no CSV:
 --       Em aberto, Inadimplente, Pago, Pago com atraso
+--     (+ Recusado, ECOM-18: pagamento da loja recusado; migração sql/37).
 --   - `parcelas` vira TINYINT UNSIGNED (valores observados 1 a 6).
 --   - `valor` e `valor_liquido` viram DECIMAL(15,2) (mesmo padrão monetário
 --     de `pedidos.valor_total`/`itens_pedido.valor_bruto`), `taxa_pct` vira
@@ -75,7 +76,7 @@ CREATE TABLE IF NOT EXISTS `pagamentos` (
     `valor_liquido` DECIMAL(15,2) NOT NULL COMMENT 'Valor líquido do pagamento em R$ (valor descontada a taxa)',
     `data_vencimento` DATE NOT NULL COMMENT 'Data de vencimento do pagamento',
     `data_pagamento` DATE NULL COMMENT 'Data em que o pagamento efetivamente ocorreu (NULL quando ainda não pago — status Em aberto/Inadimplente)',
-    `status_pagamento` ENUM('Em aberto','Inadimplente','Pago','Pago com atraso') NOT NULL COMMENT 'Status atual do pagamento',
+    `status_pagamento` ENUM('Em aberto','Inadimplente','Pago','Pago com atraso','Recusado') NOT NULL COMMENT 'Status atual do pagamento (Recusado = gateway da loja recusou, ECOM-18)',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação do registro',
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de última atualização',
     PRIMARY KEY (`pagamento_id`),

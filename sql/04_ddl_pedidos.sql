@@ -32,6 +32,11 @@
 --   - ATUALIZAÇÃO (2026-11-18, ECOM-14): `chave_checkout` CHAR(36) NULL
 --     UNIQUE, a idempotência do checkout da loja (migração sql/35,
 --     make db-fix-pedidos-chave-checkout, para bancos já criados).
+--   - ATUALIZAÇÃO (2026-11-20, ECOM-18): status `Aguardando pagamento` (pedido
+--     da loja antes da confirmação; migração sql/37, make db-fix-pagamento-loja).
+--   - ATUALIZAÇÃO (2026-11-19, ECOM-17): endereço de entrega obrigatório
+--     (entrega_cep/endereco/numero/complemento/bairro/cidade/uf, NOT NULL +
+--     chk_pedidos_entrega). Bancos já criados: sql/36 (make db-fix-pedidos-entrega).
 --   - Índices para os filtros esperados pelo Backend/Frontend (tela de
 --     Pedidos master-detail): `status`, `canal`, `data_pedido`, `cliente_id`,
 --     `vendedor_id`.
@@ -50,9 +55,16 @@ CREATE TABLE IF NOT EXISTS `pedidos` (
     `vendedor_id` BIGINT NOT NULL COMMENT 'FK para vendedores.id (vendedor_id do CSV já corresponde 1:1)',
     `data_pedido` DATE NOT NULL COMMENT 'Data do pedido',
     `canal` ENUM('App','Telefone','Visita','WhatsApp','Loja') NOT NULL COMMENT 'Canal de venda do pedido (Loja = checkout da loja online, ECOM-06)',
-    `status` ENUM('Cancelado','Em separação','Entregue','Faturado') NOT NULL COMMENT 'Status do pedido',
+    `status` ENUM('Cancelado','Em separação','Entregue','Faturado','Aguardando pagamento') NOT NULL COMMENT 'Status do pedido (Aguardando pagamento = loja antes da confirmação, ECOM-18)',
     `valor_total` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Valor total do pedido em R$',
     `chave_checkout` CHAR(36) NULL DEFAULT NULL COMMENT 'Chave de idempotência do checkout da loja (ECOM-14); NULL = pedido do CRM/ERP',
+    `entrega_cep` CHAR(8) NOT NULL COMMENT 'CEP de entrega, só dígitos (ECOM-17)',
+    `entrega_endereco` VARCHAR(255) NOT NULL COMMENT 'Rua de entrega (ECOM-17)',
+    `entrega_numero` VARCHAR(20) NOT NULL COMMENT 'Número de entrega ("s/n" aceito, ECOM-17)',
+    `entrega_complemento` VARCHAR(120) NOT NULL DEFAULT '' COMMENT 'Complemento de entrega ('''' = sem, ECOM-17)',
+    `entrega_bairro` VARCHAR(120) NOT NULL COMMENT 'Bairro de entrega (ECOM-17)',
+    `entrega_cidade` VARCHAR(120) NOT NULL COMMENT 'Cidade de entrega (ECOM-17)',
+    `entrega_uf` CHAR(2) NOT NULL COMMENT 'UF de entrega (ECOM-17)',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação do registro',
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de última atualização',
     PRIMARY KEY (`pedido_id_origem`),
@@ -62,6 +74,9 @@ CREATE TABLE IF NOT EXISTS `pedidos` (
     KEY `idx_pedidos_data_pedido` (`data_pedido`),
     KEY `idx_pedidos_cliente_id` (`cliente_id`),
     KEY `idx_pedidos_vendedor_id` (`vendedor_id`),
+    CONSTRAINT `chk_pedidos_entrega` CHECK (`entrega_cep` REGEXP '^[0-9]{8}$' AND TRIM(`entrega_endereco`) <> ''
+        AND TRIM(`entrega_numero`) <> '' AND TRIM(`entrega_bairro`) <> '' AND TRIM(`entrega_cidade`) <> ''
+        AND CHAR_LENGTH(`entrega_uf`) = 2),
     CONSTRAINT `fk_pedidos_cliente` FOREIGN KEY (`cliente_id`)
         REFERENCES `clientes`(`cliente_id_origem`)
         ON DELETE RESTRICT

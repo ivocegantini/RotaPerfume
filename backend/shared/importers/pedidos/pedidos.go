@@ -424,9 +424,10 @@ func UpsertPedidos(db cmdutil.DB, rows []PedidoRow, clienteIDs map[int64]int64) 
 	c, err := importkit.Upsert[PedidoRow]{
 		SQL: `
 		INSERT INTO pedidos
-			(pedido_id_origem, cliente_id, vendedor_id, data_pedido, canal, status, valor_total)
+			(pedido_id_origem, cliente_id, vendedor_id, data_pedido, canal, status, valor_total,
+			 entrega_cep, entrega_endereco, entrega_numero, entrega_bairro, entrega_cidade, entrega_uf)
 		VALUES
-			(?, ?, ?, ?, ?, ?, ?)
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 			cliente_id = VALUES(cliente_id),
 			vendedor_id = VALUES(vendedor_id),
@@ -443,8 +444,10 @@ func UpsertPedidos(db cmdutil.DB, rows []PedidoRow, clienteIDs map[int64]int64) 
 					row.PedidoIDOrigem, row.ClienteIDOrigem)
 				return nil, false
 			}
+			e := EntregaFicticia(row.PedidoIDOrigem)
 			return []any{row.PedidoIDOrigem, clienteID, row.VendedorID,
-				row.DataPedido.Format(dataPedidoLayout), row.Canal, row.Status, row.ValorTotal.String()}, true
+				row.DataPedido.Format(dataPedidoLayout), row.Canal, row.Status, row.ValorTotal.String(),
+				e.CEP, e.Endereco, e.Numero, e.Bairro, e.Cidade, e.UF}, true
 		},
 		LogFalha: func(row PedidoRow, err error) {
 			log.Printf("importpedidos: erro no upsert de pedido_id_origem=%d: %v", row.PedidoIDOrigem, err)

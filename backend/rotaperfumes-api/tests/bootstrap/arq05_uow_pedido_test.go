@@ -25,12 +25,14 @@ import (
 )
 
 var colunasPedido = []string{"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido", "canal", "status",
-	"valor_total", "created_at", "updated_at", "cliente_nome", "vendedor_nome"}
+	"valor_total", "entrega_cep", "entrega_endereco", "entrega_numero", "entrega_complemento", "entrega_bairro", "entrega_cidade", "entrega_uf", "created_at", "updated_at", "cliente_nome", "vendedor_nome"}
 
 func pedidoFaturado() vendasapp.Leitor[vendas.DadosPedido] {
 	return func() (vendas.DadosPedido, error) {
 		return vendas.DadosPedido{ClienteID: 1, VendedorID: 2, DataPedido: "2024-01-15", Canal: "App", Status: "Faturado",
-			Itens: []vendas.DadosItem{{ProdutoID: 10, Quantidade: 3, PrecoPraticado: "10"}}}, nil
+			Itens: []vendas.DadosItem{{ProdutoID: 10, Quantidade: 3, PrecoPraticado: "10"}},
+			Entrega: vendas.DadosEntrega{CEP: "01310100", Endereco: "Avenida Paulista", Numero: "1000", Bairro: "Bela Vista",
+				Cidade: "São Paulo", UF: "SP"}}, nil
 	}
 }
 
@@ -61,7 +63,7 @@ func TestARQ05_Bootstrap_AtualizarPedidoComBaixaNaMesmaTx(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO estoque`).WithArgs(sqlmock.AnyArg(), "SKU-10", 97, false).WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`FROM pedidos p .+ WHERE p\.pedido_id_origem = \? LIMIT 1`).WithArgs(int64(1)).
-		WillReturnRows(sqlmock.NewRows(colunasPedido).AddRow(int64(1), int64(1), int64(2), agora, "App", "Faturado", "30.0", agora, agora, "C", "V"))
+		WillReturnRows(sqlmock.NewRows(colunasPedido).AddRow(int64(1), int64(1), int64(2), agora, "App", "Faturado", "30.0", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", agora, agora, "C", "V"))
 	mock.ExpectQuery(`FROM itens_pedido i`).WithArgs(int64(1)).WillReturnRows(sqlmock.NewRows(nil))
 
 	casos := bootstrap.NovoVendas(db, bootstrap.NovoComercial(db).Escopo())
@@ -78,7 +80,7 @@ func TestARQ05_Bootstrap_CriarPedidoCabecalhoEItensNaMesmaTx(t *testing.T) {
 	agora := time.Now()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "30.00").
+	mock.ExpectExec(`INSERT INTO pedidos`).WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "30.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewResult(9, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido`).WithArgs(int64(9), int64(10), 3, "10.00", 0.0, "30.00").WillReturnResult(sqlmock.NewResult(5, 1))
 	// BUG-20: criado como Faturado, baixa o estoque na MESMA tx.
@@ -90,7 +92,7 @@ func TestARQ05_Bootstrap_CriarPedidoCabecalhoEItensNaMesmaTx(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO estoque`).WithArgs(sqlmock.AnyArg(), "SKU-10", 97, false).WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`FROM pedidos p .+ WHERE p\.pedido_id_origem = \? LIMIT 1`).WithArgs(int64(9)).
-		WillReturnRows(sqlmock.NewRows(colunasPedido).AddRow(int64(9), int64(1), int64(2), agora, "App", "Faturado", "30.0", agora, agora, "C", "V"))
+		WillReturnRows(sqlmock.NewRows(colunasPedido).AddRow(int64(9), int64(1), int64(2), agora, "App", "Faturado", "30.0", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", agora, agora, "C", "V"))
 	mock.ExpectQuery(`FROM itens_pedido i`).WithArgs(int64(9)).WillReturnRows(sqlmock.NewRows(nil))
 
 	casos := bootstrap.NovoVendas(db, bootstrap.NovoComercial(db).Escopo())

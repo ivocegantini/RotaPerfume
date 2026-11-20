@@ -29,6 +29,9 @@ type Pedidos interface {
 	// CompraDoUsuario abre um pedido do login (itens e pagamentos); de
 	// outro login ou inexistente → vendas.ErrPedidoNaoEncontrado.
 	CompraDoUsuario(ctx context.Context, usuarioID, pedidoID int64) (*vendas.CompraDetalhe, error)
+	// LojaVencidos (ECOM-19): ids dos pedidos da Loja Aguardando pagamento com
+	// pagamento Em aberto vencido antes de hoje, em ordem crescente, até limite.
+	LojaVencidos(ctx context.Context, hoje time.Time, limite int) ([]int64, error)
 }
 
 // Pagamentos é o repositório de pagamentos fora da tx. Criação e exclusão
@@ -142,6 +145,13 @@ type LojaNaTx interface {
 	GravarChave(ctx context.Context, pedidoID int64, chave string) error
 	// PagamentoDoPedido: o primeiro pagamento do pedido (nil sem linha).
 	PagamentoDoPedido(ctx context.Context, pedidoID int64) (*vendas.Pagamento, error)
+	// TravarPedidoLoja (ECOM-18): trava o pedido e lê canal, status e o
+	// login do cliente; sem linha → vendas.ErrPedidoNaoEncontrado.
+	TravarPedidoLoja(ctx context.Context, pedidoID int64) (vendas.PedidoLoja, error)
+	// TravarPagamentoDoPedido: o primeiro pagamento, com FOR UPDATE (nil sem linha).
+	TravarPagamentoDoPedido(ctx context.Context, pedidoID int64) (*vendas.Pagamento, error)
+	// GravarPagamentoLoja grava o status do pedido e o do pagamento.
+	GravarPagamentoLoja(ctx context.Context, pedidoID int64, status vendas.StatusPedido, pag *vendas.Pagamento) error
 }
 
 // Transactor é o Unit of Work (db.Transactor satisfaz).

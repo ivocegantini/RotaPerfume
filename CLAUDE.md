@@ -83,6 +83,11 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 - **TST-25** make test-integration recria e apaga o banco rotaperfumes_teste, nunca o DB_NAME.
 - **ENV-01** O `.env` (e `.env.example`, `.env.producao*`) fica em `backend/`, não na raiz. O Makefile lê `backend/.env`; os Go o acham subindo do cwd. `ENV_ARQUIVO` é relativo à raiz (ex.: `ENV_ARQUIVO=backend/.env.producao`).
 
+## Pagamento da loja (ECOM-18)
+
+- Pedido da loja nasce `Aguardando pagamento`; aprovado → `Em separação` + `Pago`; recusado → `Cancelado` + `Recusado`. `APP_ENV` (`dev`|`qa`|`producao`, ausente = producao): dev/qa ligam `POST /api/loja/pagamentos/{id}/simular` e o selo do rodapé. O servidor atual (Inspirion) é o **QA** (`APP_ENV=qa` no credential `rotaperfumes-api-env`).
+- **ECOM-19:** job dentro da API (`LOJA_EXPIRACAO_INTERVAL`, padrão 1h, `0` desliga; sem crontab) cancela o pedido `Aguardando pagamento` cujo pagamento venceu antes de hoje (`Cancelado` + `Recusado`, libera a reserva).
+
 ## Cache (CACHE-01)
 
 - Redis `REDIS_URL=redis://192.168.168.106:48110/0` só para as leituras públicas da loja (vitrine, filtros, imagens); chave `CACHE_APPNAME:area:vN:hash`, dev `rotaperfumes-dev`, produção `rotaperfumes`. Fail-open. Detalhes em `docs/cache-redis.md`.

@@ -31,7 +31,7 @@ func newPedidoTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 // Regexes/colunas que espelham as constantes do repositório.
 // ---------------------------------------------------------------------------
 
-const pedidoColunasRegex = `p\.pedido_id_origem, p\.cliente_id, p\.vendedor_id, p\.data_pedido, p\.canal, p\.status, p\.valor_total, p\.created_at, p\.updated_at, c\.razao_social, v\.nome`
+const pedidoColunasRegex = `p\.pedido_id_origem, p\.cliente_id, p\.vendedor_id, p\.data_pedido, p\.canal, p\.status, p\.valor_total, p\.entrega_cep, p\.entrega_endereco, p\.entrega_numero, p\.entrega_complemento, p\.entrega_bairro, p\.entrega_cidade, p\.entrega_uf, p\.created_at, p\.updated_at, c\.razao_social, v\.nome`
 const pedidoFromRegex = ` FROM pedidos p JOIN clientes c ON c\.cliente_id_origem = p\.cliente_id JOIN vendedores v ON v\.id = p\.vendedor_id`
 const itemPedidoColunasRegex = `i\.item_id_origem, i\.pedido_id, i\.produto_id, i\.quantidade, i\.preco_praticado, i\.desconto_pct, i\.valor_bruto, i\.created_at, i\.updated_at, pr\.sku, pr\.nome`
 const itemPedidoFromRegex = ` FROM itens_pedido i JOIN produtos pr ON pr\.id = i\.produto_id`
@@ -39,14 +39,14 @@ const itemPedidoFromRegex = ` FROM itens_pedido i JOIN produtos pr ON pr\.id = i
 func pedidoColunasHeader() []string {
 	return []string{
 		"pedido_id_origem", "cliente_id", "vendedor_id", "data_pedido",
-		"canal", "status", "valor_total", "created_at", "updated_at", "cliente_nome", "vendedor_nome",
+		"canal", "status", "valor_total", "entrega_cep", "entrega_endereco", "entrega_numero", "entrega_complemento", "entrega_bairro", "entrega_cidade", "entrega_uf", "created_at", "updated_at", "cliente_nome", "vendedor_nome",
 	}
 }
 
 func pedidoRows(idOrigem int64, valorTotal float64) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeader()).
-		AddRow(idOrigem, int64(1), int64(2), now, "App", "Faturado", decT(valorTotal), now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), int64(2), now, "App", "Faturado", decT(valorTotal), "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 func emptyPedidoRows() *sqlmock.Rows {
@@ -83,6 +83,8 @@ func validPedidoInput() vendas.DadosPedido {
 			{ProdutoID: 10, Quantidade: 2, PrecoPraticado: "100.0", DescontoPct: 10},
 			{ProdutoID: 11, Quantidade: 1, PrecoPraticado: "50.0", DescontoPct: 0},
 		},
+		Entrega: vendas.DadosEntrega{CEP: "01310100", Endereco: "Avenida Paulista", Numero: "1000", Bairro: "Bela Vista",
+			Cidade: "São Paulo", UF: "SP"},
 	}
 }
 
@@ -386,8 +388,8 @@ func TestPedidoService_CreatePedido_Validacoes(t *testing.T) {
 // validPedidoInput(), calculando valor_bruto=180.0/50.0 e valor_total=230.0.
 func expectCreateComItensSuccess(mock sqlmock.Sqlmock) {
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").
+	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total,\s+entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf\)`).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewResult(100, 1))
 	mock.ExpectExec(`INSERT INTO itens_pedido \(pedido_id, produto_id, quantidade, preco_praticado, desconto_pct, valor_bruto\)`).
 		WithArgs(int64(100), int64(10), 2, "100.00", 10.0, "180.00").
@@ -436,7 +438,7 @@ func TestPedidoService_CreatePedido_Sucesso(t *testing.T) {
 func TestPedidoService_CreatePedido_ErroCreateComItens(t *testing.T) {
 	db, mock := newPedidoTestDB(t)
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`).
+	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total,\s+entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf\)`).
 		WillReturnError(sql.ErrConnDone)
 	mock.ExpectRollback()
 
@@ -450,8 +452,8 @@ func TestPedidoService_CreatePedido_ErroCreateComItens(t *testing.T) {
 func TestPedidoService_CreatePedido_ErroLastInsertId(t *testing.T) {
 	db, mock := newPedidoTestDB(t)
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total\)`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00").
+	mock.ExpectExec(`INSERT INTO pedidos \(cliente_id, vendedor_id, data_pedido, canal, status, valor_total,\s+entrega_cep, entrega_endereco, entrega_numero, entrega_complemento, entrega_bairro, entrega_cidade, entrega_uf\)`).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP").
 		WillReturnResult(sqlmock.NewErrorResult(sql.ErrConnDone))
 	mock.ExpectRollback()
 
@@ -502,8 +504,8 @@ func TestPedidoService_UpdatePedido_Sucesso(t *testing.T) {
 	mock.ExpectQuery(selectItensAtuaisTxRegex).
 		WithArgs(int64(1)).
 		WillReturnRows(itensAtuaisRowsVazio())
-	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`).
-		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", int64(1)).
+	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?,\s+entrega_cep = \?, entrega_endereco = \?, entrega_numero = \?, entrega_complemento = \?,\s+entrega_bairro = \?, entrega_cidade = \?, entrega_uf = \?\s+WHERE pedido_id_origem = \?`).
+		WithArgs(int64(1), int64(2), sqlmock.AnyArg(), "App", "Faturado", "230.00", "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM itens_pedido WHERE pedido_id = \?`).
 		WithArgs(int64(1)).
@@ -575,7 +577,7 @@ func TestPedidoService_UpdatePedido_ErroGenericoDoRepo(t *testing.T) {
 	mock.ExpectQuery(selectItensAtuaisTxRegex).
 		WithArgs(int64(1)).
 		WillReturnRows(itensAtuaisRowsVazio())
-	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?\s+WHERE pedido_id_origem = \?`).
+	mock.ExpectExec(`UPDATE pedidos\s+SET cliente_id = \?, vendedor_id = \?, data_pedido = \?, canal = \?, status = \?, valor_total = \?,\s+entrega_cep = \?, entrega_endereco = \?, entrega_numero = \?, entrega_complemento = \?,\s+entrega_bairro = \?, entrega_cidade = \?, entrega_uf = \?\s+WHERE pedido_id_origem = \?`).
 		WillReturnError(sql.ErrConnDone)
 	mock.ExpectRollback()
 
@@ -620,7 +622,7 @@ func TestPedidoService_UpdatePedido_FaturadoTentaAlterarItens_Erro409(t *testing
 func pedidoRowsComStatus(idOrigem int64, valorTotal float64, status string) *sqlmock.Rows {
 	now := time.Now()
 	return sqlmock.NewRows(pedidoColunasHeader()).
-		AddRow(idOrigem, int64(1), int64(2), now, "App", status, decT(valorTotal), now, now, "Cliente Teste", "Vendedor Teste")
+		AddRow(idOrigem, int64(1), int64(2), now, "App", status, decT(valorTotal), "01310100", "Avenida Paulista", "1000", "", "Bela Vista", "São Paulo", "SP", now, now, "Cliente Teste", "Vendedor Teste")
 }
 
 const deleteItensPedidoRegex = `DELETE FROM itens_pedido WHERE pedido_id = \?`

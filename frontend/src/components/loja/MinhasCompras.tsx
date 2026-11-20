@@ -29,7 +29,16 @@ export function dataCompra(iso: string): string {
 
 /** Cor do status do pedido. */
 export function StatusPedido({ status }: { status: string }) {
-  const cor = status === "Cancelado" ? "red" : status === "Entregue" ? "green" : status === "Faturado" ? "blue" : "yellow";
+  const cor =
+    status === "Cancelado"
+      ? "red"
+      : status === "Entregue"
+        ? "green"
+        : status === "Faturado"
+          ? "blue"
+          : status === "Aguardando pagamento" // ECOM-18
+            ? "purple"
+            : "yellow";
   return <Badge color={cor}>{status}</Badge>;
 }
 

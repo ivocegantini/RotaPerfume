@@ -14,6 +14,8 @@ type PedidoHandler struct {
 	// SEC-79: limites do checkout (nil = sem limite, como nos testes antigos).
 	limiteUsuario, limiteIP limitador
 	confiarProxy            bool
+	// simulador: POST /api/loja/pagamentos/{id}/simular ligado (ECOM-18).
+	simulador bool
 }
 
 // NovoPedidoHandler exige os casos de uso (nil: panic na montagem).

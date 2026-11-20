@@ -51,6 +51,8 @@ import {
   ListEstoqueFilters,
   CheckoutRequest,
   CompraFinalizada,
+  Ambiente,
+  ResultadoPagamento,
 } from "./types";
 import { fetchEnvelopeWithAuth, fetchWithAuth } from "./apiClient";
 import { vlog } from "./vlog";
@@ -270,6 +272,23 @@ export async function apiMinhaCompra(id: number): Promise<CompraDetalhe> {
 export async function apiFinalizarCompra(input: CheckoutRequest): Promise<CompraFinalizada> {
   vlog(F, "apiFinalizarCompra", "enviando checkout, itens:", input.itens.length);
   return fetchWithAuth<CompraFinalizada>("/api/loja/checkout", { method: "POST", body: JSON.stringify(input) });
+}
+
+// ECOM-18: POST /api/loja/pagamentos/{id}/simular — aprova ou recusa o
+// pagamento de um pedido "Aguardando pagamento" (só APP_ENV dev/qa; senão 404).
+export async function apiSimularPagamento(id: number, resultado: ResultadoPagamento): Promise<CompraFinalizada> {
+  vlog(F, "apiSimularPagamento", "simulando pagamento, id/resultado:", id, resultado);
+  return fetchWithAuth<CompraFinalizada>(`/api/loja/pagamentos/${id}/simular`, {
+    method: "POST",
+    body: JSON.stringify({ resultado }),
+  });
+}
+
+// ECOM-18: GET /api/ambiente — APP_ENV da API (selo do rodapé), público.
+export async function apiAmbiente(): Promise<Ambiente> {
+  vlog(F, "apiAmbiente", "buscando o ambiente da API");
+  const r = await fetchWithAuth<{ ambiente: Ambiente }>("/api/ambiente", { method: "GET", noRefresh: true });
+  return r.ambiente;
 }
 
 // ECOM-04: GET /api/loja/filtros — opcoes de categoria, marca e nota olfativa.

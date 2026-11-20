@@ -12,6 +12,17 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-20: ECOM-19 expiração dos pedidos da loja sem pagamento
+- Job dentro da API (padrão da limpeza do CHORE-02, sem crontab): a cada `LOJA_EXPIRACAO_INTERVAL` (1h; 0 desliga) cancela até 500 pedidos `Aguardando pagamento` com pagamento `Em aberto` vencido antes de hoje (`Cancelado` + `Recusado`), um por tx com lock e reconferência; o shutdown espera o job.
+
+## Avulso de 2026-11-20: ECOM-18 confirmação do pagamento antes da separação
+- Pedido da loja nasce `Aguardando pagamento` (reserva estoque); aprovado → `Em separação` + `Pago`, recusado → `Cancelado` + `Recusado` (sql/37, `make db-fix-pagamento-loja`, no `Migracoes`; aplicado no dev).
+- `APP_ENV` (dev/qa/producao, ausente = producao): `POST /api/loja/pagamentos/{id}/simular` (admin ou dono; 404 fora de dev/qa) e `GET /api/ambiente` (rotas 77); rodapé DEV/QA e botões no checkout/detalhe. `make test`, `test-integration` e vitest (1935) rc=0.
+
+## Avulso de 2026-11-19: ECOM-17 endereço de entrega obrigatório no pedido
+- `pedidos.entrega_*` (CEP, rua, número, complemento opcional, bairro, cidade, UF) NOT NULL + `chk_pedidos_entrega` (sql/36, `make db-fix-pedidos-entrega`, no `Migracoes` do Jenkins); antigos, importador CSV e seed 25 recebem endereço fictício (10 capitais por `MOD(id*31,10)`).
+- Checkout e POST/PUT `/api/pedidos` exigem `entrega` (400 sem gravar); respostas e "minhas compras/{id}" trazem o endereço. Telas: CEP pesquisa na ViaCEP e libera rua/bairro/cidade/estado (abertos); checkout e modal admin bloqueiam sem endereço. `make test`, `test-integration` e `test-frontend` (1927) rc=0.
+
 ## Avulso de 2026-11-19: ECOM-16 minhas compras por pedido, com detalhe
 - `GET /api/loja/minhas-compras` passa a um pedido por linha (ID, data, status, total, nomes dos produtos sem repetir; todos os status; `order_by` data/pedido_id/valor_total). Novo `GET /api/loja/minhas-compras/{id}` (AnyRole; rotas 75): itens e pagamentos sem taxa/líquido; pedido alheio = 404. Sem mudança de schema.
 - Tela: linha clicável (e link `#ID`) abre `/minhas-compras/[id]` com produtos e pagamento; `Table` ganhou `onRowClick`. Postman, matriz e docs atualizados; `make test`, `test-integration` e `test-frontend` (1923) rc=0.

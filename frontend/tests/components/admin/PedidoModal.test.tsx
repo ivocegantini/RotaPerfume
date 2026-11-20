@@ -17,6 +17,8 @@ const api = vi.hoisted(() => ({
   apiListClientesDoVendedor: vi.fn(),
 }));
 vi.mock("@/lib/api", () => api);
+import { ENTREGA, preencherEntrega, viaCepMock } from "../../helpers/entrega";
+vi.mock("@/lib/viaCep", () => viaCepMock);
 
 import { PedidoModal, friendlyPedidoError } from "@/components/admin/PedidoModal";
 import { clearSession, refreshSessionUser } from "@/lib/session";
@@ -170,6 +172,7 @@ describe("PedidoModal - vendedor travado pela sessao (/me)", () => {
     await screen.findByRole("option", { name: "#50 - Perfume 50" });
     await userEvent.selectOptions(screen.getByLabelText("Cliente"), "700");
     await userEvent.selectOptions(screen.getByLabelText("Produto"), "50");
+    await preencherEntrega();
     await userEvent.click(screen.getByRole("button", { name: "Criar pedido" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -401,6 +404,7 @@ describe("PedidoModal - outros perfis", () => {
     await screen.findByRole("option", { name: "#50 - Perfume 50" });
     await userEvent.selectOptions(screen.getByLabelText("Cliente"), "700");
     await userEvent.selectOptions(screen.getByLabelText("Produto"), "50");
+    await preencherEntrega();
     await userEvent.click(screen.getByRole("button", { name: "Criar pedido" }));
 
     expect(
@@ -422,6 +426,7 @@ describe("PedidoModal - FE-03 (reset ao abrir e cascata)", () => {
     canal: "WhatsApp",
     status: "Faturado",
     valor_total: 20,
+    entrega: ENTREGA,
     itens: [
       { item_id_origem: 1, produto_id: 50, quantidade: 2, preco_praticado: 10, desconto_pct: 5 },
     ],
@@ -584,6 +589,7 @@ describe("PedidoModal - BUG-16 (transicoes de status e itens travados)", () => {
       canal: "App",
       status,
       valor_total: 20,
+      entrega: ENTREGA,
       itens: [
         { item_id_origem: 1, produto_id: 50, quantidade: 2, preco_praticado: 10, desconto_pct: 0 },
       ],
@@ -736,5 +742,50 @@ describe("CHORE-07: friendlyPedidoError com os textos novos", () => {
     expect(
       friendlyPedidoError("pedido faturado não pode ser excluído; só pode ter o status alterado para Entregue")
     ).not.toBe("Pedido faturado so pode ter o status alterado para Entregue.");
+  });
+});
+
+// ─── ECOM-17: endereco de entrega obrigatorio ────────────────────────────────
+
+describe("PedidoModal - ECOM-17 (endereco de entrega)", () => {
+  it("criar sem endereco nao envia; campos so liberam depois da pesquisa do CEP", async () => {
+    api.apiMe.mockResolvedValue(me({ id_vendedor: 7 }));
+    await refreshSessionUser();
+    const { onSubmit } = renderModal();
+    await screen.findByRole("option", { name: "#700 - Cliente 700" });
+    await screen.findByRole("option", { name: "#50 - Perfume 50" });
+    await userEvent.selectOptions(screen.getByLabelText("Cliente"), "700");
+    await userEvent.selectOptions(screen.getByLabelText("Produto"), "50");
+    expect(screen.getByLabelText("Cidade")).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Criar pedido" }));
+    expect(await screen.findByText(/Endereco de entrega e obrigatorio/)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await preencherEntrega();
+    expect(screen.getByLabelText("Cidade")).toHaveValue("São Paulo");
+    expect(screen.getByLabelText("Estado")).toHaveValue("SP");
+    await userEvent.click(screen.getByRole("button", { name: "Criar pedido" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ entrega: ENTREGA }));
+  });
+
+  it("editar: endereco gravado vem preenchido e liberado; alteracao e enviada", async () => {
+    api.apiMe.mockResolvedValue(me({ id_vendedor: 7 }));
+    await refreshSessionUser();
+    const pedido = {
+      pedido_id_origem: 5, cliente_id: 700, cliente_nome: "Cliente 700", vendedor_id: 7,
+      data_pedido: "2026-09-01T00:00:00Z", canal: "App", status: "Em separação", valor_total: 20, entrega: ENTREGA,
+      itens: [{ item_id_origem: 1, produto_id: 50, quantidade: 2, preco_praticado: 10, desconto_pct: 0 }],
+    } as unknown as PedidoDetalhe;
+    const { onSubmit } = renderModal({ mode: "edit", pedido });
+    await screen.findByRole("option", { name: "#50 - Perfume 50" });
+    await screen.findByRole("option", { name: /^#700 - Cliente 700/ });
+    expect(screen.getByLabelText("CEP")).toHaveValue("01310-100");
+    expect(screen.getByLabelText("Numero")).toBeEnabled();
+    await userEvent.clear(screen.getByLabelText("Complemento"));
+    await userEvent.type(screen.getByLabelText("Complemento"), "fundos");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar alteracoes" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ entrega: { ...ENTREGA, complemento: "fundos" } }));
   });
 });
