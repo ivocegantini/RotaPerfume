@@ -15,7 +15,7 @@ const arqCheckout = "checkout.go"
 
 // FinalizarCompra fecha o carrinho da loja (ECOM-14): o cliente vem só do
 // token; preços e total, do banco. Mesma chave → o mesmo pedido (Repetida).
-// Pedido "Em separação" + pagamento "Em aberto" numa única tx.
+// Pedido "Aguardando pagamento" + pagamento "Em aberto" numa única tx (ECOM-18).
 func (c *Casos) FinalizarCompra(ctx context.Context, p kernel.Principal, ler Leitor[vendas.DadosCheckout]) (res *vendas.CompraLoja, err error) {
 	defer vlog.Trace(arqCheckout, "Vendas.FinalizarCompra", "user_id=%d", p.UserID())(&err)
 	if !p.Valido() {

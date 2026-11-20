@@ -18,6 +18,19 @@ func pararTarefasDeFundo(cancel context.CancelFunc, done <-chan struct{}, timeou
 	}
 }
 
+// todasTerminadas fecha quando todos os canais fecharem (ECOM-19: limpeza
+// de refresh tokens + expiração da loja).
+func todasTerminadas(chs ...<-chan struct{}) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, c := range chs {
+			<-c
+		}
+	}()
+	return done
+}
+
 // alertador é o que o shutdown precisa do notificador de alertas.
 type alertador interface {
 	Aguardar(timeout time.Duration) bool

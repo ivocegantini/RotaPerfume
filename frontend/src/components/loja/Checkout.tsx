@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CarrinhoLateral } from "@/components/loja/CarrinhoLateral";
 import { FormEnderecoEntrega } from "@/components/loja/FormEnderecoEntrega";
+import { SimuladorPagamento } from "@/components/loja/SimuladorPagamento";
 import { TopoLoja, useSessaoLocal } from "@/components/loja/TopoLoja";
 import { apiFinalizarCompra } from "@/lib/api";
 import { limparCarrinho, useCarrinho } from "@/lib/carrinho";
@@ -33,16 +34,38 @@ export function novaChave(): string {
 
 const dataBR = (iso: string) => iso.split("-").reverse().join("/");
 
-function Confirmacao({ c }: { c: CompraFinalizada }) {
+// ECOM-18: o que o cliente faz em cada forma enquanto o pagamento não é confirmado.
+export function instrucaoPagamento(forma: string, vencimento: string): string {
+  if (forma === "PIX") return "Pague com o Pix para confirmar a compra.";
+  if (forma.startsWith("Boleto")) return `Pague o boleto até ${dataBR(vencimento)} para confirmar a compra.`;
+  return "Aguardando a autorização da operadora do cartão.";
+}
+
+// ECOM-18: texto do resultado conforme o status do pedido.
+export function mensagemStatus(status: string): string {
+  if (status === "Aguardando pagamento") return "O pedido vai para separação assim que o pagamento for confirmado.";
+  if (status === "Em separação") return "Pagamento confirmado! O pedido já está em separação.";
+  if (status === "Cancelado") return "Pagamento recusado: o pedido foi cancelado.";
+  return `Status do pedido: ${status}.`;
+}
+
+function Confirmacao({ c: inicial }: { c: CompraFinalizada }) {
+  const [c, setC] = useState(inicial);
+  const recusado = c.status === "Cancelado";
   return (
-    <section aria-labelledby="titulo-confirmacao" className="mx-auto max-w-lg rounded-xl border border-green-200 bg-white p-6 text-center shadow-sm">
-      <h2 id="titulo-confirmacao" className="text-xl font-bold text-green-700">
+    <section aria-labelledby="titulo-confirmacao" className={`mx-auto max-w-lg rounded-xl border bg-white p-6 text-center shadow-sm ${recusado ? "border-red-200" : "border-green-200"}`}>
+      <h2 id="titulo-confirmacao" className={`text-xl font-bold ${recusado ? "text-red-700" : "text-green-700"}`}>
         Pedido #{c.pedido_id} recebido!
       </h2>
       <p className="mt-2 text-sm text-slate-600">
         Total de <strong>{moeda.format(c.valor_total)}</strong> em {c.forma_pagamento}, vencimento em {dataBR(c.data_vencimento)}.
       </p>
-      <p className="mt-1 text-sm text-slate-600">Pagamento: {c.status_pagamento}. Status do pedido: {c.status}.</p>
+      <p className="mt-1 text-sm text-slate-600">Pagamento: {c.status_pagamento}.</p>
+      <p className="mt-1 text-sm font-medium text-slate-800">{mensagemStatus(c.status)}</p>
+      {c.status === "Aguardando pagamento" && (
+        <p className="mt-1 text-sm text-slate-600">{instrucaoPagamento(c.forma_pagamento, c.data_vencimento)}</p>
+      )}
+      <SimuladorPagamento pedidoId={c.pedido_id} status={c.status} onConcluido={(n) => setC({ ...c, ...n })} />
       {c.entrega && <p className="mt-1 text-sm text-slate-600">Entrega em: {formatarEntrega(c.entrega)}</p>}
       <div className="mt-5 flex justify-center gap-4 text-sm font-medium">
         <Link href="/minhas-compras" className="text-primary-600 hover:underline">

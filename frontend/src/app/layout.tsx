@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { RodapeAmbiente } from "@/components/layout/RodapeAmbiente";
 
 export const metadata: Metadata = {
   title: "RotaPerfumes - Sistema de Gestao",
@@ -20,7 +21,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        {/* ECOM-18: selo DEV/QA (nada em produção) */}
+        <RodapeAmbiente />
+      </body>
     </html>
   );
 }

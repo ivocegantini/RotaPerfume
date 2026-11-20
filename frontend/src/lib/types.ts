@@ -472,7 +472,8 @@ export type PedidoStatus =
   | "Cancelado"
   | "Em separação"
   | "Entregue"
-  | "Faturado";
+  | "Faturado"
+  | "Aguardando pagamento"; // ECOM-18: pedido da loja antes da confirmação
 
 // Pedido (cabecalho), como retornado por GET /api/pedidos e no cabecalho de
 // GET /api/pedidos/{id}. cliente_nome/vendedor_nome vem via JOIN no backend.
@@ -554,7 +555,8 @@ export type StatusPagamento =
   | "Em aberto"
   | "Inadimplente"
   | "Pago"
-  | "Pago com atraso";
+  | "Pago com atraso"
+  | "Recusado"; // ECOM-18: pagamento da loja recusado
 
 // Pagamento, como retornado por GET /api/pagamentos e GET /api/pagamentos/{id}.
 // Diferente das demais tabelas, a PK e literalmente pagamento_id (nao ha
@@ -788,3 +790,7 @@ export interface ListEstoqueResponse {
   total: number;
   pages: number;
 }
+
+// ECOM-18: APP_ENV da API (GET /api/ambiente) e o resultado do simulador.
+export type Ambiente = "dev" | "qa" | "producao";
+export type ResultadoPagamento = "aprovado" | "recusado";

@@ -628,7 +628,7 @@ Oportunidades de venda (funil do CRM), importadas de `dados/crm/oportunidades.cs
 
 **Regras de negócio:** `origem` e `etapa` são VARCHAR (e não ENUM) para não travar a importação se surgirem valores novos; o banco não valida a lista. Exclusão física pela API.
 
-**Migrações:** a 19 só transfere dados. **36 (ECOM-17, `make db-fix-pedidos-entrega`):** cria `entrega_*`, dá aos pedidos antigos um endereço fictício (10 capitais, escolhidas por `MOD(id*31, 10)`; o importador CSV e o seed 25 usam o mesmo) e aplica NOT NULL + CHECK. Reversão: `make db-revert-pedidos-entrega` (perde os endereços).
+**Migrações:** a 19 só transfere dados. **36 (ECOM-17, `make db-fix-pedidos-entrega`):** cria `entrega_*`, dá aos pedidos antigos um endereço fictício (10 capitais, escolhidas por `MOD(id*31, 10)`; o importador CSV e o seed 25 usam o mesmo) e aplica NOT NULL + CHECK. Reversão: `make db-revert-pedidos-entrega` (perde os endereços). **37 (ECOM-18, `make db-fix-pagamento-loja`):** acrescenta `Aguardando pagamento` (pedidos) e `Recusado` (pagamentos) aos ENUMs. Reversão: `make db-revert-pagamento-loja` (Aguardando volta a Em separação; Recusado, a Em aberto).
 
 ---
 
@@ -716,7 +716,7 @@ Pedidos do ERP, importados de `dados/erp/pedidos.csv` (`make db-import-pedidos`,
 | `vendedor_id` | BIGINT | não | - | FK `fk_pedidos_vendedor` → `vendedores.id` (`ON DELETE RESTRICT`, `ON UPDATE CASCADE`). |
 | `data_pedido` | DATE | não | - | Data do pedido (sem horário). |
 | `canal` | ENUM('App','Telefone','Visita','WhatsApp') | não | - | Canal de venda. |
-| `status` | ENUM('Cancelado','Em separação','Entregue','Faturado') | não | - | Status. |
+| `status` | ENUM('Cancelado','Em separação','Entregue','Faturado','Aguardando pagamento') | não | - | Status. ECOM-18: pedido da loja nasce `Aguardando pagamento`; aprovado → `Em separação`, recusado → `Cancelado`. |
 | `valor_total` | DECIMAL(15,2) | não | 0.00 | Valor total em R$. |
 | `entrega_cep` | CHAR(8) | não | - | ECOM-17: CEP de entrega, só dígitos. |
 | `entrega_endereco`, `entrega_numero` | VARCHAR(255), VARCHAR(20) | não | - | Rua e número ("s/n" aceito). |
@@ -774,7 +774,7 @@ Pagamentos dos pedidos, importados de `dados/erp/pagamentos.csv` (`make db-impor
 | `valor_liquido` | DECIMAL(15,2) | não | - | Valor descontada a taxa. |
 | `data_vencimento` | DATE | não | - | Vencimento. |
 | `data_pagamento` | DATE | sim | NULL | **NULL = ainda não pago** (status Em aberto ou Inadimplente). |
-| `status_pagamento` | ENUM('Em aberto','Inadimplente','Pago','Pago com atraso') | não | - | Status. |
+| `status_pagamento` | ENUM('Em aberto','Inadimplente','Pago','Pago com atraso','Recusado') | não | - | Status. ECOM-18: `Recusado` = pagamento da loja recusado. |
 | `created_at`, `updated_at` | TIMESTAMP | não | CURRENT_TIMESTAMP | Controle. |
 
 **Índices:** `PRIMARY` (`pagamento_id`), `idx_pagamentos_pedido_id`, `idx_pagamentos_status_pagamento`, `idx_pagamentos_data_vencimento`.

@@ -93,8 +93,14 @@ export function opcoesStatusPedido(
   if (mode === "edit" && statusAtual === STATUS_ENTREGUE) {
     return STATUS_OPTIONS.filter((o) => o.value === STATUS_ENTREGUE);
   }
-  return STATUS_OPTIONS.filter((o) => o.value !== STATUS_ENTREGUE);
+  // ECOM-18: "Aguardando pagamento" só aparece no pedido da loja que já está nele.
+  const aguardando = mode === "edit" && statusAtual === STATUS_AGUARDANDO_PAGAMENTO;
+  return STATUS_OPTIONS.filter(
+    (o) => o.value !== STATUS_ENTREGUE && (o.value !== STATUS_AGUARDANDO_PAGAMENTO || aguardando)
+  );
 }
+
+const STATUS_AGUARDANDO_PAGAMENTO = "Aguardando pagamento";
 
 interface PedidoModalProps {
   open: boolean;
@@ -112,6 +118,7 @@ const CANAL_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
+  { value: "Aguardando pagamento", label: "Aguardando pagamento" }, // ECOM-18: pedidos da loja
   { value: "Em separação", label: "Em separação" },
   { value: "Faturado", label: "Faturado" },
   { value: "Entregue", label: "Entregue" },

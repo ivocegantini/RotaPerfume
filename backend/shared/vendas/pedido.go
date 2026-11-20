@@ -22,12 +22,15 @@ const (
 	StatusEmSeparacao StatusPedido = "Em separação"
 	StatusEntregue    StatusPedido = "Entregue"
 	StatusFaturado    StatusPedido = "Faturado"
+	// StatusAguardandoPagamento: pedido da loja antes da confirmação do
+	// pagamento (ECOM-18); aprovado vai para Em separação, recusado é Cancelado.
+	StatusAguardandoPagamento StatusPedido = "Aguardando pagamento"
 )
 
 // NovoStatusPedido valida o status (espaços nas pontas ignorados).
 func NovoStatusPedido(s string) (StatusPedido, error) {
 	switch v := StatusPedido(strings.TrimSpace(s)); v {
-	case StatusCancelado, StatusEmSeparacao, StatusEntregue, StatusFaturado:
+	case StatusCancelado, StatusEmSeparacao, StatusEntregue, StatusFaturado, StatusAguardandoPagamento:
 		return v, nil
 	}
 	return "", ErrStatusInvalido

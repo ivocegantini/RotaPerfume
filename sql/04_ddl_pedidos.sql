@@ -32,6 +32,8 @@
 --   - ATUALIZAÇÃO (2026-11-18, ECOM-14): `chave_checkout` CHAR(36) NULL
 --     UNIQUE, a idempotência do checkout da loja (migração sql/35,
 --     make db-fix-pedidos-chave-checkout, para bancos já criados).
+--   - ATUALIZAÇÃO (2026-11-20, ECOM-18): status `Aguardando pagamento` (pedido
+--     da loja antes da confirmação; migração sql/37, make db-fix-pagamento-loja).
 --   - ATUALIZAÇÃO (2026-11-19, ECOM-17): endereço de entrega obrigatório
 --     (entrega_cep/endereco/numero/complemento/bairro/cidade/uf, NOT NULL +
 --     chk_pedidos_entrega). Bancos já criados: sql/36 (make db-fix-pedidos-entrega).
@@ -53,7 +55,7 @@ CREATE TABLE IF NOT EXISTS `pedidos` (
     `vendedor_id` BIGINT NOT NULL COMMENT 'FK para vendedores.id (vendedor_id do CSV já corresponde 1:1)',
     `data_pedido` DATE NOT NULL COMMENT 'Data do pedido',
     `canal` ENUM('App','Telefone','Visita','WhatsApp','Loja') NOT NULL COMMENT 'Canal de venda do pedido (Loja = checkout da loja online, ECOM-06)',
-    `status` ENUM('Cancelado','Em separação','Entregue','Faturado') NOT NULL COMMENT 'Status do pedido',
+    `status` ENUM('Cancelado','Em separação','Entregue','Faturado','Aguardando pagamento') NOT NULL COMMENT 'Status do pedido (Aguardando pagamento = loja antes da confirmação, ECOM-18)',
     `valor_total` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Valor total do pedido em R$',
     `chave_checkout` CHAR(36) NULL DEFAULT NULL COMMENT 'Chave de idempotência do checkout da loja (ECOM-14); NULL = pedido do CRM/ERP',
     `entrega_cep` CHAR(8) NOT NULL COMMENT 'CEP de entrega, só dígitos (ECOM-17)',

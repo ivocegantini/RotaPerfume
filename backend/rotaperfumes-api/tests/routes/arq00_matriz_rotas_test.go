@@ -111,12 +111,13 @@ var matrizRotas = []rotaMatriz{
 	{"POST /api/auth/reset-password", politicaAnyRole, p("/api/auth/reset-password"), true},
 	{"GET /api/auth/me", politicaAnyRole, p("/api/auth/me"), true},
 	// Loja (ECOM-01)
-	{"GET /api/loja/produtos", politicaPublic, p("/api/loja/produtos"), false},              // ECOM-10: vitrine pública
-	{"GET /api/loja/produtos/{id}", politicaPublic, p("/api/loja/produtos/1"), false},       // ECOM-11: página do produto
-	{"GET /api/loja/filtros", politicaPublic, p("/api/loja/filtros"), false},                // ECOM-04/10
-	{"GET /api/loja/minhas-compras", politicaAnyRole, p("/api/loja/minhas-compras"), false}, // ECOM-12: compras do usuário
-	{"GET /api/loja/minhas-compras/{id}", politicaAnyRole, p("/api/loja/minhas-compras/1"), false}, // ECOM-16: detalhe da compra
-	{"POST /api/loja/checkout", politicaAnyRole, p("/api/loja/checkout"), false},            // ECOM-14: fecha o carrinho
+	{"GET /api/loja/produtos", politicaPublic, p("/api/loja/produtos"), false},                              // ECOM-10: vitrine pública
+	{"GET /api/loja/produtos/{id}", politicaPublic, p("/api/loja/produtos/1"), false},                       // ECOM-11: página do produto
+	{"GET /api/loja/filtros", politicaPublic, p("/api/loja/filtros"), false},                                // ECOM-04/10
+	{"GET /api/loja/minhas-compras", politicaAnyRole, p("/api/loja/minhas-compras"), false},                 // ECOM-12: compras do usuário
+	{"GET /api/loja/minhas-compras/{id}", politicaAnyRole, p("/api/loja/minhas-compras/1"), false},          // ECOM-16: detalhe da compra
+	{"POST /api/loja/checkout", politicaAnyRole, p("/api/loja/checkout"), false},                            // ECOM-14: fecha o carrinho
+	{"POST /api/loja/pagamentos/{id}/simular", politicaAnyRole, p("/api/loja/pagamentos/1/simular"), false}, // ECOM-18: simulador (dev/qa)
 	// Usuários / admin
 	{"GET /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
 	{"POST /api/usuarios", politicaAdminOnly, p("/api/usuarios"), false},
@@ -190,6 +191,7 @@ var matrizRotas = []rotaMatriz{
 	{"PUT /api/estoque/{id}", politicaAdminOnly, p("/api/estoque/1"), false},
 	// Healthcheck (X1: GET, que também atende HEAD)
 	{"GET /health", politicaPublic, p("/health"), false},
+	{"GET /api/ambiente", politicaPublic, p("/api/ambiente"), false}, // ECOM-18: selo do rodapé
 }
 
 const (
@@ -330,12 +332,12 @@ func TestARQ00_Matriz_CobreTodasAsRotasDeRoutesGo(t *testing.T) {
 	assert.Empty(t, faltando, "rotas registradas no router SEM política na matriz ARQ-00 — adicione-as a matrizRotas")
 	assert.Empty(t, sobrando, "rotas na matriz ARQ-00 que NÃO estão mais no router — remova-as ou corrija o padrão")
 	assert.Empty(t, divergentes, "política registrada no router diverge da matriz ARQ-00")
-	assert.Len(t, registradas, 75, "a API registra 75 padrões (13 Public, 34 Authenticated, 23 AdminOnly, 5 AnyRole)")
+	assert.Len(t, registradas, 77, "a API registra 77 padrões (14 Public, 34 Authenticated, 23 AdminOnly, 6 AnyRole)")
 	porPolitica := map[politicaRota]int{}
 	for _, rt := range registradas {
 		porPolitica[politicaDe(rt.Policy)]++
 	}
-	assert.Equal(t, map[politicaRota]int{politicaPublic: 13, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 5}, porPolitica,
+	assert.Equal(t, map[politicaRota]int{politicaPublic: 14, politicaAuthenticated: 34, politicaAdminOnly: 23, politicaAnyRole: 6}, porPolitica,
 		"contagem por política registrada no router")
 }
 
@@ -360,7 +362,7 @@ func TestARQ00_Matriz_Sanidade(t *testing.T) {
 		}
 	}
 	sort.Strings(publicas)
-	assert.Equal(t, []string{"GET /api/loja/filtros", "GET /api/loja/produtos", "GET /api/loja/produtos/{id}", "GET /api/public/produtos/imagens/{arquivo}", "GET /health", "POST /api/auth/cadastro", "POST /api/auth/confirmar-email", "POST /api/auth/google", "POST /api/auth/google/cadastro", "POST /api/auth/login", "POST /api/auth/logout", "POST /api/auth/reenviar-confirmacao", "POST /api/auth/refresh"}, publicas)
+	assert.Equal(t, []string{"GET /api/ambiente", "GET /api/loja/filtros", "GET /api/loja/produtos", "GET /api/loja/produtos/{id}", "GET /api/public/produtos/imagens/{arquivo}", "GET /health", "POST /api/auth/cadastro", "POST /api/auth/confirmar-email", "POST /api/auth/google", "POST /api/auth/google/cadastro", "POST /api/auth/login", "POST /api/auth/logout", "POST /api/auth/reenviar-confirmacao", "POST /api/auth/refresh"}, publicas)
 }
 
 // ---------------------------------------------------------------------------

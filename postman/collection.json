@@ -23,6 +23,11 @@
       "value": ""
     },
     {
+      "key": "pedido_loja_id",
+      "value": "",
+      "description": "ECOM-18: pedido criado pelo Finalizar Compra, usado pelo Simular Pagamento."
+    },
+    {
       "key": "admin_token",
       "value": ""
     },
@@ -109,6 +114,32 @@
           "body": "{\n  \"success\": true,\n  \"data\": {\n    \"status\": \"ok\"\n  }\n}"
         }
       ]
+    },
+    {
+      "name": "Ambiente da API (pública, ECOM-18)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', function() { pm.response.to.have.status(200); });",
+              "pm.test('ambiente dev, qa ou producao', function() { pm.expect(pm.response.json().data.ambiente).to.be.oneOf(['dev', 'qa', 'producao']); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/ambiente",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ambiente"]
+        },
+        "description": "GET /api/ambiente — **pública**. Devolve o `APP_ENV` da API (`dev`, `qa` ou `producao`; ausente = `producao`). O frontend mostra o selo DEV/QA no rodapé e libera o simulador de pagamento."
+      },
+      "response": []
     },
     {
       "name": "Login",
@@ -6243,10 +6274,11 @@
                   "var d = pm.response.json().data;",
                   "pm.test('Pedido da loja sem vendedor nem custo', function() {",
                   "    pm.expect(d).to.have.property('pedido_id');",
-                  "    pm.expect(d.status).to.eql('Em separação');",
+                  "    pm.expect(d.status).to.eql('Aguardando pagamento'); // ECOM-18",
                   "    pm.expect(d.status_pagamento).to.eql('Em aberto');",
                   "    pm.expect(d).to.not.have.property('vendedor_id');",
-                  "});"
+                  "});",
+                  "pm.collectionVariables.set('pedido_loja_id', d.pedido_id); // ECOM-18: usado pelo simulador"
                 ]
               }
             }
@@ -6274,7 +6306,83 @@
                 "checkout"
               ]
             },
-            "description": "POST /api/loja/checkout — **AnyRole** (sessão obrigatória). Fecha o carrinho do cliente da loja ligado ao usuário do token. O corpo traz só `produto_id` e `quantidade` (1..99, até 50 itens, sem repetir), `forma_pagamento` (`pix`, `cartao`, `boleto`) e `chave` (UUID de idempotência).\n\nPreço e total vêm do banco (`preco_tabela` dos ativos). Cria o pedido (canal `Loja`, vendedor \"Loja Online\", status `Em separação`) e o pagamento `Em aberto` (PIX/cartão vencem hoje; boleto em 14 dias) numa única transação. Mesma chave → **200** com o mesmo pedido (`repetida: true`).\n\n**Estoque (SEC-79):** disponível = saldo do último snapshot − unidades em pedidos `Loja` \"Em separação\"; o produto é travado na tx (sem vender a mesma unidade duas vezes).\n\n**Limite (SEC-79):** 10 tentativas por usuário e 30 por IP em 10 min; acima, 429 por 15 min (`Retry-After`).\n\n**Erros:** 400 corpo inválido; 401 sem sessão; 403 login sem cliente da loja; 409 produto inativo/inexistente, estoque insuficiente ou chave de outro cliente; 429 limite de tentativas.\n\n**ECOM-17 (2026-11-19):** `entrega` é obrigatório: `cep` (8 dígitos, com ou sem máscara), `endereco`, `numero` (\"s/n\" aceito), `bairro`, `cidade` e `uf` (sigla); `complemento` opcional. Faltando algum: `400` (ex.: `\"cep de entrega deve ter 8 dígitos\"`) e nada é gravado — a compra não é finalizada nem vai para separação. A resposta traz o objeto `entrega` (cep só dígitos)."
+            "description": "POST /api/loja/checkout — **AnyRole** (sessão obrigatória). Fecha o carrinho do cliente da loja ligado ao usuário do token. O corpo traz só `produto_id` e `quantidade` (1..99, até 50 itens, sem repetir), `forma_pagamento` (`pix`, `cartao`, `boleto`) e `chave` (UUID de idempotência).\n\nPreço e total vêm do banco (`preco_tabela` dos ativos). Cria o pedido (canal `Loja`, vendedor \"Loja Online\", status `Aguardando pagamento`, ECOM-18) e o pagamento `Em aberto` (PIX/cartão vencem hoje; boleto em 14 dias) numa única transação. Mesma chave → **200** com o mesmo pedido (`repetida: true`).\n\n**Estoque (SEC-79):** disponível = saldo do último snapshot − unidades em pedidos `Loja` \"Aguardando pagamento\" ou \"Em separação\"; o produto é travado na tx (sem vender a mesma unidade duas vezes).\n\n**Limite (SEC-79):** 10 tentativas por usuário e 30 por IP em 10 min; acima, 429 por 15 min (`Retry-After`).\n\n**Erros:** 400 corpo inválido; 401 sem sessão; 403 login sem cliente da loja; 409 produto inativo/inexistente, estoque insuficiente ou chave de outro cliente; 429 limite de tentativas.\n\n**ECOM-17 (2026-11-19):** `entrega` é obrigatório: `cep` (8 dígitos, com ou sem máscara), `endereco`, `numero` (\"s/n\" aceito), `bairro`, `cidade` e `uf` (sigla); `complemento` opcional. Faltando algum: `400` (ex.: `\"cep de entrega deve ter 8 dígitos\"`) e nada é gravado — a compra não é finalizada nem vai para separação. A resposta traz o objeto `entrega` (cep só dígitos)."
+          },
+          "response": []
+        },
+        {
+          "name": "Simular Pagamento — aprovado (AnyRole, só dev/qa, ECOM-18)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 (dev/qa) ou 409 (já confirmado)', function() { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });",
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.test('Pedido Em separação e pagamento Pago', function() { pm.expect(d.status).to.eql('Em separação'); pm.expect(d.status_pagamento).to.eql('Pago'); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resultado\": \"aprovado\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/loja/pagamentos/{{pedido_loja_id}}/simular",
+              "host": ["{{base_url}}"],
+              "path": ["api", "loja", "pagamentos", "{{pedido_loja_id}}", "simular"]
+            },
+            "description": "POST /api/loja/pagamentos/{id}/simular — **AnyRole**, só com `APP_ENV=dev` ou `qa` (em produção: **404**). Simula a resposta do gateway para um pedido da loja `Aguardando pagamento`: `aprovado` → pedido `Em separação` + pagamento `Pago` (data de hoje); `recusado` → pedido `Cancelado` + pagamento `Recusado` (libera a reserva de estoque).\n\nSó o admin ou o dono do pedido (de outro login: 404). **Erros:** 400 resultado inválido; 404 desligado/inexistente/alheio; 409 pedido não está aguardando pagamento."
+          },
+          "response": []
+        },
+        {
+          "name": "Simular Pagamento — recusado (AnyRole, só dev/qa, ECOM-18)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 (dev/qa) ou 409 (já confirmado)', function() { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });",
+                  "if (pm.response.code === 200) {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.test('Pedido Cancelado e pagamento Recusado', function() { pm.expect(d.status).to.eql('Cancelado'); pm.expect(d.status_pagamento).to.eql('Recusado'); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resultado\": \"recusado\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/loja/pagamentos/{{pedido_loja_id}}/simular",
+              "host": ["{{base_url}}"],
+              "path": ["api", "loja", "pagamentos", "{{pedido_loja_id}}", "simular"]
+            },
+            "description": "POST /api/loja/pagamentos/{id}/simular — **AnyRole**, só com `APP_ENV=dev` ou `qa` (em produção: **404**). Simula a resposta do gateway para um pedido da loja `Aguardando pagamento`: `aprovado` → pedido `Em separação` + pagamento `Pago` (data de hoje); `recusado` → pedido `Cancelado` + pagamento `Recusado` (libera a reserva de estoque).\n\nSó o admin ou o dono do pedido (de outro login: 404). **Erros:** 400 resultado inválido; 404 desligado/inexistente/alheio; 409 pedido não está aguardando pagamento."
           },
           "response": []
         }

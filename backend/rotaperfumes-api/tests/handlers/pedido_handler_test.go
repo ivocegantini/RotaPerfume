@@ -576,7 +576,7 @@ func TestCreatePedido_ValidacaoNegocio(t *testing.T) {
 				p["status"] = "Pendente"
 				return p
 			},
-			wantMsg: "status inválido (use: Cancelado, Em separação, Entregue, Faturado)",
+			wantMsg: "status inválido (use: Cancelado, Em separação, Entregue, Faturado, Aguardando pagamento)",
 		},
 		{
 			nome: "itens vazio",

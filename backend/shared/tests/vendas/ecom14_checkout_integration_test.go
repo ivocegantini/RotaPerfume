@@ -105,7 +105,7 @@ func TestIntegracaoECOM14_Checkout(t *testing.T) {
 	require.NoError(t, conn.QueryRow(`SELECT entrega_cep, entrega_uf FROM pedidos WHERE pedido_id_origem = ?`, id).Scan(&cep, &uf))
 	assert.Equal(t, "01310100", cep)
 	assert.Equal(t, "SP", uf)
-	assert.Equal(t, []string{"Loja", "Em separação", "300.85", chave}, []string{canal, status, total, chaveGravada})
+	assert.Equal(t, []string{"Loja", "Aguardando pagamento", "300.85", chave}, []string{canal, status, total, chaveGravada})
 	var nItens int
 	require.NoError(t, conn.QueryRow(`SELECT COUNT(*) FROM itens_pedido WHERE pedido_id = ?`, id).Scan(&nItens))
 	assert.Equal(t, 2, nItens)
@@ -128,7 +128,7 @@ func TestIntegracaoECOM14_Checkout(t *testing.T) {
 	require.NoError(t, conn.QueryRow(`SELECT COUNT(*) FROM pedidos WHERE cliente_id = ?`, cliente).Scan(&nPedidos))
 	assert.Equal(t, 1, nPedidos, "o inativo não gravou nada")
 
-	// SEC-79: A tinha 5 e o 1º pedido (Em separação) reservou 3: sobram 2.
+	// SEC-79: A tinha 5 e o 1º pedido (Aguardando pagamento) reservou 3: sobram 2.
 	terceira := fmt.Sprintf("%08x-0000-4000-8000-%012x", (n+2)%0xffffffff, (n+2)%0xffffffffffff)
 	_, err = finalizar(usuario, terceira, vendas.ItemCheckout{ProdutoID: prodA, Quantidade: 3})
 	assert.ErrorIs(t, err, vendas.ErrCheckoutSemEstoque, "5 - 3 reservados = 2 < 3")

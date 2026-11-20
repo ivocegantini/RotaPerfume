@@ -73,7 +73,7 @@ func TestECOM14_MontarCompraLoja(t *testing.T) {
 		ped, pag, err := vendas.MontarCompraLoja(v, 55, 168, ofertas, hoje)
 		require.NoError(t, err)
 		assert.Equal(t, "Loja", ped.Canal)
-		assert.Equal(t, "Em separação", ped.Status)
+		assert.Equal(t, "Aguardando pagamento", ped.Status, "ECOM-18")
 		assert.Equal(t, vendas.Entrega{CEP: "01310100", Endereco: "Avenida Paulista", Numero: "1000", Bairro: "Bela Vista",
 			Cidade: "São Paulo", UF: "SP"}, ped.Entrega, "ECOM-17: o pedido nasce com o endereço normalizado")
 		assert.Equal(t, int64(55), ped.ClienteID)

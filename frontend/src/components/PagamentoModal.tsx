@@ -57,6 +57,7 @@ const STATUS_PAGAMENTO_OPTIONS = [
   { value: "Inadimplente", label: "Inadimplente" },
   { value: "Pago", label: "Pago" },
   { value: "Pago com atraso", label: "Pago com atraso" },
+  { value: "Recusado", label: "Recusado" }, // ECOM-18
 ];
 
 // SEC-27: teto da taxa (%) aceito pelo backend (400 fora de 0..30).

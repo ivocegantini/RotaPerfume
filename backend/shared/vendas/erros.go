@@ -27,7 +27,7 @@ var (
 	ErrVendedorIDObrigatorio  = kernel.NovoErro(kernel.KindInvalido, "vendedor_id é obrigatório")
 	ErrDataPedidoInvalida     = kernel.NovoErro(kernel.KindInvalido, "data_pedido inválida (use o formato AAAA-MM-DD)")
 	ErrCanalInvalido          = kernel.NovoErro(kernel.KindInvalido, "canal inválido (use: App, Telefone, Visita, WhatsApp, Loja)")
-	ErrStatusInvalido         = kernel.NovoErro(kernel.KindInvalido, "status inválido (use: Cancelado, Em separação, Entregue, Faturado)")
+	ErrStatusInvalido         = kernel.NovoErro(kernel.KindInvalido, "status inválido (use: Cancelado, Em separação, Entregue, Faturado, Aguardando pagamento)")
 	ErrItensObrigatorios      = kernel.NovoErro(kernel.KindInvalido, "o pedido deve ter ao menos um item")
 	ErrItensDemais            = kernel.NovoErro(kernel.KindInvalido, "o pedido deve ter no máximo 200 itens") // SEC-14: MaxItensPedido
 	ErrProdutoIDObrigatorio   = kernel.NovoErro(kernel.KindInvalido, "produto_id é obrigatório em todos os itens")
@@ -103,4 +103,16 @@ var (
 	ErrCheckoutChaveEmUso = kernel.NovoErro(kernel.KindConflito, "checkout já utilizado; recarregue a página")
 	// ErrVendedorLojaAusente: falta o vendedor "Loja Online" (sql/33).
 	ErrVendedorLojaAusente = kernel.NovoErro(kernel.KindInterno, "erro interno")
+)
+
+// Erros da confirmação do pagamento da loja (ECOM-18).
+var (
+	ErrResultadoPagamentoInvalido = kernel.NovoErro(kernel.KindInvalido, "resultado inválido (use: aprovado, recusado)")
+	// ErrPagamentoNaoPendente: o pedido não é da loja ou já saiu de
+	// "Aguardando pagamento" (confirmado, recusado ou alterado pelo admin).
+	ErrPagamentoNaoPendente = kernel.NovoErro(kernel.KindConflito, "o pedido não está aguardando pagamento")
+	// ErrSimuladorDesligado: APP_ENV fora de dev/qa (a rota responde 404).
+	ErrSimuladorDesligado = kernel.NovoErro(kernel.KindNaoEncontrado, "recurso não encontrado")
+	// ErrPagamentoNaoVencido (ECOM-19): o job não cancela antes do vencimento.
+	ErrPagamentoNaoVencido = kernel.NovoErro(kernel.KindConflito, "o pagamento ainda não venceu")
 )

@@ -40,12 +40,13 @@ const (
 	StatusInadimplente  StatusPagamento = "Inadimplente"
 	StatusPago          StatusPagamento = "Pago"
 	StatusPagoComAtraso StatusPagamento = "Pago com atraso"
+	StatusRecusado      StatusPagamento = "Recusado" // gateway da loja recusou (ECOM-18)
 )
 
 // NovoStatusPagamento valida o status (espaços nas pontas ignorados).
 func NovoStatusPagamento(s string) (StatusPagamento, error) {
 	switch v := StatusPagamento(strings.TrimSpace(s)); v {
-	case StatusEmAberto, StatusInadimplente, StatusPago, StatusPagoComAtraso:
+	case StatusEmAberto, StatusInadimplente, StatusPago, StatusPagoComAtraso, StatusRecusado:
 		return v, nil
 	}
 	return "", ErrStatusPagamentoInvalido

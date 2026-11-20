@@ -17,6 +17,7 @@ import (
 	"github.com/rotaperfumes/shared/db"
 	"github.com/rotaperfumes/shared/identidade/identidadeapp"
 	"github.com/rotaperfumes/shared/notificacao/notificacaoapp"
+	"github.com/rotaperfumes/shared/vendas/vendasapp"
 )
 
 // Timeouts do servidor e do shutdown (F-04); ReadHeaderTimeout e
@@ -40,6 +41,8 @@ type App struct {
 	Handler     http.Handler
 	Identidade  *identidadeapp.Casos
 	Notificador *notificacaoapp.AlertaSegurancaNotifier
+	// Vendas: casos de uso do job de expiração da loja (ECOM-19).
+	Vendas *vendasapp.Casos
 }
 
 // Montar liga as dependências sobre o pool: e-mail (SMTP ou Noop), notifier
@@ -58,10 +61,12 @@ func Montar(cfg *config.Config, pool *sql.DB) *App {
 	})
 	hs := NovosHandlersCom(pool, cfg, identidade)
 	// SEC-06: o checker é o próprio caso de uso (consulta o banco a cada request).
-	return &App{Handler: httpx.Chain(HandlerHTTP(cfg, identidade, hs), httpx.Logging), Identidade: identidade, Notificador: notifier}
+	return &App{Handler: httpx.Chain(HandlerHTTP(cfg, identidade, hs), httpx.Logging), Identidade: identidade, Notificador: notifier,
+		Vendas: NovoVendas(pool, NovoComercial(pool).Escopo())}
 }
 
-// Run abre o banco, sobe a limpeza de refresh tokens (CHORE-02) e o servidor,
+// Run abre o banco, sobe a limpeza de refresh tokens (CHORE-02), a expiração
+// dos pedidos da loja (ECOM-19) e o servidor,
 // e no SIGINT/SIGTERM faz o shutdown na ordem F-04/I-10: servidor (10 s) →
 // tarefas de fundo (até 10 s) → alertas de segurança em andamento (até
 // 10 s, NB-6) → pool.
@@ -72,6 +77,8 @@ func Run(cfg *config.Config) {
 	defer bgCancel()
 	app := Montar(cfg, pool)
 	limpezaDone := identidadeapp.IniciarLimpezaPeriodica(bgCtx, app.Identidade, cfg.RefreshCleanupInterval)
+	// ECOM-19: cancela pedidos da loja com pagamento vencido.
+	expiracaoDone := vendasapp.IniciarExpiracaoPeriodica(bgCtx, app.Vendas, cfg.LojaExpiracaoInterval)
 
 	srv := NovoServidor(app.Handler)
 	go func() {
@@ -89,7 +96,7 @@ func Run(cfg *config.Config) {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("[server] shutdown erro: %v", err)
 	}
-	pararTarefasDeFundo(bgCancel, limpezaDone, timeoutTarefasFund)
+	pararTarefasDeFundo(bgCancel, todasTerminadas(limpezaDone, expiracaoDone), timeoutTarefasFund)
 	aguardarAlertas(app.Notificador, timeoutAlertas)
 	_ = pool.Close()
 	log.Printf("[server] bye")
