@@ -131,7 +131,7 @@ type LojaNaTx interface {
 	// ClienteDoUsuario trava (FOR UPDATE) o cliente ligado ao login: serializa
 	// os checkouts do mesmo cliente. Sem cliente → vendas.ErrCheckoutSemCliente.
 	ClienteDoUsuario(ctx context.Context, usuarioID int64) (int64, error)
-	// VendedorLoja: o vendedor "Loja Online" (sql/33); ausente →
+	// VendedorLoja: o vendedor "Loja Online" (sql/schema.sql); ausente →
 	// vendas.ErrVendedorLojaAusente.
 	VendedorLoja(ctx context.Context) (int64, error)
 	// OfertasAtivas: preço e disponível dos produtos ATIVOS entre ids (os

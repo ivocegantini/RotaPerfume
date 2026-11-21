@@ -186,7 +186,7 @@ func TestTrocarSenha_RamosDeFalha(t *testing.T) {
 	})
 	// BUG-15: antes a troca seguia (O8-iii); agora histórico, senha e
 	// revogação estão na mesma tx e a falha de qualquer um é 500 sem trocar
-	// a senha (casos por etapa em bug15_senha_tx_test.go).
+	// a senha (casos por etapa em senha_troca_reset_tx_unica_test.go).
 	t.Run("histórico ou revogação falham: 500 e a senha não muda (BUG-15)", func(t *testing.T) {
 		for _, falhar := range []func(a *ambiente){
 			func(a *ambiente) { a.historico.errRegistro = errInfra },

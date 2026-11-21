@@ -1,4 +1,4 @@
-.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-fix-deve-trocar-senha db-fix-tipo-reset db-fix-cnpj-unique db-revert-cnpj-unique db-fix-cnpj-comment db-revert-cnpj-comment db-fix-revoked-reason db-revert-revoked-reason db-fix-tokens-validos-desde db-revert-tokens-validos-desde db-fix-reuso-detectado db-revert-reuso-detectado db-fix-taxa-pct-check db-revert-taxa-pct-check db-fix-produtos-imagem db-revert-produtos-imagem db-fix-role-usuario db-revert-role-usuario db-fix-confirmacao-email db-revert-confirmacao-email db-fix-clientes-loja db-revert-clientes-loja db-fix-clientes-numero db-revert-clientes-numero db-fix-historico-created-at db-revert-historico-created-at db-fix-pedidos-canal-loja db-revert-pedidos-canal-loja db-fix-produtos-nome-descricao db-revert-produtos-nome-descricao db-fix-pedidos-chave-checkout db-revert-pedidos-chave-checkout db-fix-pedidos-entrega db-revert-pedidos-entrega db-fix-pagamento-loja db-revert-pagamento-loja db-fix-estoque-origem db-revert-estoque-origem db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test lint shellcheck \
+.PHONY: help db-guard-producao db-guard-sem-producao db-guard-drop db-guard-integracao db-guard-banco-teste fix-admin test-integration reset-senhas-simular reset-senhas-ativos db-gerar-imagens-produtos db-check-env db-up db-down db-seed db-reset db-create db-migrar db-rebuild db-export db-import-clientes db-import-produtos db-import-pedidos db-import-pagamentos db-import-carteiras db-import-oportunidades db-import-visitas db-import-estoque db-seed-mes-atual test lint shellcheck \
 	build build-api run-api dev-api stop-api \
 	test-api cover-api test-shared cover-shared arch-check cover-combinada gen-hash fix-hash \
 	frontend-deps \
@@ -271,7 +271,7 @@ setup-check: ## SETUP-01: só confere versões (inclui covdata e GOTOOLCHAIN, pr
 # Banco de dados
 # =============================================================================
 # SEC-11: pré-requisito de todo alvo que chama o cliente do banco (db-create, db-down,
-# db-fix-*, db-revert-*; db-up/db-seed herdam via db-create). Fica depois do
+# db-migrar; db-up/db-seed herdam via db-create). Fica depois do
 # "help" para não virar o alvo padrão do make.
 db-check-env: ## Confere DB_USUARIO/DB_SENHA (SEC-11), o TLS exigido para host remoto (SEC-42) e o cliente MariaDB (DB_CLIENTE_BIN)
 	@test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD" || { echo "SEC-11: defina DB_USUARIO/DB_SENHA no backend/.env"; exit 1; }
@@ -419,16 +419,12 @@ db-guard-integracao: ## SEC-54: testes de integracao so no loopback ou no CasaOS
 db-create: db-guard-producao db-check-env ## Cria o banco de dados se não existir
 	$(DB_CLI) -e "CREATE DATABASE IF NOT EXISTS $(DB_NAME) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-# DEPLOY-07: a ordem da DDL fica em sql/ordem-ddl.txt (a mesma usada pelo
-# deploy/seed-producao.sh). Linhas vazias e "#..." sao ignoradas.
-DDL_ORDEM := $(shell grep -Ev '^[[:space:]]*(\#|$$)' sql/ordem-ddl.txt 2>/dev/null)
-
-db-up: db-guard-producao db-create ## Cria o schema (tabelas vazias) na ordem de sql/ordem-ddl.txt
-	@test -n "$(DDL_ORDEM)" || { echo "DEPLOY-07: sql/ordem-ddl.txt ausente ou vazio"; exit 1; }
-	@for f in $(DDL_ORDEM); do \
-	  echo "=== Aplicando DDL sql/$$f ==="; \
-	  $(DB_CLI) $(DB_NAME) < "sql/$$f" || exit 1; \
-	done
+# CHORE-20: o schema completo (versao atual) fica em sql/schema.sql, o mesmo do
+# deploy/seed-producao.sh; banco que ja existe sobe com o db-migrar.
+db-up: db-guard-producao db-create ## Cria o schema (tabelas vazias) a partir de sql/schema.sql
+	@test -s sql/schema.sql || { echo "CHORE-20: sql/schema.sql ausente ou vazio"; exit 1; }
+	@echo "=== Aplicando sql/schema.sql ==="
+	$(DB_CLI) $(DB_NAME) < sql/schema.sql
 
 # BUG-28: o db-up (CREATE DATABASE + DDL) roda na RECEITA do db-seed, por
 # sub-make: com make -k/-j ele nao roda mais em paralelo a uma guarda que
@@ -437,9 +433,9 @@ db-up: db-guard-producao db-create ## Cria o schema (tabelas vazias) na ordem de
 db-seed: db-guard-producao db-guard-sem-producao db-check-env ## Cria o schema, carrega dados e corrige hashes (DEV; producao: deploy/seed-producao.sh)
 	$(MAKE) RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' db-up
 	@echo "=== Seed: admin principal ==="
-	$(DB_CLI) $(DB_NAME) < sql/02_seed_admin.sql
+	$(DB_CLI) $(DB_NAME) < sql/seed_admin.sql
 	@echo "=== Seed: usuarios dos 42 vendedores ==="
-	$(DB_CLI) $(DB_NAME) < sql/03_seed_vendedores.sql
+	$(DB_CLI) $(DB_NAME) < sql/seed_vendedores.sql
 	@echo ""
 	@echo "=== Corrigindo hashes (placeholder -> argon2id real) + criando admin ==="
 	cd backend/shared && go run ./cmd/resetpassword -list
@@ -469,120 +465,10 @@ db-down: db-guard-producao db-guard-sem-producao db-guard-drop db-check-env ## D
 db-reset: db-guard-producao db-guard-sem-producao db-guard-drop ## Recria o banco do zero com hashes validos (db-down && db-seed em sequencia; para no 1o erro, mesmo com -k/-j: BUG-27)
 	$(MAKE) RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' db-down && $(MAKE) RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' db-seed
 
-db-fix-deve-trocar-senha: db-guard-producao db-check-env ## Adiciona a coluna deve_trocar_senha em bancos existentes (nao destrutivo, sem apagar dados)
-	$(DB_CLI) $(DB_NAME) < sql/08_alter_usuarios_deve_trocar_senha.sql
-
-db-fix-tipo-reset: db-guard-producao db-check-env ## Corrige o ENUM de senha_historico.tipo_reset em bancos existentes (nao destrutivo, sem apagar dados)
-	$(DB_CLI) $(DB_NAME) < sql/13_alter_senha_historico_tipo_reset.sql
-
-db-fix-estoque-origem: db-guard-producao db-check-env ## Remove estoque.origem (migracao 18) em bancos criados com o 17 antigo (idempotente; perde o rastreio de origem)
-	$(DB_CLI) $(DB_NAME) < sql/18_alter_estoque_drop_origem.sql
-
-db-revert-estoque-origem: db-guard-producao db-check-env ## Reverte db-fix-estoque-origem (recria estoque.origem; linhas existentes voltam como import_csv)
-	$(DB_CLI) $(DB_NAME) < sql/18_revert_estoque_drop_origem.sql
-
-db-fix-cnpj-unique: db-guard-producao db-check-env ## Unifica clientes com CNPJ duplicado no menor id e cria UNIQUE uq_clientes_cnpj (APAGA as copias; backup em clientes_merge_backup_20260925*)
-	$(DB_CLI) $(DB_NAME) < sql/19_alter_clientes_cnpj_unique.sql
-
-db-revert-cnpj-unique: db-guard-producao db-check-env ## Reverte db-fix-cnpj-unique a partir das tabelas clientes_merge_backup_20260925*
-	$(DB_CLI) $(DB_NAME) < sql/19_revert_clientes_cnpj_unique.sql
-
-db-fix-cnpj-comment: db-guard-producao db-check-env ## Atualiza o COMMENT de clientes.cnpj para o formato alfanumerico (so metadado, sem apagar dados)
-	$(DB_CLI) $(DB_NAME) < sql/20_alter_clientes_cnpj_comment.sql
-
-db-revert-cnpj-comment: db-guard-producao db-check-env ## Reverte db-fix-cnpj-comment (volta o COMMENT antigo "somente digitos")
-	$(DB_CLI) $(DB_NAME) < sql/20_revert_clientes_cnpj_comment.sql
-
-db-fix-revoked-reason: db-guard-producao db-check-env ## Adiciona refresh_tokens.revoked_reason (SEC-07) em bancos existentes (nao destrutivo, legado fica NULL)
-	$(DB_CLI) $(DB_NAME) < sql/21_alter_refresh_tokens_revoked_reason.sql
-
-db-revert-revoked-reason: db-guard-producao db-check-env ## Reverte db-fix-revoked-reason (remove a coluna; perde os motivos gravados)
-	$(DB_CLI) $(DB_NAME) < sql/21_revert_refresh_tokens_revoked_reason.sql
-
-db-fix-tokens-validos-desde: db-guard-producao db-check-env ## Adiciona usuarios.tokens_validos_desde (SEC-08) em bancos existentes (nao destrutivo, linhas existentes ficam NULL)
-	$(DB_CLI) $(DB_NAME) < sql/22_alter_usuarios_tokens_validos_desde.sql
-
-db-revert-tokens-validos-desde: db-guard-producao db-check-env ## Reverte db-fix-tokens-validos-desde (remove a coluna; perde os cortes de token gravados)
-	$(DB_CLI) $(DB_NAME) < sql/22_revert_usuarios_tokens_validos_desde.sql
-
-db-fix-reuso-detectado: db-guard-producao db-check-env ## Adiciona refresh_tokens.reuso_detectado_em (SEC-12) em bancos existentes (nao destrutivo, linhas existentes ficam NULL)
-	$(DB_CLI) $(DB_NAME) < sql/23_alter_refresh_tokens_reuso_detectado_em.sql
-
-db-revert-reuso-detectado: db-guard-producao db-check-env ## Reverte db-fix-reuso-detectado (remove a coluna; perde as marcas de reuso gravadas)
-	$(DB_CLI) $(DB_NAME) < sql/23_revert_refresh_tokens_reuso_detectado_em.sql
-
-db-fix-taxa-pct-check: db-guard-producao db-check-env ## Cria o CHECK chk_pagamentos_taxa_pct (0 a 30) em bancos existentes (SEC-27; aborta sem alterar dados se houver taxa_pct fora da faixa)
-	$(DB_CLI) $(DB_NAME) < sql/24_alter_pagamentos_taxa_pct_check.sql
-
-db-revert-taxa-pct-check: db-guard-producao db-check-env ## Reverte db-fix-taxa-pct-check (remove o CHECK; o teto de taxa_pct fica so no dominio)
-	$(DB_CLI) $(DB_NAME) < sql/24_revert_pagamentos_taxa_pct_check.sql
-
-db-fix-produtos-imagem: db-guard-producao db-check-env ## Adiciona produtos.imagem + CHECK chk_produtos_imagem + UNIQUE uk_produtos_imagem (IMG-01) em bancos existentes (nao destrutivo, linhas existentes ficam NULL)
-	$(DB_CLI) $(DB_NAME) < sql/26_alter_produtos_imagem.sql
-
-db-revert-produtos-imagem: db-guard-producao db-check-env ## Reverte db-fix-produtos-imagem (remove CHECK, UNIQUE e coluna; perde os vinculos produto->imagem, arquivos ficam orfaos)
-	$(DB_CLI) $(DB_NAME) < sql/26_revert_produtos_imagem.sql
-
-db-fix-role-usuario: db-guard-producao db-check-env ## Adiciona 'usuario' ao ENUM usuarios.role (ECOM-01, cliente da loja; nao destrutivo, idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/27_alter_usuarios_role_usuario.sql
-
-db-revert-role-usuario: db-guard-producao db-check-env ## Reverte db-fix-role-usuario (aborta se houver usuario com role 'usuario')
-	$(DB_CLI) $(DB_NAME) < sql/27_revert_usuarios_role_usuario.sql
-
-db-fix-confirmacao-email: db-guard-producao db-check-env ## Cria confirmacoes_email + usuarios.email_confirmacao_pendente (ECOM-03; nao destrutivo, idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/28_ddl_confirmacoes_email.sql
-	$(DB_CLI) $(DB_NAME) < sql/29_alter_usuarios_email_confirmacao.sql
-
-db-revert-confirmacao-email: db-guard-producao db-check-env ## Reverte db-fix-confirmacao-email (apaga a tabela e a coluna; contas pendentes passam a entrar)
-	$(DB_CLI) $(DB_NAME) < sql/29_revert_usuarios_email_confirmacao.sql
-
-db-fix-clientes-loja: db-guard-producao db-check-env ## ECOM-05: clientes aceita pessoa fisica (cnpj NULL, cpf, endereco, cep, usuario_id; nao destrutivo, idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/30_alter_clientes_loja.sql
-
-db-revert-clientes-loja: db-guard-producao db-check-env ## Reverte db-fix-clientes-loja (aborta se houver cliente pessoa fisica)
-	$(DB_CLI) $(DB_NAME) < sql/30_revert_clientes_loja.sql
-
-db-fix-clientes-numero: db-guard-producao db-check-env ## ECOM-09: clientes.numero e clientes.complemento (endereco vira logradouro; nao destrutivo, idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/31_alter_clientes_numero_complemento.sql
-
-db-revert-clientes-numero: db-guard-producao db-check-env ## Reverte db-fix-clientes-numero (perde numero e complemento gravados)
-	$(DB_CLI) $(DB_NAME) < sql/31_revert_clientes_numero_complemento.sql
-
-db-fix-historico-created-at: db-guard-producao db-check-env ## DB-09: senha_historico.created_at NOT NULL (idempotente; aborta sem alterar dados se houver created_at NULL, remedio no cabecalho do sql/32)
-	$(DB_CLI) $(DB_NAME) < sql/32_alter_senha_historico_created_at_not_null.sql
-
-db-revert-historico-created-at: db-guard-producao db-check-env ## Reverte db-fix-historico-created-at (a coluna volta a aceitar NULL; nao altera as linhas)
-	$(DB_CLI) $(DB_NAME) < sql/32_revert_senha_historico_created_at_not_null.sql
-
-db-fix-pedidos-canal-loja: db-guard-producao db-check-env ## ECOM-06: canal 'Loja' em pedidos + vendedor "Loja Online" (nao destrutivo, idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/33_alter_pedidos_canal_loja.sql
-
-db-revert-pedidos-canal-loja: db-guard-producao db-check-env ## Reverte db-fix-pedidos-canal-loja (aborta se ja houver pedido com canal Loja)
-	$(DB_CLI) $(DB_NAME) < sql/33_revert_pedidos_canal_loja.sql
-
-db-fix-produtos-nome-descricao: db-guard-producao db-check-env ## ECOM-11: produtos.descricao vira nome + nova descricao TEXT (nao destrutivo, idempotente; depois rode db-import-produtos para gerar as descricoes)
-	$(DB_CLI) $(DB_NAME) < sql/34_alter_produtos_nome_descricao.sql
-
-db-revert-produtos-nome-descricao: db-guard-producao db-check-env ## Reverte db-fix-produtos-nome-descricao (perde as descricoes completas)
-	$(DB_CLI) $(DB_NAME) < sql/34_revert_produtos_nome_descricao.sql
-
-db-fix-pedidos-chave-checkout: db-guard-producao db-check-env ## ECOM-14: pedidos.chave_checkout (idempotencia do checkout da loja; nao destrutivo, idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/35_alter_pedidos_chave_checkout.sql
-
-db-revert-pedidos-chave-checkout: db-guard-producao db-check-env ## Reverte db-fix-pedidos-chave-checkout (remove a protecao contra compra repetida)
-	$(DB_CLI) $(DB_NAME) < sql/35_revert_pedidos_chave_checkout.sql
-
-db-fix-pedidos-entrega: db-guard-producao db-check-env ## ECOM-17: pedidos.entrega_* obrigatorio (antigos recebem endereco ficticio; idempotente)
-	$(DB_CLI) $(DB_NAME) < sql/36_alter_pedidos_endereco_entrega.sql
-
-db-revert-pedidos-entrega: db-guard-producao db-check-env ## Reverte db-fix-pedidos-entrega (perde os enderecos de entrega)
-	$(DB_CLI) $(DB_NAME) < sql/36_revert_pedidos_endereco_entrega.sql
-
-db-fix-pagamento-loja: db-guard-producao db-check-env ## ECOM-18: status Aguardando pagamento (pedido) e Recusado (pagamento); idempotente
-	$(DB_CLI) $(DB_NAME) < sql/37_alter_pagamento_loja.sql
-
-db-revert-pagamento-loja: db-guard-producao db-check-env ## Reverte db-fix-pagamento-loja (Aguardando pagamento volta a Em separacao)
-	$(DB_CLI) $(DB_NAME) < sql/37_revert_pagamento_loja.sql
+# CHORE-20: um so script idempotente leva qualquer banco da base de 2026-10-31
+# em diante a versao do sql/schema.sql (sem revert: volte pelo backup).
+db-migrar: db-guard-producao db-check-env ## Atualiza um banco existente para o sql/schema.sql (sql/migracao.sql; idempotente, nao destrutivo)
+	$(DB_CLI) $(DB_NAME) < sql/migracao.sql
 
 # IMG-01: gera um PNG por produto (nome na diagonal) pelo mesmo caso de uso do
 # upload, no PRODUTO_IMAGENS_DIR (padrão backend/rotaperfumes-api/data/produtos-imagens).
@@ -593,7 +479,7 @@ db-gerar-imagens-produtos: db-guard-producao db-check-env ## IMG-01: gera e grav
 	cd backend/rotaperfumes-api && go run ./cmd/gerarimagens -confirmar $(GERAR_IMAGENS_FLAGS)
 
 db-seed-mes-atual: db-guard-producao db-check-env ## Gera movimentacoes de exemplo no mes corrente (pedidos/itens/pagamentos/oportunidades/visitas/estoque/carteiras; idempotente, refaz so as linhas do seed do mes)
-	$(DB_CLI) $(DB_NAME) < sql/25_seed_movimentacoes_mes_atual.sql
+	$(DB_CLI) $(DB_NAME) < sql/seed_movimentacoes_mes_atual.sql
 
 db-import-clientes: db-guard-producao ## Importa dados/crm/clientes.csv para a tabela clientes (upsert idempotente)
 	cd backend/shared && go run ./cmd/importclientes

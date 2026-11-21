@@ -693,7 +693,7 @@ export interface ListOportunidadesResponse {
 // (rota /api/visitas). Mesmo padrao de Oportunidades, porem data_visita e
 // sempre obrigatoria (sem default no backend).
 
-// Valores observados no dataset de origem (ver sql/16_ddl_visitas.sql).
+// Valores observados no dataset de origem (ver sql/schema.sql).
 // Coluna e VARCHAR(40) livre no backend, entao novos valores nao quebram a
 // tela — apenas nao aparecerao pre-listados nos selects de filtro/form.
 export type VisitaResultado =

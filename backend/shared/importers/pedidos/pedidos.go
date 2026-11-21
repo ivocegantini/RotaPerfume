@@ -1,7 +1,7 @@
 // Package pedidos implementa o importador usado por cmd/importpedidos: lê
 // dados/erp/pedidos.csv e dados/erp/itens_pedido.csv e importa (upsert) os
 // registros nas tabelas `pedidos` e `itens_pedido` (ver
-// sql/04_ddl_pedidos.sql e sql/11_ddl_itens_pedido.sql), nessa ordem (itens
+// sql/schema.sql), nessa ordem (itens
 // dependem dos pedidos já importados).
 //
 // Uso (via comando):
@@ -390,7 +390,7 @@ func ParseItemPedidoRow(record []string) (ItemPedidoRow, error) {
 
 // LoadClienteIDsByOrigem carrega o conjunto de cliente_id_origem existentes
 // em `clientes` para lookup. Como cliente_id_origem agora É a PK da tabela
-// (ver sql/09_ddl_clientes.sql), o valor usado como FK em pedidos.cliente_id
+// (ver sql/schema.sql), o valor usado como FK em pedidos.cliente_id
 // é o próprio cliente_id_origem — o mapa é usado apenas para validar
 // existência (identidade origem -> origem).
 func LoadClienteIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {
@@ -399,7 +399,7 @@ func LoadClienteIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {
 
 // LoadPedidoIDsByOrigem carrega o conjunto de pedido_id_origem existentes em
 // `pedidos` para lookup. Como pedido_id_origem agora É a PK da tabela (ver
-// sql/04_ddl_pedidos.sql), o valor usado como FK em itens_pedido.pedido_id é
+// sql/schema.sql), o valor usado como FK em itens_pedido.pedido_id é
 // o próprio pedido_id_origem — o mapa é usado apenas para validar existência
 // (identidade origem -> origem).
 func LoadPedidoIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {

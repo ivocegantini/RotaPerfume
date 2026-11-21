@@ -23,7 +23,7 @@ func HandlerHTTP(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) h
 	)
 }
 
-// NovoRouter registra as 75 rotas da API com método e política obrigatórios.
+// NovoRouter registra as 77 rotas da API com método e política obrigatórios.
 // Rotas() do router devolvido é a fonte da matriz ARQ-00.
 func NovoRouter(cfg *config.Config, checker httpx.ConsultaStatus, h Handlers) *httpx.Router {
 	r := httpx.NovoRouter(httpx.NovoAutenticador(identidadecrypto.NovoJWT(cfg), checker).ComCookieSeguro(cfg.CookieSecure))

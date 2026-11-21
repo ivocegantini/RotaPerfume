@@ -1,6 +1,6 @@
 // Package visitas implementa o importador usado por cmd/importvisitas: lê
 // dados/crm/visitas.csv e importa (upsert) os registros na tabela `visitas`
-// (ver sql/16_ddl_visitas.sql).
+// (ver sql/schema.sql).
 //
 // Uso (via comando):
 //
@@ -201,7 +201,7 @@ func ParseData(raw string) (time.Time, error) {
 
 // LoadClienteIDsByOrigem pré-carrega o conjunto de cliente_id_origem
 // existentes em `clientes`, usado para validar o cliente_id do CSV. Como
-// cliente_id_origem É a PK da tabela (ver sql/09_ddl_clientes.sql), o valor
+// cliente_id_origem É a PK da tabela (ver sql/schema.sql), o valor
 // usado como FK em visitas.cliente_id é o próprio cliente_id_origem — o mapa
 // serve apenas para checar existência (identidade origem -> origem).
 func LoadClienteIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {

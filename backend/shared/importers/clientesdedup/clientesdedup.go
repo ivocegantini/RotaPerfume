@@ -4,7 +4,7 @@
 // Decisão do usuário (2026-09-25): clientes.cnpj é UNIQUE (uq_clientes_cnpj)
 // e, para cada CNPJ repetido no CSV, fica a PRIMEIRA ocorrência (na ordem do
 // arquivo, que é crescente por cliente_id — equivale ao MIN(cliente_id) usado
-// por sql/19_alter_clientes_cnpj_unique.sql). As ocorrências seguintes são
+// pela antiga migração 19 (CNPJ único)). As ocorrências seguintes são
 // "cópias": o importclientes não as grava, e os importadores que referenciam
 // o cliente pelo cliente_id do CSV (carteiras, pedidos, oportunidades,
 // visitas) redirecionam a cópia para o id sobrevivente.

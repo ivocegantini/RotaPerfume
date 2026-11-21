@@ -57,6 +57,7 @@ make help          # ver todos os comandos
 make setup-check   # conferir as ferramentas do ambiente (só verifica)
 make setup         # instalar/ajustar as ferramentas (Go, Node, govulncheck, mariadb, Postman CLI)
 make db-reset      # recriar banco
+make db-migrar     # atualizar um banco existente (sql/migracao.sql, idempotente)
 make dev-api       # subir API Go
 make dev-frontend  # subir frontend Next.js
 make test          # rodar testes Go
@@ -69,6 +70,7 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 
 - **Dev:** MariaDB 11.8 do CasaOS (`192.168.168.106:3307`, CA `deploy/ca-cert.pem`), no `.env` padrão.
 - **Produção:** `192.168.168.106:3306`. Seed inicial só pelo `deploy/seed-producao.sh` (`docs/deploy-servidor.md` §11). Acesso do admin pelo `backend/.env.producao` (`make <alvo> ENV_ARQUIVO=backend/.env.producao`).
+- **SQL (CHORE-20):** `sql/schema.sql` cria tudo na versão atual (`db-up`, `seed-producao.sh`); `sql/migracao.sql` (idempotente, `make db-migrar`, estágio `Migracoes` do Jenkins) leva um banco existente até ela. Sem revert: volta pelo backup. Seeds em `sql/seed_*.sql`. Mudança de schema = editar os dois arquivos.
 - **Guarda `db-guard-producao` (DEPLOY-07):** recusa os alvos que escrevem no banco contra a produção (host e porta), salvo `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>` na linha de comando.
 - **SEC-46:** `db-down`, `db-seed`, `db-reset` e `db-rebuild` são recusados **sempre** na produção, mesmo com `CONFIRMO_PRODUCAO`. Fora do loopback, o `DROP DATABASE` exige `CONFIRMAR=<DB_NAME>` na linha de comando (ex.: `CONFIRMAR=rotaperfumes` no CasaOS :3307).
 - **SEC-53:** os segredos do `.env` (ou do `ENV_ARQUIVO`) não chegam aos processos de test, build, lint e npm do Makefile. As `DB_*` só chegam ao `go test` pelo `make test-integration`, que passa pela guarda.
@@ -95,7 +97,7 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 ## Instalação do ambiente
 
 - **Scripts (SETUP-01):** `scripts/setup-linux.sh` (Debian/Ubuntu e derivados, via apt; em outras distros só confere) e `scripts/setup-windows.ps1` (PowerShell 5.1+/7, via winget). Pelo make: `make setup-check` (só verifica, sai com erro se faltar algo) e `make setup` (instala o que falta; idempotente). Opções: `--check`/`-Check`, `--deps`/`-Deps` (`go mod download` + `make frontend-deps`), `--go-dir`/`-GoDir`, `--go-sistema` (Linux, `/usr/local/go` com sudo), `--sem-sudo`; ver `--help`. Pelo make: `make setup SETUP_ARGS="--deps"`.
-- **Versões (fonte da verdade):** Go = diretiva `go` dos `go.mod` (hoje 1.26.0); Node = `frontend/.nvmrc` (mínimo em `engines` do `frontend/package.json`); demais mínimos (cliente MariaDB 11.4, Postman CLI, git, make, openssl, versão do nvm) em `scripts/versoes.conf`. Ao subir a versão do Go ou do Node, mude só esses arquivos (e o `GO_IMAGE` do Jenkinsfile / o `NODE_IMAGE` do Jenkinsfile e o `NODE_VERSION` do `frontend/Dockerfile`).
+- **Versões (fonte da verdade):** Go = diretiva `go` dos `go.mod` (hoje 1.27.4); Node = `frontend/.nvmrc` (mínimo em `engines` do `frontend/package.json`); demais mínimos (cliente MariaDB 11.4, Postman CLI, git, make, openssl, versão do nvm) em `scripts/versoes.conf`. Ao subir a versão do Go ou do Node, mude só esses arquivos (e o `GO_IMAGE` do Jenkinsfile / o `NODE_IMAGE` do Jenkinsfile e o `NODE_VERSION` do `frontend/Dockerfile`).
 - **Pré-requisito do `make test` (TST-08):** Go **instalado localmente** na versão do `go.mod` (tarball/MSI/zip oficial de go.dev), primeiro no `PATH`, e `GOTOOLCHAIN=local` (`go env -w GOTOOLCHAIN=local`; o `make setup` grava). Sem isso, um `go` mais antigo (ex.: o `golang-go` do apt) troca sozinho para um toolchain baixado do módulo `golang.org/toolchain`, e o TST-08 registrou `go: no such tool "covdata"` nesse cenário com `-coverpkg`. O `make setup-check` confere `go tool -n covdata` e roda um `go test -coverpkg` mínimo.
 - **Postman CLI:** o script instala o pacote npm oficial `postman-cli` (ou o instalador oficial com `--postman-script`). Se o app desktop do Postman estiver no `PATH` antes do CLI, `postman --version` falha e o script avisa.
 - **Docker:** opcional (deploy); só é conferido, nunca instalado.

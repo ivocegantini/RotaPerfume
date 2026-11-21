@@ -7,7 +7,7 @@ import (
 )
 
 // ECOM-17: o CSV do ERP não traz endereço de entrega (obrigatório desde a
-// sql/36). Cada pedido importado recebe o mesmo endereço fictício que a
+// sql/schema.sql). Cada pedido importado recebe o mesmo endereço fictício que a
 // migração dá aos antigos: capital = (id*31) mod 10, número 1..1999.
 var capitaisFicticias = [10]vendas.Entrega{
 	{CEP: "01310100", Endereco: "Avenida Paulista", Bairro: "Bela Vista", Cidade: "São Paulo", UF: "SP"},

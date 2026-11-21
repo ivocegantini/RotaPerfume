@@ -49,14 +49,14 @@ func chdir(t *testing.T, dir string) {
 	t.Cleanup(func() { _ = os.Chdir(antigo) })
 }
 
-// raizFalsa cria <tmp>/sql/02_seed_admin.sql e 03_seed_vendedores.sql com
+// raizFalsa cria <tmp>/sql/seed_admin.sql e seed_vendedores.sql com
 // os placeholders.
 func raizFalsa(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "sql"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "sql", "02_seed_admin.sql"), []byte(sqlAdmin), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "sql", "03_seed_vendedores.sql"), []byte(sqlVend), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "sql", "seed_admin.sql"), []byte(sqlAdmin), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "sql", "seed_vendedores.sql"), []byte(sqlVend), 0o600))
 	return root
 }
 
@@ -110,10 +110,10 @@ func TestRun_SubstituiEExecuta(t *testing.T) {
 
 	// SEC-10: sql/ fica intacto; o que roda são as cópias de tmp/seed,
 	// apagadas ao final.
-	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "02_seed_admin.sql")))
-	assert.NoFileExists(t, filepath.Join(root, "tmp", "seed", "02_seed_admin.sql"))
-	admin := ex.conteudos["02_seed_admin.sql"]
-	vend := ex.conteudos["03_seed_vendedores.sql"]
+	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "seed_admin.sql")))
+	assert.NoFileExists(t, filepath.Join(root, "tmp", "seed", "seed_admin.sql"))
+	admin := ex.conteudos["seed_admin.sql"]
+	vend := ex.conteudos["seed_vendedores.sql"]
 	assert.NotContains(t, admin+vend, "PLACEHOLDER", "nenhum placeholder sobra")
 
 	hAdmin := reHash.FindString(admin)
@@ -124,7 +124,7 @@ func TestRun_SubstituiEExecuta(t *testing.T) {
 	assert.True(t, verificarSenha(hsRapida, hAdmin, "Admin@Env1"))
 	assert.True(t, verificarSenha(hsRapida, hVend[0], "User@Env1"))
 
-	assert.Equal(t, []string{"02_seed_admin.sql", "03_seed_vendedores.sql"}, ex.arquivos, "executa na ordem")
+	assert.Equal(t, []string{"seed_admin.sql", "seed_vendedores.sql"}, ex.arquivos, "executa na ordem")
 	assert.Contains(t, logs.String(), "total de placeholders substituídos: 3")
 	assert.Contains(t, logs.String(), "OK — 2 arquivos SQL aplicados")
 	assert.NotContains(t, out.String(), "Admin@Env1", "senha só aparece com --show-password")
@@ -146,8 +146,8 @@ func TestRun_ShowPasswordENoExec(t *testing.T) {
 	assert.Empty(t, ex.arquivos, "--no-exec não roda o mariadb")
 	assert.Contains(t, out.String(), "ADMIN_PASSWORD=Admin@Env1")
 	assert.Contains(t, out.String(), "USER_PASSWORD =User@Env1")
-	assert.NotContains(t, ler(t, filepath.Join(root, "tmp", "seed", "02_seed_admin.sql")), "PLACEHOLDER")
-	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "02_seed_admin.sql")), "sql/ nunca é alterado")
+	assert.NotContains(t, ler(t, filepath.Join(root, "tmp", "seed", "seed_admin.sql")), "PLACEHOLDER")
+	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "seed_admin.sql")), "sql/ nunca é alterado")
 }
 
 // credenciaisDB define DB_USUARIO/DB_SENHA, exigidos no caminho que executa SQL.
@@ -176,7 +176,7 @@ func TestRun_DryRunNaoTocaArquivos(t *testing.T) {
 	// ARQ-07 / NB-7: sem -show-password o dry-run não imprime o hash inteiro.
 	assert.Empty(t, reHash.FindAllString(out.String(), -1), "sem -show-password, nenhum hash completo")
 	assert.Equal(t, 2, strings.Count(out.String(), "(hash completo só com -show-password)"))
-	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "02_seed_admin.sql")))
+	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "seed_admin.sql")))
 
 	out.Reset()
 	err = seedusers.Run(cfgRapida(), seedusers.Options{DryRun: true, ShowPassword: true}, seedusers.Deps{
@@ -186,7 +186,7 @@ func TestRun_DryRunNaoTocaArquivos(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, reHash.FindAllString(out.String(), -1), 2, "com -show-password, imprime os dois hashes")
-	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "02_seed_admin.sql")))
+	assert.Equal(t, sqlAdmin, ler(t, filepath.Join(root, "sql", "seed_admin.sql")))
 }
 
 func TestRun_Erros(t *testing.T) {
@@ -212,12 +212,12 @@ func TestRun_Erros(t *testing.T) {
 		{
 			nome:   "SQL de seed ausente",
 			root:   func(t *testing.T) (string, error) { return t.TempDir(), nil },
-			errSub: "02_seed_admin.sql",
+			errSub: "seed_admin.sql",
 		},
 		{
 			nome:   "mariadb falha no segundo arquivo",
 			root:   func(t *testing.T) (string, error) { return raizFalsa(t), nil },
-			falhar: "03_seed_vendedores.sql",
+			falhar: "seed_vendedores.sql",
 			errIs:  errMariaDB,
 			errSub: "mariadb falhou em",
 		},

@@ -1,6 +1,6 @@
 // Package pagamentos implementa o importador usado por cmd/importpagamentos:
 // lê dados/erp/pagamentos.csv e importa (upsert) os registros na tabela
-// `pagamentos` (ver sql/12_ddl_pagamentos.sql).
+// `pagamentos` (ver sql/schema.sql).
 //
 // Uso (via comando):
 //
@@ -20,7 +20,7 @@
 //     - `pedido_id` do CSV é resolvido via lookup em `pedidos.pedido_id_origem`
 //     (pré-carregado em memória), pois `pedidos` mantém a PK interna `id`
 //     desacoplada da origem (padrão diferente de `pagamentos`, cuja PK É o
-//     próprio `pagamento_id` do CSV — ver sql/12_ddl_pagamentos.sql).
+//     próprio `pagamento_id` do CSV — ver sql/schema.sql).
 //     - `data_pagamento` vazia no CSV é gravada como NULL (pagamento ainda
 //     não ocorreu — status "Em aberto" ou "Inadimplente").
 //     - Linha com pedido não encontrado é contada como erro e pulada (não
@@ -256,7 +256,7 @@ func IsValidStatusPagamento(v string) bool {
 
 // LoadPedidoIDsByOrigem pré-carrega o conjunto de pedido_id_origem
 // existentes em `pedidos`, usado para validar o pedido_id do CSV. Como
-// pedido_id_origem agora É a PK da tabela (ver sql/04_ddl_pedidos.sql), o
+// pedido_id_origem agora É a PK da tabela (ver sql/schema.sql), o
 // valor usado como FK em pagamentos.pedido_id é o próprio pedido_id_origem
 // — o mapa serve apenas para checar existência (identidade origem -> origem).
 func LoadPedidoIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {
@@ -271,7 +271,7 @@ func LoadPedidoIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {
 // DUPLICATE KEY UPDATE, usando o próprio `pagamento_id` (PK, vindo do CSV)
 // como chave de idempotência — diferente de pedidos/itens_pedido, aqui NÃO
 // há coluna `id` desacoplada nem `pagamento_id_origem` (ver
-// sql/12_ddl_pagamentos.sql). Linhas cujo pedido_id não é encontrado no
+// sql/schema.sql). Linhas cujo pedido_id não é encontrado no
 // lookup são contadas como erro e puladas (não abortam a importação). Só
 // devolve err se o prepare falhar.
 func UpsertPagamentos(db cmdutil.DB, rows []Row, pedidoIDs map[int64]int64) (inserted, updated, failed int, err error) {

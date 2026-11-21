@@ -3,7 +3,7 @@ package notificacao_test
 // ARQ-07: contexto Notificação. O envio SMTP (Strategy de TLS, AUTH só sobre
 // TLS, CR/LF) é coberto pelas suítes MAIL01/SEC10_TLS/SEC09 em
 // tests/services; o notificador (dedup, teto, fila, prazo), por
-// rotaperfumes-api/tests/services/sec09_notifier_test.go. Aqui ficam o
+// rotaperfumes-api/tests/services/alerta_seguranca_notificador_test.go. Aqui ficam o
 // domínio, a montagem do notificador e a espera do shutdown (NB-6).
 
 import (
