@@ -7,7 +7,7 @@ import (
 	"github.com/rotaperfumes/shared/kernel"
 )
 
-// ECOM-17: endereço de entrega obrigatório em todo pedido (sql/36). Sem ele
+// ECOM-17: endereço de entrega obrigatório em todo pedido (sql/schema.sql). Sem ele
 // a compra não é finalizada nem o pedido vai para separação. Só o
 // complemento é opcional. Os erros nunca ecoam o valor (endereço é PII).
 

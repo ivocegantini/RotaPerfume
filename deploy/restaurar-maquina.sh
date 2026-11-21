@@ -1237,11 +1237,9 @@ etapa5() {
 etapa6() {
   etapa 6 "Migracoes"
   if ! falta 6; then info "Ja conferidas."; return 0; fi
-  local f
-  printf 'Migracoes do repositorio. Aplique as mais novas que o dump, numa a numa:\n  sudo rotaperfumes-dba < ARQUIVO\n'
-  for f in "$RAIZ"/sql/*_alter_*.sql; do
-    [[ -e "$f" ]] && printf '  sql/%s\n' "${f##*/}"
-  done
+  # CHORE-20: um so script idempotente leva o dump restaurado a versao atual.
+  printf 'Migracao do repositorio (idempotente; leva o dump ao sql/schema.sql):\n  sudo rotaperfumes-dba < %s\n' "sql/migracao.sql"
+  [[ -r "$RAIZ/sql/migracao.sql" ]] || aviso "sql/migracao.sql nao encontrado em $RAIZ"
   confirmar "Digite MIGRACOES CONFERIDAS: " "MIGRACOES CONFERIDAS"
   registrar "migracoes conferidas pelo operador"
   etapa_ok 6

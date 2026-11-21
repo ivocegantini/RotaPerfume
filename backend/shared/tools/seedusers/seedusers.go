@@ -15,7 +15,7 @@
 //     Não há senha padrão fixa.
 //  2. Gera 2 hashes Argon2id com o pepper PASSWORD_PEPPER e os parâmetros
 //     ARGON2_* do .env (o pepper do servidor precisa ser o mesmo).
-//  3. Lê sql/02_seed_admin.sql e sql/03_seed_vendedores.sql, substitui os
+//  3. Lê sql/seed_admin.sql e sql/seed_vendedores.sql, substitui os
 //     placeholders e grava as cópias em <raiz>/tmp/seed (perm 0600).
 //  4. Executa as cópias (exige DB_USUARIO e DB_SENHA no .env) e as apaga ao
 //     final, mesmo em erro. Com -no-exec as cópias ficam em tmp/seed.
@@ -161,8 +161,8 @@ func Run(cfg *config.Config, opts Options, deps Deps) error {
 // SeedFiles devolve os SQLs de seed (em sql/) na ordem de execução.
 func SeedFiles(projectRoot string) []string {
 	return []string{
-		filepath.Join(projectRoot, "sql", "02_seed_admin.sql"),
-		filepath.Join(projectRoot, "sql", "03_seed_vendedores.sql"),
+		filepath.Join(projectRoot, "sql", "seed_admin.sql"),
+		filepath.Join(projectRoot, "sql", "seed_vendedores.sql"),
 	}
 }
 

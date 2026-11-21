@@ -15,11 +15,11 @@ import (
 
 const arqPagamentos = "pagamentos.go"
 
-// fkPagamentosPedido é a FK pagamentos.pedido_id → pedidos (sql/12_ddl_pagamentos.sql).
+// fkPagamentosPedido é a FK pagamentos.pedido_id → pedidos (sql/schema.sql).
 const fkPagamentosPedido = "fk_pagamentos_pedido"
 
 // pagamentoColunas usa a PK literal pagamento_id (não há coluna id
-// desacoplada nesta tabela — ver sql/12_ddl_pagamentos.sql).
+// desacoplada nesta tabela — ver sql/schema.sql).
 const pagamentoColunas = `pagamento_id, pedido_id, forma_pagamento, parcelas, valor, taxa_pct, valor_liquido, data_vencimento, data_pagamento, status_pagamento, created_at, updated_at`
 
 // Pagamentos é o repositório de pagamentos (porta vendasapp.Pagamentos).

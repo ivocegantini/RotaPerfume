@@ -1,6 +1,6 @@
 // Package estoque implementa o importador usado por cmd/importestoque: lê
 // dados/erp/estoque.csv e importa (upsert) os registros na tabela `estoque`
-// (ver sql/17_ddl_estoque.sql).
+// (ver sql/schema.sql).
 //
 // Uso (via comando):
 //

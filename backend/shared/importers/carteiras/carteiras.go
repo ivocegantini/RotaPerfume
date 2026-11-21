@@ -1,6 +1,6 @@
 // Package carteiras implementa o importador usado por cmd/importcarteiras:
 // lê dados/crm/carteira.csv e importa (upsert) os registros na tabela
-// `carteiras` (ver sql/14_ddl_carteiras.sql).
+// `carteiras` (ver sql/schema.sql).
 //
 // Uso (via comando):
 //
@@ -109,7 +109,7 @@ func (i *importacao) gravar(db cmdutil.DB) error {
 
 	// NEG-01: cópias de CNPJ duplicado no clientes.csv apontam para o
 	// sobrevivente; vínculos da cópia equivalentes a um já existente no
-	// grupo são descartados (mesma regra de sql/19_alter_clientes_cnpj_unique.sql).
+	// grupo são descartados (mesma regra da antiga migração 19, CNPJ único).
 	lidos := len(i.rows)
 	projectRoot, _ := cmdutil.FindProjectRoot()
 	unificacao := clientesdedup.Redirecionar(Tag, projectRoot, clienteIDs)
@@ -267,7 +267,7 @@ func ParseData(raw string) (time.Time, error) {
 
 // LoadClienteIDsByOrigem pré-carrega o conjunto de cliente_id_origem
 // existentes em `clientes`, usado para validar o cliente_id do CSV. Como
-// cliente_id_origem agora É a PK da tabela (ver sql/09_ddl_clientes.sql), o
+// cliente_id_origem agora É a PK da tabela (ver sql/schema.sql), o
 // valor usado como FK em carteiras.cliente_id é o próprio cliente_id_origem
 // — o mapa serve apenas para checar existência (identidade origem -> origem).
 func LoadClienteIDsByOrigem(db cmdutil.DB) (map[int64]int64, error) {

@@ -622,6 +622,6 @@ func TestECOM17_EntregaFicticia(t *testing.T) {
 		vistos[e.Cidade] = true
 	}
 	assert.Len(t, vistos, 10)
-	assert.Equal(t, "Recife", pedidos.EntregaFicticia(6).Cidade, "MOD(6*31, 10) = 6, como na sql/36")
+	assert.Equal(t, "Recife", pedidos.EntregaFicticia(6).Cidade, "MOD(6*31, 10) = 6, como no sql/migracao.sql")
 	assert.Equal(t, "1", pedidos.EntregaFicticia(0).Numero)
 }

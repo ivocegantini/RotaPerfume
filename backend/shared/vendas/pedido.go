@@ -10,7 +10,7 @@ import (
 	"github.com/rotaperfumes/shared/kernel"
 )
 
-// StatusPedido é o ENUM status de sql/04_ddl_pedidos.sql (VO de validação
+// StatusPedido é o ENUM status de sql/schema.sql (VO de validação
 // do comando). A entidade guarda o texto (string, como o model legado e o
 // precedente do ARQ-04): um valor lido do banco não é validado (o legado
 // também não validava).
@@ -36,7 +36,7 @@ func NovoStatusPedido(s string) (StatusPedido, error) {
 	return "", ErrStatusInvalido
 }
 
-// Canal é o ENUM canal de sql/04_ddl_pedidos.sql.
+// Canal é o ENUM canal de sql/schema.sql.
 type Canal string
 
 // Canais aceitos no payload.
@@ -45,7 +45,7 @@ const (
 	CanalTelefone Canal = "Telefone"
 	CanalVisita   Canal = "Visita"
 	CanalWhatsApp Canal = "WhatsApp"
-	CanalLoja     Canal = "Loja" // checkout da loja online (ECOM-06, sql/33)
+	CanalLoja     Canal = "Loja" // checkout da loja online (ECOM-06, sql/schema.sql)
 )
 
 // NovoCanal valida o canal (espaços nas pontas ignorados).

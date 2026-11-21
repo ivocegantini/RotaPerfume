@@ -233,8 +233,8 @@ pipeline {
         }
 
         stage('Migracoes') {
-            // DEPLOY-10: migracoes da loja (ECOM-01/03/05/06/09/11/14), idempotentes,
-            // antes de subir a API nova (sem elas a API nova falha nas colunas novas).
+            // DEPLOY-10/CHORE-20: sql/migracao.sql (idempotente) leva o banco ao
+            // sql/schema.sql antes de subir a API nova (sem ele a API falha nas colunas novas).
             // Depois dos testes: build vermelho nao altera o banco da API em uso.
             steps {
                 withCredentials([usernamePassword(credentialsId: 'rotaperfumes-db-admin',
@@ -243,7 +243,7 @@ pipeline {
                     sh '''#!/bin/bash
                         set -euo pipefail
                         [ -r deploy/db-ca.sha256 ] || { echo "Estagio CA do banco nao validou a CA" >&2; exit 1; }
-                        MIGRACOES="27_alter_usuarios_role_usuario.sql 28_ddl_confirmacoes_email.sql 29_alter_usuarios_email_confirmacao.sql 30_alter_clientes_loja.sql 31_alter_clientes_numero_complemento.sql 33_alter_pedidos_canal_loja.sql 34_alter_produtos_nome_descricao.sql 35_alter_pedidos_chave_checkout.sql 36_alter_pedidos_endereco_entrega.sql 37_alter_pagamento_loja.sql"
+                        MIGRACOES="migracao.sql"
                         for f in $MIGRACOES; do
                           [ -r "sql/$f" ] || { echo "Migracao ausente: sql/$f" >&2; exit 1; }
                         done

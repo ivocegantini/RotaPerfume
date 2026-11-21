@@ -8,7 +8,7 @@ import (
 	"github.com/rotaperfumes/shared/kernel"
 )
 
-// FormaPagamento é o ENUM forma_pagamento de sql/12_ddl_pagamentos.sql.
+// FormaPagamento é o ENUM forma_pagamento de sql/schema.sql.
 type FormaPagamento string
 
 // Formas de pagamento aceitas no payload.
@@ -31,7 +31,7 @@ func NovaFormaPagamento(s string) (FormaPagamento, error) {
 	return "", ErrFormaPagamentoInvalida
 }
 
-// StatusPagamento é o ENUM status_pagamento de sql/12_ddl_pagamentos.sql.
+// StatusPagamento é o ENUM status_pagamento de sql/schema.sql.
 type StatusPagamento string
 
 // Status de pagamento aceitos no payload.

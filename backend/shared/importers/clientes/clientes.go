@@ -1,6 +1,6 @@
 // Package clientes implementa o importador usado por cmd/importclientes: lê
 // dados/crm/clientes.csv e importa (upsert) os registros na tabela
-// `clientes` (ver sql/09_ddl_clientes.sql).
+// `clientes` (ver sql/schema.sql).
 //
 // Uso (via comando):
 //

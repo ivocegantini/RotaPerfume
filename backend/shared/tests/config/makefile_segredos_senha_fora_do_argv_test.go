@@ -1,0 +1,435 @@
+package config_test
+
+// SEC-11 (Lote 12): testes de texto do Makefile e dos sql/*.sql (raiz via
+// cmdutil.FindProjectRoot).
+//   - MYSQL_OPTS sem -p (senha só por MYSQL_PWD no ambiente); sem default
+//     DB_USUARIO?=/DB_SENHA?= nem "golang"; "-include backend/.env" antes do export.
+//   - DB-03/SEC-28: cliente mariadb (nunca o mysql puro) com --local-infile=0.
+//   - Todo alvo que chama o mariadb depende (direta ou transitivamente) de
+//     db-check-env; db-create/db-down/db-migrar diretamente.
+//   - help/build/test/lint/dev-frontend não exigem credenciais; help continua
+//     sendo o alvo padrão (db-check-env vem depois dele).
+//   - Nenhum sql/*.sql ensina -p$DB_SENHA.
+// SEC-12 (DDL): coluna reuso_detectado_em no schema.sql (base exigida pelo migracao.sql).
+// DB-01: estoque sem a coluna origem; o migracao.sql recusa banco que ainda a tem.
+
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rotaperfumes/shared/cmdutil"
+)
+
+type makeRegra struct {
+	prereqs []string
+	receita []string
+	linha   int // ordem de declaração
+}
+
+type makefile struct {
+	texto  string
+	linhas []string // continuações "\" já unidas
+	regras map[string]*makeRegra
+	phony  map[string]bool
+	ordem  []string // alvos na ordem de declaração
+}
+
+func raizProjeto(t *testing.T) string {
+	t.Helper()
+	root, err := cmdutil.FindProjectRoot()
+	require.NoError(t, err)
+	return root
+}
+
+func lerTexto(t *testing.T, caminho string) string {
+	t.Helper()
+	b, err := os.ReadFile(caminho)
+	require.NoError(t, err)
+	return strings.ReplaceAll(string(b), "\r\n", "\n")
+}
+
+var reRegra = regexp.MustCompile(`^([A-Za-z0-9_.%-]+(?:[ \t]+[A-Za-z0-9_.%-]+)*)[ \t]*:([^=].*|)$`)
+
+func lerMakefile(t *testing.T) *makefile {
+	t.Helper()
+	texto := lerTexto(t, filepath.Join(raizProjeto(t), "Makefile"))
+	var linhas []string
+	acc := ""
+	for _, l := range strings.Split(texto, "\n") {
+		if strings.HasSuffix(l, "\\") {
+			acc += strings.TrimSuffix(l, "\\") + " "
+			continue
+		}
+		linhas = append(linhas, acc+l)
+		acc = ""
+	}
+	mk := &makefile{texto: texto, linhas: linhas, regras: map[string]*makeRegra{}, phony: map[string]bool{}}
+	var atual []*makeRegra
+	for i, l := range linhas {
+		if strings.HasPrefix(l, "\t") {
+			for _, r := range atual {
+				r.receita = append(r.receita, strings.TrimSpace(l))
+			}
+			continue
+		}
+		if strings.TrimSpace(l) == "" || strings.HasPrefix(strings.TrimSpace(l), "#") {
+			continue
+		}
+		m := reRegra.FindStringSubmatch(l)
+		if m == nil {
+			atual = nil
+			continue
+		}
+		deps := m[2]
+		if idx := strings.Index(deps, "##"); idx >= 0 {
+			deps = deps[:idx]
+		}
+		alvos := strings.Fields(m[1])
+		if len(alvos) == 1 && alvos[0] == ".PHONY" {
+			for _, a := range strings.Fields(deps) {
+				mk.phony[a] = true
+			}
+			atual = nil
+			continue
+		}
+		atual = nil
+		for _, a := range alvos {
+			r := &makeRegra{prereqs: strings.Fields(deps), linha: i}
+			mk.regras[a] = r
+			mk.ordem = append(mk.ordem, a)
+			atual = append(atual, r)
+		}
+	}
+	return mk
+}
+
+// dependeDe informa se alvo depende de dep, direta ou transitivamente.
+func (mk *makefile) dependeDe(alvo, dep string) bool {
+	visto := map[string]bool{}
+	var busca func(a string) bool
+	busca = func(a string) bool {
+		if visto[a] {
+			return false
+		}
+		visto[a] = true
+		r, ok := mk.regras[a]
+		if !ok {
+			return false
+		}
+		for _, p := range r.prereqs {
+			if p == dep || busca(p) {
+				return true
+			}
+		}
+		return false
+	}
+	return busca(alvo)
+}
+
+func (mk *makefile) linhaDaVariavel(t *testing.T, nome string) string {
+	t.Helper()
+	re := regexp.MustCompile(`^(override\s+)?` + regexp.QuoteMeta(nome) + `\s*[:?]?=`)
+	for _, l := range mk.linhas {
+		if re.MatchString(l) {
+			return l
+		}
+	}
+	t.Fatalf("variável %s não encontrada no Makefile", nome)
+	return ""
+}
+
+func (mk *makefile) indiceLinha(re *regexp.Regexp) int {
+	for i, l := range mk.linhas {
+		if re.MatchString(l) {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestSEC11_Makefile_MysqlOptsSemSenha(t *testing.T) {
+	mk := lerMakefile(t)
+	opts := mk.linhaDaVariavel(t, "MYSQL_OPTS")
+	assert.NotRegexp(t, `(^|\s)-p`, strings.SplitN(opts, "=", 2)[1], "MYSQL_OPTS não pode levar -p (senha no argv)")
+	assert.NotContains(t, opts, "DB_SENHA")
+	assert.Contains(t, opts, `-u "$(DB_USUARIO)"`)
+	// SEC-28 (DB-03): LOAD DATA LOCAL desligado no cliente mariadb.
+	assert.Contains(t, opts, "--local-infile=0")
+	assert.NotContains(t, opts, "--local-infile=1")
+	assert.NotContains(t, mk.texto, "--local-infile=1", "nenhuma receita reabilita o LOCAL INFILE")
+
+	casos := []struct{ nome, re string }{
+		{"-p$(DB_SENHA)", `-p\$\(DB_SENHA\)`},
+		{"-p${DB_SENHA}", `-p\$\{DB_SENHA\}`},
+		{"-p$DB_SENHA", `-p\$DB_SENHA`},
+		{"--password=", `--password=`},
+	}
+	for _, c := range casos {
+		t.Run("sem "+c.nome, func(t *testing.T) {
+			assert.NotRegexp(t, c.re, mk.texto)
+		})
+	}
+}
+
+func TestSEC11_Makefile_SemDefaultDeCredenciais(t *testing.T) {
+	mk := lerMakefile(t)
+	casos := []struct{ nome, re string }{
+		{"DB_USUARIO?=", `(?m)^\s*DB_USUARIO\s*\?=`},
+		{"DB_SENHA?=", `(?m)^\s*DB_SENHA\s*\?=`},
+		{"DB_USUARIO=valor fixo", `(?m)^\s*DB_USUARIO\s*=`},
+		{"DB_SENHA=valor fixo", `(?m)^\s*DB_SENHA\s*=`},
+		{"golang", `(?i)golang`},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			assert.NotRegexp(t, c.re, mk.texto)
+		})
+	}
+	// As únicas atribuições são as de limpeza de CR (:= a partir dela mesma).
+	for _, v := range []string{"DB_USUARIO", "DB_SENHA"} {
+		l := mk.linhaDaVariavel(t, v)
+		assert.Regexp(t, `^`+v+`\s*:=\s*.*\$\(subst \$\(CR\),,\$\(`+v+`\)\)`, l)
+	}
+}
+
+func TestSEC11_Makefile_IncludeEnvEMysqlPwd(t *testing.T) {
+	mk := lerMakefile(t)
+	iInclude := mk.indiceLinha(regexp.MustCompile(`^-include backend/\.env\s*$`))
+	iSubst := mk.indiceLinha(regexp.MustCompile(`^DB_SENHA\s*:=`))
+	iPwd := mk.indiceLinha(regexp.MustCompile(`^MYSQL_PWD\s*=\s*\$\(DB_SENHA\)\s*$`))
+	iMsys := mk.indiceLinha(regexp.MustCompile(`^MSYS2_ENV_CONV_EXCL\s*=\s*MYSQL_PWD\s*$`))
+	iExport := mk.indiceLinha(regexp.MustCompile(`^export\s*$`))
+	iOpts := mk.indiceLinha(regexp.MustCompile(`^MYSQL_OPTS\s*=`))
+
+	for nome, i := range map[string]int{"-include backend/.env": iInclude, "DB_SENHA :=": iSubst, "MYSQL_PWD = $(DB_SENHA)": iPwd,
+		"MSYS2_ENV_CONV_EXCL = MYSQL_PWD": iMsys, "export": iExport, "MYSQL_OPTS": iOpts} {
+		require.GreaterOrEqual(t, i, 0, "linha %q ausente", nome)
+	}
+	assert.Less(t, iInclude, iSubst, "o .env é incluído antes da limpeza de CR")
+	assert.Less(t, iSubst, iPwd)
+	assert.Less(t, iPwd, iExport, "MYSQL_PWD precisa ser exportado")
+	assert.Less(t, iMsys, iExport)
+	assert.Contains(t, mk.linhaDaVariavel(t, "CR"), `$(shell printf '\r')`)
+	// Nada de $(error) por credenciais no parse (help/build/test não exigem
+	// .env); os únicos $(error) são as recusas do BUG-29 (MAKEFLAGS na linha
+	// de comando, ENV_ARQUIVO do ambiente/inválido, sentinela, vars proibidas)
+	// a allowlist de linhas do SEC-59 e os charsets do SEC-63.
+	reErroPermitido := regexp.MustCompile(`\$\(error (BUG-29|SEC-59|SEC-63): `)
+	for _, l := range mk.linhas {
+		if strings.Contains(l, "$(error") {
+			assert.Regexp(t, reErroPermitido, l, "só os $(error) do BUG-29, do SEC-59 e do SEC-63: %s", l)
+		}
+	}
+}
+
+func TestSEC11_Makefile_AlvosDeBancoDependemDeDbCheckEnv(t *testing.T) {
+	mk := lerMakefile(t)
+	require.Contains(t, mk.regras, "db-check-env")
+	assert.True(t, mk.phony["db-check-env"], "db-check-env no .PHONY")
+
+	// A checagem lê as variáveis exportadas pelo shell ($$VAR), sem expandir
+	// a senha no texto do comando (argv do sh).
+	receita := strings.Join(mk.regras["db-check-env"].receita, "\n")
+	assert.Contains(t, receita, `test -n "$$DB_USUARIO" -a -n "$$MYSQL_PWD"`)
+	assert.NotContains(t, receita, "$(DB_SENHA)")
+	assert.Contains(t, receita, "exit 1")
+	assert.Contains(t, receita, "SEC-11: defina DB_USUARIO/DB_SENHA no backend/.env")
+
+	// Diretos: db-create, db-down e db-migrar (CHORE-20: sem db-fix-*/db-revert-*).
+	diretos := []string{"db-create", "db-down", "db-migrar"}
+	sort.Strings(diretos)
+	for a := range mk.regras {
+		assert.False(t, strings.HasPrefix(a, "db-fix-") || strings.HasPrefix(a, "db-revert-"), "CHORE-20: %s saiu (use db-migrar)", a)
+	}
+	for _, a := range diretos {
+		t.Run("direto/"+a, func(t *testing.T) {
+			assert.Contains(t, mk.regras[a].prereqs, "db-check-env")
+			assert.True(t, mk.phony[a], "%s no .PHONY", a)
+		})
+	}
+
+	// Transitivos: db-up/db-seed herdam via db-create.
+	for _, a := range []string{"db-up", "db-seed"} {
+		t.Run("transitivo/"+a, func(t *testing.T) {
+			assert.True(t, mk.dependeDe(a, "db-check-env"))
+		})
+	}
+	// BUG-27: db-reset/db-rebuild chamam db-down e db-seed por sub-make
+	// ($(MAKE) db-down && $(MAKE) db-seed), que exigem o db-check-env.
+	for _, a := range []string{"db-reset", "db-rebuild"} {
+		t.Run("sub-make/"+a, func(t *testing.T) {
+			receita := strings.Join(mk.regras[a].receita, " ")
+			assert.Contains(t, receita, "$(MAKE) RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' db-down && $(MAKE) RP_ENV_PAI='$(ENV_ARQUIVO_LIDO)' db-seed")
+			assert.True(t, mk.dependeDe("db-down", "db-check-env"))
+			assert.True(t, mk.dependeDe("db-seed", "db-check-env"))
+		})
+	}
+
+	// Regra geral: toda receita que chama o cliente do banco (mariadb, mysql,
+	// *-dump, com ou sem .exe) exige db-check-env. Ao menos uma receita precisa
+	// casar, senão o teste ficaria verde vazio (o que aconteceu ao trocar
+	// mysql por mariadb no DB-03).
+	// CHORE-13: as receitas chamam o cliente por $(DB_CLI), que expande para
+	// $(DB_CLIENTE_BIN) $(MYSQL_OPTS) (padrão mariadb); o próprio db-check-env
+	// só roda "$(DB_CLIENTE_BIN) --version" (sem conectar) e fica de fora.
+	assert.Regexp(t, `^DB_CLI\s*=\s*\$\(DB_CLIENTE_BIN\)\s+\$\(MYSQL_OPTS\)\s*$`, mk.linhaDaVariavel(t, "DB_CLI"))
+	assert.Regexp(t, `,mariadb\)\s*$`, mk.linhaDaVariavel(t, "DB_CLIENTE_BIN"), "DB_CLIENTE_BIN cai para mariadb quando vazio")
+	reCliente := regexp.MustCompile(`(^|[\s;&|(@])((mysql|mariadb)(-dump)?(\.exe)?\s|\$\(DB_CLI\)(\s|$))`)
+	casaram := 0
+	for _, a := range mk.ordem {
+		if a == "db-check-env" {
+			continue
+		}
+		for _, l := range mk.regras[a].receita {
+			if reCliente.MatchString(l) {
+				casaram++
+				assert.True(t, mk.dependeDe(a, "db-check-env"), "alvo %s chama o cliente do banco sem db-check-env: %s", a, l)
+				break
+			}
+		}
+	}
+	assert.Greater(t, casaram, 0, "nenhuma receita chama o cliente mariadb: regex desatualizado?")
+
+	// DB-03: o projeto usa o cliente mariadb; nenhuma receita chama o mysql puro.
+	reMysqlPuro := regexp.MustCompile(`(^|[\s;&|(@])mysql(dump|-dump)?(\.exe)?(\s|$)`)
+	for _, a := range mk.ordem {
+		for _, l := range mk.regras[a].receita {
+			assert.NotRegexp(t, reMysqlPuro, l, "alvo %s chama o cliente mysql (use mariadb)", a)
+		}
+	}
+}
+
+func TestSEC11_Makefile_AlvosSemCredenciais(t *testing.T) {
+	mk := lerMakefile(t)
+	for _, a := range []string{"help", "build", "build-api", "test", "test-shared", "test-api", "lint", "dev-frontend", "cover-api", "cover-shared"} {
+		t.Run(a, func(t *testing.T) {
+			require.Contains(t, mk.regras, a)
+			assert.False(t, mk.dependeDe(a, "db-check-env"), "%s não pode exigir credenciais do banco", a)
+		})
+	}
+}
+
+func TestSEC11_Makefile_HelpContinuaAlvoPadrao(t *testing.T) {
+	mk := lerMakefile(t)
+	require.NotEmpty(t, mk.ordem)
+	assert.Equal(t, "help", mk.ordem[0], "o primeiro alvo (padrão do make) deve ser help")
+	assert.Greater(t, mk.regras["db-check-env"].linha, mk.regras["help"].linha, "db-check-env fica depois do help")
+}
+
+// BUG-13: com o "-include backend/.env", $(MAKEFILE_LIST) vale "Makefile backend/.env"; o grep
+// do help com vários arquivos prefixa cada linha com "Makefile:" e o awk
+// mostra o nome do arquivo no lugar do alvo. A receita do help deve ler só o
+// Makefile ($(firstword $(MAKEFILE_LIST))) ou usar grep -h.
+func TestBUG13_Makefile_HelpNaoPrefixaNomeDoArquivo(t *testing.T) {
+	mk := lerMakefile(t)
+	require.Contains(t, mk.regras, "help")
+	receita := strings.Join(mk.regras["help"].receita, "\n")
+	require.Contains(t, receita, "grep", "help lista os alvos via grep")
+
+	reGrepH := regexp.MustCompile(`grep\s+(-[A-Za-z]*h[A-Za-z]*\s+|--no-filename\s+)`)
+	semListaPura := strings.ReplaceAll(receita, "$(firstword $(MAKEFILE_LIST))", "")
+	usaListaPura := strings.Contains(semListaPura, "$(MAKEFILE_LIST)")
+	assert.False(t, usaListaPura && !reGrepH.MatchString(receita),
+		"help não pode passar $(MAKEFILE_LIST) puro ao grep sem -h (com .env vira \"Makefile .env\"): %s", receita)
+}
+
+// Nenhuma receita expande a senha no texto do comando ($(DB_SENHA) ou
+// $(MYSQL_PWD)); só o db-check-env consulta $$MYSQL_PWD (variável do
+// ambiente do shell, fora do argv).
+func TestSEC11_Makefile_SenhaNuncaNoTextoDasReceitas(t *testing.T) {
+	mk := lerMakefile(t)
+	for _, a := range mk.ordem {
+		for _, l := range mk.regras[a].receita {
+			assert.NotContains(t, l, "$(DB_SENHA)", "alvo %s", a)
+			assert.NotContains(t, l, "${DB_SENHA}", "alvo %s", a)
+			assert.NotContains(t, l, "$(MYSQL_PWD)", "alvo %s", a)
+			if a != "db-check-env" {
+				assert.NotContains(t, l, "DB_SENHA", "alvo %s", a)
+				assert.NotContains(t, l, "MYSQL_PWD", "alvo %s", a)
+			}
+		}
+	}
+}
+
+// Todo sql/*.sql referenciado pelo Makefile existe.
+func TestSEC11_Makefile_SqlReferenciadosExistem(t *testing.T) {
+	mk := lerMakefile(t)
+	root := raizProjeto(t)
+	refs := regexp.MustCompile(`sql/[0-9A-Za-z_]+\.sql`).FindAllString(mk.texto, -1)
+	require.NotEmpty(t, refs)
+	for _, r := range refs {
+		assert.FileExists(t, filepath.Join(root, filepath.FromSlash(r)))
+	}
+}
+
+func TestSEC11_SQL_NenhumEnsinaSenhaNoArgv(t *testing.T) {
+	root := raizProjeto(t)
+	arquivos, err := filepath.Glob(filepath.Join(root, "sql", "*.sql"))
+	require.NoError(t, err)
+	require.NotEmpty(t, arquivos)
+	proibidos := []*regexp.Regexp{
+		regexp.MustCompile(`-p\$DB_SENHA`),
+		regexp.MustCompile(`-p"\$DB_SENHA"`),
+		regexp.MustCompile(`-p\$\{DB_SENHA\}`),
+		regexp.MustCompile(`-p\$\(DB_SENHA\)`),
+		regexp.MustCompile(`--password=\$`),
+	}
+	for _, arq := range arquivos {
+		t.Run(filepath.Base(arq), func(t *testing.T) {
+			texto := lerTexto(t, arq)
+			for _, re := range proibidos {
+				assert.NotRegexp(t, re, texto)
+			}
+		})
+	}
+}
+
+// Os scripts de sql/ não ensinam senha no argv nem reabilitam o LOCAL INFILE (SEC-28).
+func TestSEC11_SQL_CabecalhosUsamMysqlPwd(t *testing.T) {
+	root := raizProjeto(t)
+	for _, nome := range []string{"schema.sql", "migracao.sql"} {
+		t.Run(nome, func(t *testing.T) {
+			texto := lerTexto(t, filepath.Join(root, "sql", nome))
+			assert.NotRegexp(t, `(^|\s)-p\S`, texto, "sem -p<senha>")
+			assert.NotContains(t, texto, "--password=")
+			assert.NotContains(t, texto, "--local-infile=1", "SEC-28")
+			assert.NotContains(t, texto, `MYSQL_PWD="$DB_SENHA" mysql`, "DB-03: cliente mariadb")
+		})
+	}
+}
+
+// SEC-12: coluna reuso_detectado_em no schema e exigida como base pelo migracao.sql.
+func TestSEC12_SQL_ReusoDetectadoEm(t *testing.T) {
+	root := raizProjeto(t)
+	ddl := lerTexto(t, filepath.Join(root, "sql", "schema.sql"))
+	assert.Regexp(t, "`?reuso_detectado_em`?\\s+DATETIME\\s+NULL\\s+DEFAULT\\s+NULL", ddl)
+	assert.Contains(t, lerTexto(t, filepath.Join(root, "sql", "migracao.sql")), "COLUMN_NAME = 'reuso_detectado_em'", "guarda da base")
+}
+
+// DB-01: estoque sem a coluna origem; o db-up aplica o schema.sql com estoque
+// depois de produtos (FK de estoque.sku); o migracao.sql recusa banco com origem.
+func TestDB01_Estoque17SemOrigemEAplicadoNoDbUp(t *testing.T) {
+	root := raizProjeto(t)
+	ddl := lerTexto(t, filepath.Join(root, "sql", "schema.sql"))
+
+	ini := strings.Index(ddl, "CREATE TABLE IF NOT EXISTS `estoque`")
+	require.GreaterOrEqual(t, ini, 0)
+	fim := strings.Index(ddl[ini:], ";")
+	require.Greater(t, fim, 0)
+	create := ddl[ini : ini+fim]
+	assert.NotContains(t, create, "`origem`", "a coluna origem saiu do schema")
+	assert.NotRegexp(t, `(?m)^\s*origem\s`, create)
+	assert.NotContains(t, create, "import_csv")
+	assert.Greater(t, ini, strings.Index(ddl, "CREATE TABLE IF NOT EXISTS `produtos`"), "estoque depois de produtos (FK)")
+
+	mk := lerMakefile(t)
+	assert.Contains(t, strings.Join(mk.regras["db-up"].receita, "\n"), "sql/schema.sql")
+	assert.Contains(t, lerTexto(t, filepath.Join(root, "sql", "migracao.sql")), "TABLE_NAME = 'estoque' AND COLUMN_NAME = 'origem'")
+}

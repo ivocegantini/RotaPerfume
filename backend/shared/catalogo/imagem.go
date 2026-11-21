@@ -23,7 +23,7 @@ const (
 
 // padraoNomeImagem é o único formato de nome aceito em disco e no banco:
 // UUID v4 minúsculo + a extensão do tipo DETECTADO. É o mesmo regex do
-// CHECK chk_produtos_imagem (sql/26_alter_produtos_imagem.sql).
+// CHECK chk_produtos_imagem (sql/schema.sql).
 var padraoNomeImagem = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp)$`)
 
 // NomeImagemValido informa se nome segue o padrão <uuid-v4><ext>.

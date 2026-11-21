@@ -12,6 +12,14 @@
 - 2026-11-05: Lotes 35 e 36 (banco descartável `rp-descartavel-l36`; incidente do `MAKEFLAGS=-k` sem escrita).
 - 2026-11-13: Lote 37. 2026-11-14: Lotes 38 (ARQ-09 aplicado na `main`) e 39.
 
+## Avulso de 2026-11-20: CHORE-20 SQL, docs e nomes de testes consolidados
+- SQL: `sql/schema.sql` (tudo na versão atual) + `sql/migracao.sql` (idempotente, `make db-migrar`, único no `Migracoes`; recusa base anterior a 2026-10-31 e `created_at` NULL); seeds `sql/seed_*.sql`; saíram os 46 DDL/alter/revert, o `ordem-ddl.txt` e os ~40 `db-fix/db-revert`. Equivalência provada (schema = base antiga + migração, 2ª execução sem efeito); `db-migrar` 2x no CasaOS.
+- Docs: 12 roteiros por lote → 6 por tipo (`docs/roteiro-teste-*.md`); `arquitetura-ddd`, `manual-base-de-dados`, `deploy-servidor`, `logs-verbose`, `Instal_SSL`, `arq-00` resumidos ao estado atual. Testes: 285 arquivos renomeados por característica (card no comentário); 2640 funções. `make test`, `test-integration`, `lint` e vitest (1935) rc=0.
+- `postman/README.md` resumido (1367 → 416 linhas, as 77 rotas do `rotas.go`) e `README.md` do projeto criado na raiz.
+
+## Avulso de 2026-11-20: DEPLOY-16 `APP_ENV=qa` no Inspirion
+- `APP_ENV=qa` acrescentado pelo usuário ao credential `rotaperfumes-api-env` do Jenkins (simulador de pagamento e selo QA ligados no servidor de QA).
+
 ## Avulso de 2026-11-20: ECOM-19 expiração dos pedidos da loja sem pagamento
 - Job dentro da API (padrão da limpeza do CHORE-02, sem crontab): a cada `LOJA_EXPIRACAO_INTERVAL` (1h; 0 desliga) cancela até 500 pedidos `Aguardando pagamento` com pagamento `Em aberto` vencido antes de hoje (`Cancelado` + `Recusado`), um por tx com lock e reconferência; o shutdown espera o job.
 

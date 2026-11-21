@@ -15,10 +15,10 @@ import (
 
 const arqLoja = "loja.go"
 
-// uqPedidosChaveCheckout é o UNIQUE de sql/35 (ECOM-14).
+// uqPedidosChaveCheckout é o UNIQUE de sql/schema.sql (ECOM-14).
 const uqPedidosChaveCheckout = "uq_pedidos_chave_checkout"
 
-// nomeVendedorLoja é o vendedor do canal Loja (sql/33).
+// nomeVendedorLoja é o vendedor do canal Loja (sql/schema.sql).
 const nomeVendedorLoja = "Loja Online"
 
 // Loja é o adapter das leituras do checkout (porta vendasapp.LojaNaTx),

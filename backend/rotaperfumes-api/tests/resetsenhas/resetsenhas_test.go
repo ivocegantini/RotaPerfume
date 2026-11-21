@@ -4,7 +4,7 @@ package resetsenhas_test
 // O comando inteiro roda sobre o sqlmock e um e-mail falso: simula por
 // padrão (M-03), exige SMTP, para no primeiro e-mail que falha e imprime os
 // e-mails mascarados (NB-7). O caso de uso em si (hash, histórico,
-// revogação) é coberto por tests/services/ops01_reset_senhas_ativos_test.go.
+// revogação) é coberto por tests/services/usuario_reset_senhas_massa_test.go.
 
 import (
 	"bytes"

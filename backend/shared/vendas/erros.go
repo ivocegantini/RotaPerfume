@@ -101,7 +101,7 @@ var (
 	ErrCheckoutSemCliente = kernel.NovoErro(kernel.KindProibido, "apenas clientes da loja podem finalizar compras")
 	// ErrCheckoutChaveEmUso: a chave já é de um pedido de outro cliente.
 	ErrCheckoutChaveEmUso = kernel.NovoErro(kernel.KindConflito, "checkout já utilizado; recarregue a página")
-	// ErrVendedorLojaAusente: falta o vendedor "Loja Online" (sql/33).
+	// ErrVendedorLojaAusente: falta o vendedor "Loja Online" (sql/schema.sql).
 	ErrVendedorLojaAusente = kernel.NovoErro(kernel.KindInterno, "erro interno")
 )
 

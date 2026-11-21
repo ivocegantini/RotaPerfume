@@ -14,8 +14,8 @@
 #      arquivos de sql/, pepper e o destino da senha do admin (nada muda antes)
 #   2. estado do banco: tabela usuarios com linhas = recusa (fail closed),
 #      salvo --forcar, que exige dump recente (BACKUP-01) e digitar o nome do banco
-#   3. DDL na ordem de sql/ordem-ddl.txt (a mesma do make db-up)
-#   4. sql/02_seed_admin.sql e sql/03_seed_vendedores.sql (INSERT IGNORE) e,
+#   3. DDL de sql/schema.sql (a mesma do make db-up)
+#   4. sql/seed_admin.sql e sql/seed_vendedores.sql (INSERT IGNORE) e,
 #      depois, todos os usuarios nao-admin INATIVOS (os 42 vendedores sao
 #      reais; o admin os ativa pelo fluxo de reset de senha da aplicacao)
 #   5. compila o backend/shared/cmd/resetpassword num container GO_IMAGE
@@ -83,8 +83,8 @@ ADMIN_SENHA_ARQ=""
 RAIZ=$(cd "$(dirname "$0")/.." && pwd -P)
 readonly RAIZ
 readonly SQL_DIR="$RAIZ/sql"
-readonly ORDEM_DDL="$SQL_DIR/ordem-ddl.txt"
-readonly SEEDS=(02_seed_admin.sql 03_seed_vendedores.sql)
+readonly SCHEMA_SQL="$SQL_DIR/schema.sql"
+readonly SEEDS=(seed_admin.sql seed_vendedores.sql)
 
 usage() {
   cat <<EOF
@@ -151,11 +151,11 @@ para uma instalacao de teste criada por ele com as mesmas opcoes):
 O que o script faz (nesta ordem):
   1. confere as opcoes, root, docker, container rodando na rede, CA em
      <ssl-dir>/ca.pem, senha em <segredos-dir>/$DB_ADMIN.senha,
-     sql/ordem-ddl.txt e os seeds,
+     sql/schema.sql e os seeds,
      pepper ($PEPPER_MIN_BYTES bytes ou mais) e o destino da senha do admin
   2. recusa se usuarios ja tem linhas (salvo --forcar)
-  3. aplica a DDL na ordem de sql/ordem-ddl.txt (a mesma do make db-up)
-  4. aplica sql/02_seed_admin.sql e sql/03_seed_vendedores.sql e roda
+  3. aplica a DDL de sql/schema.sql (a mesma do make db-up)
+  4. aplica sql/seed_admin.sql e sql/seed_vendedores.sql e roda
      UPDATE usuarios SET ativo = 0 WHERE role <> 'admin'
      (os 42 vendedores sao reais e entram INATIVOS, com hash placeholder;
      o admin os ativa pelo fluxo de reset de senha da aplicacao)
@@ -479,19 +479,8 @@ arquivo_secreto_ok "$SENHA_DB_ARQ" || die "$SENHA_DB_ARQ ausente ou com dono/mod
 SENHA_DB=$(<"$SENHA_DB_ARQ")
 [[ "$SENHA_DB" =~ ^[A-Za-z0-9]{20,}$ ]] || die "senha em $SENHA_DB_ARQ fora do formato [A-Za-z0-9]{20,}"
 
-# sql/ordem-ddl.txt: so nomes de DDL de sql/, todos existentes.
-[[ -r "$ORDEM_DDL" ]] || die "$ORDEM_DDL nao encontrado (rode a partir do checkout do repositorio)"
-DDLS=()
-while IFS= read -r linha || [[ -n "$linha" ]]; do
-  linha=${linha%$'\r'}
-  linha=${linha#"${linha%%[![:space:]]*}"}
-  linha=${linha%"${linha##*[![:space:]]}"}
-  [[ -z "$linha" || "$linha" == \#* ]] && continue
-  [[ "$linha" =~ ^[0-9]{2}_ddl_[a-z_]+\.sql$ ]] || die "linha invalida em $ORDEM_DDL: '$linha' (esperado NN_ddl_nome.sql)"
-  [[ -r "$SQL_DIR/$linha" ]] || die "$SQL_DIR/$linha (listado em $ORDEM_DDL) nao encontrado"
-  DDLS+=("$linha")
-done < "$ORDEM_DDL"
-(( ${#DDLS[@]} > 0 )) || die "$ORDEM_DDL sem nenhum arquivo"
+# sql/schema.sql (schema completo, CHORE-20) e os seeds.
+[[ -s "$SCHEMA_SQL" ]] || die "$SCHEMA_SQL nao encontrado ou vazio (rode a partir do checkout do repositorio)"
 for f in "${SEEDS[@]}"; do
   [[ -r "$SQL_DIR/$f" ]] || die "$SQL_DIR/$f nao encontrado"
 done
@@ -519,7 +508,7 @@ PEPPER=${PEPPER%$'\r'}
 case "$PEPPER" in
   \"*\"|\'*\') aviso "o PASSWORD_PEPPER informado comeca e termina com aspas: confira se elas fazem parte do valor no rotaperfumes-api-env." ;;
 esac
-info "Pre-requisitos OK (container $CONTAINER, rede $REDE_NOME, ${#DDLS[@]} DDL, pepper lido; nada foi impresso)."
+info "Pre-requisitos OK (container $CONTAINER, rede $REDE_NOME, schema.sql, pepper lido; nada foi impresso)."
 
 TRAB=$(mktemp -d "$TRABALHO_DIR/rotaperfumes-seed.XXXXXX") || die "mktemp em $TRABALHO_DIR falhou"
 # TST-17: a area de trabalho e o caminho real, do root, modo 700.
@@ -577,11 +566,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-etapa "DDL (sql/ordem-ddl.txt)"
-for f in "${DDLS[@]}"; do
-  info "Aplicando sql/$f"
-  mariadb_cli "$DB_NOME" < "$SQL_DIR/$f" >/dev/null || die "falhou a DDL sql/$f"
-done
+etapa "DDL (sql/schema.sql)"
+info "Aplicando sql/schema.sql"
+mariadb_cli "$DB_NOME" < "$SCHEMA_SQL" >/dev/null || die "falhou a DDL sql/schema.sql"
 
 # ---------------------------------------------------------------------------
 etapa "Seeds (admin e vendedores) e vendedores inativos"

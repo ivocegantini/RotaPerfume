@@ -1,6 +1,6 @@
 // Package produtos implementa o importador usado por cmd/importprodutos: lê
 // dados/erp/produtos.csv e importa (upsert) os registros na tabela
-// `produtos` (ver sql/10_ddl_produtos.sql).
+// `produtos` (ver sql/schema.sql).
 //
 // Uso (via comando):
 //

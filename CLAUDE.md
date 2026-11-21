@@ -57,6 +57,7 @@ make help          # ver todos os comandos
 make setup-check   # conferir as ferramentas do ambiente (só verifica)
 make setup         # instalar/ajustar as ferramentas (Go, Node, govulncheck, mariadb, Postman CLI)
 make db-reset      # recriar banco
+make db-migrar     # atualizar um banco existente (sql/migracao.sql, idempotente)
 make dev-api       # subir API Go
 make dev-frontend  # subir frontend Next.js
 make test          # rodar testes Go
@@ -69,6 +70,7 @@ Banco: **MariaDB 11.4 LTS** (somente MariaDB; em produção, o container `rotape
 
 - **Dev:** MariaDB 11.8 do CasaOS (`192.168.168.106:3307`, CA `deploy/ca-cert.pem`), no `.env` padrão.
 - **Produção:** `192.168.168.106:3306`. Seed inicial só pelo `deploy/seed-producao.sh` (`docs/deploy-servidor.md` §11). Acesso do admin pelo `backend/.env.producao` (`make <alvo> ENV_ARQUIVO=backend/.env.producao`).
+- **SQL (CHORE-20):** `sql/schema.sql` cria tudo na versão atual (`db-up`, `seed-producao.sh`); `sql/migracao.sql` (idempotente, `make db-migrar`, estágio `Migracoes` do Jenkins) leva um banco existente até ela. Sem revert: volta pelo backup. Seeds em `sql/seed_*.sql`. Mudança de schema = editar os dois arquivos.
 - **Guarda `db-guard-producao` (DEPLOY-07):** recusa os alvos que escrevem no banco contra a produção (host e porta), salvo `CONFIRMO_PRODUCAO=<DB_HOST>/<DB_NAME>` na linha de comando.
 - **SEC-46:** `db-down`, `db-seed`, `db-reset` e `db-rebuild` são recusados **sempre** na produção, mesmo com `CONFIRMO_PRODUCAO`. Fora do loopback, o `DROP DATABASE` exige `CONFIRMAR=<DB_NAME>` na linha de comando (ex.: `CONFIRMAR=rotaperfumes` no CasaOS :3307).
 - **SEC-53:** os segredos do `.env` (ou do `ENV_ARQUIVO`) não chegam aos processos de test, build, lint e npm do Makefile. As `DB_*` só chegam ao `go test` pelo `make test-integration`, que passa pela guarda.
